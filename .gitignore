@@ -1,0 +1,42 @@
+.DS_Store
+*.xcuserstate
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Xcode project schemes
+# Shared schemes are project configuration and should be versioned.
+xcshareddata/WorkspaceSettings.xcsettings
+
+# Build products
+build/
+DerivedData/
+.build/
+.swiftpm/
+
+# Other
+*.moved-aside
+*.swp
+*.xcuserstate
+*.DS_Store
+
+# Swift Package Manager
+
+# Fastlane
+
+
+# Archives
+*.xcarchive
+
+# Local development guidelines (for Cursor/AI assistant use only)
+.cursorrules

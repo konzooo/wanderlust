@@ -6,6 +6,7 @@
 //
 
 import CoreModels
+import DesignSystem
 import Foundation
 import SwiftUI
 
@@ -126,7 +127,7 @@ struct SecretTipCard: View {
         }
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall)
                 .fill(Color.infoCardBkg)
                 .shadow(color: .black.opacity(0.15), radius: 4, x: -5, y: -3)
         )

@@ -110,9 +110,9 @@ struct FeedbackScreen: View {
                 .focused($focusedField, equals: .likes)       // 🔑
                 .font(.kanit(14))
                 .frame(height: 120)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: CGFloat.Radius.compact).stroke(Color.gray.opacity(0.5)))
                 .background(Color.white)
-                .cornerRadius(8)
+                .cornerRadius(CGFloat.Radius.compact)
                 .overlay(
                     Text(store.state.likesDislikes.isEmpty ? "Tell us why…" : "")
                         .font(.kanitItalic(14))
@@ -133,9 +133,9 @@ struct FeedbackScreen: View {
                 .focused($focusedField, equals: .suggestions) // 🔑
                 .font(.kanit(14))
                 .frame(height: 120)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.5)))
+                .overlay(RoundedRectangle(cornerRadius: CGFloat.Radius.compact).stroke(Color.gray.opacity(0.5)))
                 .background(Color.white)
-                .cornerRadius(8)
+                .cornerRadius(CGFloat.Radius.compact)
                 .overlay(
                     Text(store.state.suggestions.isEmpty ? "Tell us why…" : "")
                         .font(.kanitItalic(14))

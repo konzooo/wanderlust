@@ -23,10 +23,10 @@ public struct SecondaryButtonStyle: ButtonStyle {
             .padding(.vertical, internalPadding)
             .padding(.horizontal, internalPadding*1.4)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: CGFloat.Radius.control, style: .continuous)
                     .stroke(Color.appTint, lineWidth: 2)
                     .background(          // subtle blue-tint fill like your cards
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: CGFloat.Radius.control)
                             .fill(Color.blue.opacity(0.06))
                     )
                     .shadow(radius: 2)

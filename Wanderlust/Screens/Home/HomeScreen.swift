@@ -121,7 +121,7 @@ extension HomeScreen {
     var centerImage: some View {
         Image("welcome-card")
             .resizable()
-            .cornerRadius(20)
+            .cornerRadius(CGFloat.Radius.image)
             .padding(.horizontal, 40)
             .frame(height: 360)
     }
@@ -152,7 +152,7 @@ extension HomeScreen {
             if showPlane {
                 Image(systemName: "airplane.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundColor(Color(hex: "#586FF2"))
+                    .foregroundColor(Color.appTint)
                     .frame(maxWidth: .infinity)
                     .rotationEffect(.degrees(rotatePlane ? 360 : 0))
                     .offset(y: planeOffsetY)

@@ -61,7 +61,7 @@ public struct PrimaryButtonStyle: ButtonStyle {
                 .padding(.vertical, 12)
                 .padding(.horizontal, 22)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.control, style: .continuous)
                         .fill(Color.appTint)
                         .shadow(radius: 4)
                 )

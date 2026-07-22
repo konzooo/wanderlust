@@ -8,6 +8,7 @@
 import CoreModels
 import SwiftUI
 import CoreArchitecture
+import DesignSystem
 
 // MARK: - Card
 struct ItineraryCard: View {
@@ -62,7 +63,7 @@ struct ItineraryCard: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall)
                         .fill(Color.blue.opacity(0.12))
                         .shadow(radius: 4)
                 )

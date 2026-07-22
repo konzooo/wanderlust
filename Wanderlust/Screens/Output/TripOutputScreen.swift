@@ -149,7 +149,7 @@ struct TripOutputScreen: View {
                     .foregroundColor(.gray.opacity(0.4))
 
                 Text("No favorites yet")
-                    .font(.kanitLight(30))
+                    .font(DS.Typography.displayLight)
                     .foregroundStyle(Color.gray)
                 
                 Text("Tap the heart icon on items you like!")

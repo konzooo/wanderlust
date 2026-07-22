@@ -56,23 +56,23 @@ extension BasicInfoScreen {
     var titleSubtitle: some View {
         VStack(spacing: 0) {
             Text("Next Trip")
-                .font(.kanit(34))
+                .font(DS.Typography.displayRegular)
             Text("Your unique path starts here")
-                .font(.kanitLight(18))
+                .font(DS.Typography.subtitle)
                 .foregroundColor(Color(.systemGray))
         }
     }
-    
+
     var whiteCardForm: some View {
         VStack(spacing: 0) {
             basicInfoForm
-            
+
             bottomCTA
                 .padding(.top, .Padding.md)
         }
         .padding(24)
         .background(Color.white)
-        .cornerRadius(24)
+        .cornerRadius(CGFloat.Radius.cardLarge)
         .shadow(color: Color(.systemGray4).opacity(0.3), radius: 12, x: 0, y: 4)
     }
 
@@ -80,7 +80,7 @@ extension BasicInfoScreen {
         VStack(alignment: .leading, spacing: 0) {
             // Destination
             Text("Where to?")
-                .font(.kanitMedium(16))
+                .font(DS.Typography.fieldLabel)
                 .padding(.bottom, 10)
 
             destinationTextfield
@@ -88,7 +88,7 @@ extension BasicInfoScreen {
 
             // Group type
             Text("Travel companions?")
-                .font(.kanitMedium(16))
+                .font(DS.Typography.fieldLabel)
                 .padding(.top, 8)
                 .padding(.bottom, 10)
             groupPicker
@@ -99,7 +99,7 @@ extension BasicInfoScreen {
 
             // Duration
             Text("Trip duration?")
-                .font(.kanitMedium(16))
+                .font(DS.Typography.fieldLabel)
                 .padding(.top, 8)
                 .padding(.bottom, 10)
             daysSlider
@@ -108,7 +108,7 @@ extension BasicInfoScreen {
 
             // Month
             Text("Start of your trip?")
-                .font(.kanitMedium(16))
+                .font(DS.Typography.fieldLabel)
                 .padding(.top, 8)
 
             monthsCarousel
@@ -141,9 +141,9 @@ extension BasicInfoScreen {
         .padding(.vertical, .Padding.sm3)
         .padding(.horizontal, .Padding.sm2)
         .background(Color.white)
-        .cornerRadius(12)
+        .cornerRadius(CGFloat.Radius.field)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: CGFloat.Radius.field)
                 .stroke(Color(.systemGray4), lineWidth: 1)
         )
     }

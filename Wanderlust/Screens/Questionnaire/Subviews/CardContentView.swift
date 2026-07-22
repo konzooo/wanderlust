@@ -5,6 +5,7 @@
 //  Created by Rodrigo Mato Castellano on 4/1/25.
 //
 
+import DesignSystem
 import SwiftUI
 
 struct CardContentView: View {
@@ -17,7 +18,7 @@ struct CardContentView: View {
             Image(imageName)
                 .resizable()
                 .scaledToFit()
-                .cornerRadius(10)
+                .cornerRadius(CGFloat.Radius.cardSmall)
                 .shadow(radius: 5)
 
             VStack {

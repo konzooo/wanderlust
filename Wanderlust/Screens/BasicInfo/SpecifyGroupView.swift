@@ -7,6 +7,7 @@
 
 import CoreArchitecture
 import CoreModels
+import DesignSystem
 import SwiftUI
 
 struct SpecifyGroupView: View {
@@ -41,7 +42,7 @@ struct SpecifyGroupView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     Text("Specify your group")
-                        .font(.kanitItalic(22))
+                        .font(DS.Typography.sheetTitle)
                         .frame(alignment: .center)
                         .padding(.bottom, .Padding.md3)
 
@@ -90,7 +91,7 @@ struct SpecifyGroupView: View {
     var averageAgeView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Average Age")
-                .font(.kanitLight(18))
+                .font(DS.Typography.fieldCaption)
 
             TextField("e.g. 35", text: $averageAgeText)
                 .font(.kanitLightItalic(17))
@@ -102,7 +103,7 @@ struct SpecifyGroupView: View {
     var genderView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Gender")
-                .font(.kanitLight(18))
+                .font(DS.Typography.fieldCaption)
 
             Picker("Gender", selection: $genderSelection) {
                 ForEach(Trip.Details.Gender.all, id: \.self) { gender in
@@ -118,7 +119,7 @@ struct SpecifyGroupView: View {
     var customDescriptionView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Custom")
-                .font(.kanitLight(18))
+                .font(DS.Typography.fieldCaption)
 
             PlaceholderTextEditor(
                 text: $customDescription,
@@ -126,11 +127,11 @@ struct SpecifyGroupView: View {
             )
             .frame(height: 100)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: CGFloat.Radius.compact)
                     .stroke(Color.gray.opacity(0.5))
             )
             .background(Color.white)
-            .cornerRadius(8)
+            .cornerRadius(CGFloat.Radius.compact)
             .scrollContentBackground(.hidden)
         }
     }

@@ -24,5 +24,9 @@ public extension Color {
     // Gradient
     static let gradientTop: Self = Color(red: 0.9, green: 0.95, blue: 1.0)
     static let gradientBottom: Self = Color(red: 1.0, green: 0.94, blue: 0.8)
+
+    // Suggestions (alternating section backgrounds)
+    static let suggestionTintA: Self = Color(hex: "#D8E3EE")
+    static let suggestionTintB: Self = Color(hex: "#F1F6FA")
 }
 

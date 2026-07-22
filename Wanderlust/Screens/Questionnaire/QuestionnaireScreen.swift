@@ -55,9 +55,9 @@ struct QuestionnaireScreen: View {
     var titleSubtitle: some View {
         VStack(spacing: 5) {
             Text("What's your style?")
-                .font(.kanit(34))
+                .font(DS.Typography.displayRegular)
             Text("Tap or swipe right/left to choose")
-                .font(.kanitLight(18))
+                .font(DS.Typography.subtitle)
                 .foregroundColor(Color(.systemGray))
         }
     }

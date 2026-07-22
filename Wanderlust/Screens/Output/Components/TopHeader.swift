@@ -65,7 +65,6 @@ struct TopHeader: View {
                 titleAndChipsView
             }
         }
-        .background(Color.red)
         .frame(height: maxHeight)
         .clipped()
     }
@@ -73,7 +72,7 @@ struct TopHeader: View {
     var titleAndChipsView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.kanitMedium(32))
+                .font(DS.Typography.displayMedium)
                 .foregroundColor(.white)
                 .shadow(radius: 4)
             

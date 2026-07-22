@@ -114,7 +114,7 @@ extension TravelTipsView {
         }
         
         var body: some View {
-            let sectionColor = sectionIndex.isMultiple(of: 2) ? Color(hex: "D8E3EE") : Color(hex: "F1F6FA")
+            let sectionColor = sectionIndex.isMultiple(of: 2) ? Color.suggestionTintA : Color.suggestionTintB
             VStack(alignment: .leading, spacing: 10) {
                 // ---------- Header ----------
                 HStack(alignment: .firstTextBaseline, spacing:10) {

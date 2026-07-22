@@ -34,27 +34,27 @@ struct TripCard: View {
                 )
                 .padding(.trailing, 60)
             )
-            .cornerRadius(24)
-            
+            .cornerRadius(CGFloat.Radius.cardLarge)
+
             VStack(alignment: .leading, spacing: 8) {
                 Spacer()
                 
                 Text(trip.details.destination.name)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(DS.Typography.displayBold)
                     .foregroundColor(.white)
                     .shadow(radius: 4)
-                
+
                 HStack(spacing: 8) {
                     Text(trip.details.month.simplified.capitalized)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.kanitMedium(14))
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Color.white.opacity(0.25))
                         .clipShape(Capsule())
-                    
+
                     Text(trip.details.members.groupType.rawValue.capitalized)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.kanitMedium(14))
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -81,10 +81,10 @@ struct TripCard: View {
 //            .padding(12)
         }
         .background(
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge)
                 .fill(Color.white.opacity(0.0001))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24)
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge)
                         .stroke(Color.appTint.opacity(0.4), lineWidth: 2)
                 )
         )

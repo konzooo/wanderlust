@@ -6,6 +6,7 @@
 //
 
 import CoreModels
+import DesignSystem
 import SwiftUI
 
 struct FavouritesListView: View {
@@ -63,9 +64,9 @@ struct FavoriteCard: View {
             heartView()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 6)) // 🔐 Needed to clip ZStack background
+        .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.compact)) // 🔐 Needed to clip ZStack background
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: CGFloat.Radius.field)
                 .stroke(Color.clear, lineWidth: 0) // Optional: Add border if needed
         )
     }

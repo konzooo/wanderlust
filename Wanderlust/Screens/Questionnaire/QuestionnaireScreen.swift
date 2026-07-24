@@ -36,18 +36,15 @@ struct QuestionnaireScreen: View {
         .cleanTopInsets()
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    router.pop()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44, alignment: .leading)
-                        .contentShape(Rectangle())
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    questionnaireBackButton
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
+                .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    questionnaireBackButton
+                }
             }
         }
         .onAppear {
@@ -191,6 +188,19 @@ struct QuestionnaireScreen: View {
                 .underline()
         }
         .foregroundColor(.appTint)
+    }
+
+    private var questionnaireBackButton: some View {
+        Button {
+            router.pop()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Back")
     }
 
     // MARK: Navigation helper

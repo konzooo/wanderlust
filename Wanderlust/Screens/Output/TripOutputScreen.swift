@@ -44,17 +44,15 @@ struct TripOutputScreen: View {
             view
                 .ignoresSafeArea(edges: .vertical)
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: {
-                            store.send(.navigateBack)
-                        }) {
-                            HStack {
-                                Image(systemName: "chevron.left")
-                                Text("Saved Trips")
-                            }
-                            .foregroundColor(.white)
+                    if #available(iOS 26.0, *) {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            outputBackButton
                         }
-                        .buttonStyle(.plain)
+                        .sharedBackgroundVisibility(.hidden)
+                    } else {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            outputBackButton
+                        }
                     }
                 }
         }
@@ -180,6 +178,19 @@ struct TripOutputScreen: View {
             && store.itineraryResponse.isLoaded
             && !hasDismissedOutputOnThisVisit
             && !hasPermanentlyDismissedOutputOnboarding
+    }
+
+    private var outputBackButton: some View {
+        Button {
+            store.send(.navigateBack)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.left")
+                Text("Saved Trips")
+            }
+            .foregroundStyle(.white)
+        }
+        .accessibilityLabel("Back to Saved Trips")
     }
 }
 

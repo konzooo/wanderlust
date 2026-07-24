@@ -1,18 +1,43 @@
 import Combine
 import CoreArchitecture
+import CoreModels
 import DesignSystem
 import Foundation
 import SwiftUI
 
 struct QuestionnaireScreen: View {
 
-    @ObservedObject var store = QuestionnaireStore()
+    @ObservedObject var store: QuestionnaireStore
     @EnvironmentObject var router: NavigationRouter
-    @AppStorage(OnboardingPreferenceKey.questionnaireCardsDismissed) private var hasDismissedCardsOnboarding = false
+    @AppStorage(OnboardingPreferenceKey.questionnaireCardsDismissed) private var hasDismissedSoloCardsOnboarding = false
     @State private var isCardsOnboardingPresented = false
 
     private let swipeSubject = PassthroughSubject<SwipeDirection, Never>()
     private let undoSubject  = PassthroughSubject<Void,          Never>()
+    private let onGroupCompletion: ((MemberPreferences) -> Void)?
+
+    init(
+        mode: QuestionnaireStore.Mode = .solo,
+        onGroupCompletion: ((MemberPreferences) -> Void)? = nil
+    ) {
+        self.store = QuestionnaireStore(mode: mode)
+        self.onGroupCompletion = onGroupCompletion
+    }
+
+    /// The tap/swipe tutorial overlay is solo-only: the group flow's own
+    /// "What's your style?" onboarding (shown once, before this screen) already
+    /// explains tap/swipe, so showing this overlay too would stack two
+    /// onboardings on the same first card.
+    private var hasDismissedCardsOnboarding: Bool {
+        get {
+            if case .group = store.mode { return true }
+            return hasDismissedSoloCardsOnboarding
+        }
+        nonmutating set {
+            guard case .solo = store.mode else { return }
+            hasDismissedSoloCardsOnboarding = newValue
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -122,12 +147,19 @@ struct QuestionnaireScreen: View {
             },
             onEmptyStack: {
                 store.send(.finished)
-                generateItinerary()
-                AnalyticsTracker.shared.log(
-                    .questionnaireFinished(
-                        properties: TripOrganizer.shared.questionnaireEventProperties
+                switch store.mode {
+                case .solo:
+                    generateItinerary()
+                    AnalyticsTracker.shared.log(
+                        .questionnaireFinished(
+                            properties: TripOrganizer.shared.questionnaireEventProperties
+                        )
                     )
-                )
+                case .group:
+                    if let preferences = store.groupPreferences() {
+                        onGroupCompletion?(preferences)
+                    }
+                }
             },
             manualSwipe : swipeSubject.eraseToAnyPublisher(),
             manualUndo  : undoSubject.eraseToAnyPublisher(),

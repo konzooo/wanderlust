@@ -1,0 +1,13 @@
+{
+  "name": "wanderlust-convex-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Convex backend for Wanderlust Group Trips",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy"
+  },
+  "dependencies": {
+    "convex": "^1.17.0"
+  }
+}

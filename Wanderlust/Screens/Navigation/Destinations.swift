@@ -19,6 +19,18 @@ enum Destination: Hashable {
     case itineraryResult(TripOutputStore.State)
     /// The saved trips screen.
     case savedTrips
+    /// The group trip creation screen.
+    case groupCreate
+    /// The group trip members screen, with its state.
+    case groupMembers(GroupTripMembersStore.State)
+    /// The group questionnaire (swipe) screen for a given group.
+    case groupSwipe(groupId: String)
+    /// The live group dashboard for a given group.
+    case groupDashboard(groupId: String)
+    /// The read-only group trip output, with its pre-loaded state.
+    case groupOutput(TripOutputStore.State)
+    /// The join-a-group-trip screen for a given invite code.
+    case groupJoin(code: String)
     /// The feedback screen.
     case feedback
     /// An unknown or deprecated destination, for future-proofing and deep linking.

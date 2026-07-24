@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["REPLACE_TEAM_ID.com.wanderlust.client"],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Group trip invite links open the app on /join/<code>"
+          }
+        ]
+      }
+    ]
+  }
+}

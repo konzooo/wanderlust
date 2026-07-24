@@ -9,6 +9,13 @@ struct SavedTripsScreen: View {
 
     @EnvironmentObject var router: NavigationRouter
     @State private var isDrawerOpen = false
+    @State private var segment: Segment = .myTrips
+    @State private var groupSummaries: [GroupTripSummary] = []
+
+    private enum Segment: String, CaseIterable {
+        case myTrips = "My Trips"
+        case myGroupTrips = "My Group Trips"
+    }
 
     init(store: SavedTripsStore = .init()) {
         self._store = StateObject(wrappedValue: store)
@@ -18,8 +25,21 @@ struct SavedTripsScreen: View {
         VStack(spacing: 0) {
             titleSubtitle
 
-            tripsList
-                .padding(.horizontal, 16)
+            Picker("View", selection: $segment) {
+                ForEach(Segment.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+
+            switch segment {
+            case .myTrips:
+                tripsList
+                    .padding(.horizontal, 16)
+            case .myGroupTrips:
+                groupTripsList
+                    .padding(.horizontal, 16)
+            }
         }
         .gradientBackground()
         .drawerToolbar(
@@ -32,6 +52,7 @@ struct SavedTripsScreen: View {
         // onAppear is only called the first time this screen is shown (not when returning via pop)
         .onAppear {
             store.send(.loadSavedTrips)
+            groupSummaries = GroupTripCredentialsStore.summaries
         }
         // Use onChange to detect when navigation returns to SavedTripsScreen and refresh the data.
         // (SwiftUI NavigationStack does not call onAppear again when popping back to this screen)
@@ -39,8 +60,70 @@ struct SavedTripsScreen: View {
             // If returning to SavedTripsScreen (either as last or only screen), refresh
             if newPath.last == .savedTrips || newPath.isEmpty {
                 store.send(.loadSavedTrips)
+                groupSummaries = GroupTripCredentialsStore.summaries
             }
         }
+    }
+
+    var groupTripsList: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                if groupSummaries.isEmpty {
+                    emptyGroupState
+                } else {
+                    ForEach(groupSummaries) { summary in
+                        Button {
+                            router.goToGroupDashboard(summary.groupId)
+                        } label: {
+                            groupSummaryCard(summary)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private func groupSummaryCard(_ summary: GroupTripSummary) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Color.appTint.opacity(0.12)).frame(width: 48, height: 48)
+                Image(systemName: "person.3.fill").foregroundStyle(Color.appTint)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(summary.name).font(.kanitMedium(17)).foregroundColor(.primary)
+                Text(summary.destination).font(DS.Typography.subtitle).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").foregroundStyle(Color(.systemGray3))
+        }
+        .padding(14)
+        .background(Color(.systemBackground).opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous))
+    }
+
+    private var emptyGroupState: some View {
+        VStack(spacing: 14) {
+            Spacer(minLength: 60)
+            ZStack {
+                Circle().fill(Color.appTint.opacity(0.12)).frame(width: 92, height: 92)
+                Image(systemName: "person.3").font(.system(size: 38)).foregroundStyle(Color.appTint)
+            }
+            Text("No group trips yet").font(DS.Typography.displayLight)
+            Text("Start or join a group trip and it’ll live here.")
+                .font(DS.Typography.subtitle).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).padding(.horizontal, 40)
+            Button { router.goToGroupCreate(resetStack: true) } label: {
+                HStack(spacing: 6) { Image(systemName: "person.3.fill"); Text("Group trip") }
+                    .font(.kanit(17)).foregroundStyle(.white)
+                    .padding(.horizontal, 24).padding(.vertical, 14)
+                    .background(Capsule().fill(Color.appTint))
+            }
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     var titleSubtitle: some View {

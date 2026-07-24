@@ -21,10 +21,13 @@ struct TopHeader: View {
     var saveState: Bool
     /// Save button callback
     let onSaveTapped: (() -> Void)?
-    
+    /// Whether to show the save/bookmark button. Group trips hide it — they
+    /// aren't personal saved trips.
+    var showSaveButton: Bool
+
     /// Maximum header height (in points, not pixels).
     private let maxHeight: CGFloat = 230
-    
+
     // Internal
     var imageCache: any ImageCacheStrategy
 
@@ -33,6 +36,7 @@ struct TopHeader: View {
         title: String,
         chips: [String],
         saveState: Bool,
+        showSaveButton: Bool = true,
         onSaveTapped: (() -> Void)? = nil,
         imageCache: any ImageCacheStrategy = InMemoryImageCacheStrategy.shared
     ) {
@@ -40,6 +44,7 @@ struct TopHeader: View {
         self.title = title
         self.chips = chips
         self.saveState = saveState
+        self.showSaveButton = showSaveButton
         self.onSaveTapped = onSaveTapped
         self.imageCache = imageCache
     }
@@ -78,11 +83,13 @@ struct TopHeader: View {
             
             HStack(spacing: 8) {
                 ForEach(chips, id: \.self) { Chip(text: $0) }
-                
+
                 Spacer()
-                
-                saveButton
-                    .padding(.trailing, 14)
+
+                if showSaveButton {
+                    saveButton
+                        .padding(.trailing, 14)
+                }
             }
         }
         .padding(.bottom, 24)

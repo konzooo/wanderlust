@@ -11,6 +11,7 @@ public enum DrawerRow: Int, CaseIterable {
     case home = 0
     case savedTrips
     case newTrip
+    case groupTrip
     case feedback
     case none
 
@@ -22,6 +23,8 @@ public enum DrawerRow: Int, CaseIterable {
             "Saved trips"
         case .newTrip:
             "Start a new trip"
+        case .groupTrip:
+            "Start or join group trip"
         case .feedback:
             "Give us feedback"
         case .none:
@@ -38,6 +41,8 @@ public enum DrawerRow: Int, CaseIterable {
             "bookmark"
         case .newTrip:
             "plus.circle"
+        case .groupTrip:
+            "person.3"
         case .feedback:
             "bubble.left"
         case .none:

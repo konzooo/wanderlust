@@ -243,7 +243,7 @@ extension BasicInfoScreen {
 /// two-stop linear gradient — same yellow/blue/purple family, more depth.
 /// The dashed curve is a signature touch: a literal "path" tracing across
 /// the background, echoing the "Your unique path starts here" subtitle.
-private struct AuroraBackground: View {
+struct AuroraBackground: View {
     var body: some View {
         ZStack {
             LinearGradient(

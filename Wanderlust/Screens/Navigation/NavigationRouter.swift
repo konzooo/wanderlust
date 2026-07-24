@@ -1,3 +1,4 @@
+import CoreModels
 import SwiftUI
 import DesignSystem
 
@@ -65,6 +66,77 @@ class NavigationRouter: ObservableObject {
         path.append(.itineraryResult(state))
     }
 
+    /// Navigate to the group trip creation screen.
+    func goToGroupCreate(resetStack: Bool = false) {
+        guard path.last != .groupCreate else {
+            return
+        }
+
+        if resetStack {
+            path.removeAll()
+        }
+
+        path.append(.groupCreate)
+    }
+
+    /// Navigate to the group trip members screen.
+    func goToGroupMembers(_ state: GroupTripMembersStore.State, resetStack: Bool = false) {
+        if resetStack {
+            path.removeAll()
+        }
+
+        path.append(.groupMembers(state))
+    }
+
+    /// Navigate to the group questionnaire (swipe) screen.
+    func goToGroupSwipe(_ groupId: String, resetStack: Bool = false) {
+        if resetStack {
+            path.removeAll()
+        }
+        path.append(.groupSwipe(groupId: groupId))
+    }
+
+    /// Navigate to the live group dashboard.
+    func goToGroupDashboard(_ groupId: String, resetStack: Bool = false) {
+        if resetStack {
+            path.removeAll()
+        }
+        guard path.last != .groupDashboard(groupId: groupId) else { return }
+        path.append(.groupDashboard(groupId: groupId))
+    }
+
+    /// Navigate to the read-only group trip output, built from a loaded group.
+    func goToGroupOutput(_ group: GroupDTO) {
+        guard let itinerary = group.itinerary else { return }
+        let month = Month(rawValue: group.startMonth) ?? .january
+        var state = TripOutputStore.State(
+            tripSummary: group.destination.isEmpty ? group.name : group.destination,
+            details: Trip.Details(
+                destination: Place(name: group.destination),
+                members: Trip.Details.Members(groupType: .group),
+                duration: 0,
+                month: month
+            ),
+            mode: .groupTrip
+        )
+        state.itineraryResponse = .loaded(itinerary)
+        if let suggestions = group.suggestions {
+            state.suggestionsResponse = .loaded(suggestions)
+        }
+        if let imageUrl = group.imageUrl, let url = URL(string: imageUrl) {
+            state.imageUrlResponse = .loaded(url)
+        }
+        path.append(.groupOutput(state))
+    }
+
+    /// Navigate to the join-a-group-trip screen for an invite code.
+    func goToGroupJoin(code: String, resetStack: Bool = false) {
+        if resetStack {
+            path.removeAll()
+        }
+        path.append(.groupJoin(code: code))
+    }
+
     /// Navigate to the feedback screen.
     func goToFeedback() {
         guard path.last != .feedback else {
@@ -95,14 +167,28 @@ class NavigationRouter: ObservableObject {
     }
 
     /// Handle a deep link URL and navigate accordingly. Extend this for your deep link structure.
+    ///
+    /// Group invite links are `https://<domain>/join/<code>`. We validate the
+    /// path shape and extract the 5-digit code, then route straight into the
+    /// join screen. Anything else falls through to the existing handlers.
     func handleDeepLink(_ url: URL) {
-        // Example: /feedback, /itinerary, etc.
+        // Handle both the Universal Link form (https://<domain>/join/<code>) and
+        // the dev custom-scheme form (wanderlust://join/<code>) by flattening the
+        // host + path into segments and looking for "join" followed by a code.
+        let segments = ([url.host] + url.pathComponents)
+            .compactMap { $0 }
+            .filter { $0 != "/" }
+        if let joinIndex = segments.firstIndex(of: "join"), joinIndex + 1 < segments.count {
+            let code = segments[joinIndex + 1].filter(\.isNumber)
+            if !code.isEmpty {
+                goToGroupJoin(code: code, resetStack: true)
+                return
+            }
+        }
+
         switch url.path {
         case "/feedback":
             goToFeedback()
-        case "/itinerary":
-            // You would parse query params and create a state here
-            goToUnknown("Deep link to itinerary not yet implemented")
         default:
             goToUnknown("Unknown deep link: \(url.absoluteString)")
         }
@@ -119,6 +205,8 @@ extension NavigationRouter: DrawerNavigating {
             goToSavedTrips()
         case .newTrip:
             goToBasicInfo(resetStack: true)
+        case .groupTrip:
+            goToGroupCreate(resetStack: true)
         case .feedback:
             goToFeedback()
         case .none:

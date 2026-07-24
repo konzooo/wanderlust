@@ -191,6 +191,18 @@ private extension View {
                 BasicInfoScreen()
             case .questionnaire:
                 QuestionnaireScreen()
+            case .groupCreate:
+                GroupTripCreateScreen()
+            case let .groupMembers(state):
+                GroupTripMembersScreen(store: GroupTripMembersStore(initialState: state))
+            case let .groupSwipe(groupId):
+                GroupSwipeScreen(groupId: groupId)
+            case let .groupDashboard(groupId):
+                GroupDashboardScreen(groupId: groupId)
+            case let .groupOutput(state):
+                TripOutputScreen(initialState: state)
+            case let .groupJoin(code):
+                GroupJoinScreen(code: code)
             case let .itineraryResult(state):
                 TripOutputScreen(initialState: state)
             case .feedback:

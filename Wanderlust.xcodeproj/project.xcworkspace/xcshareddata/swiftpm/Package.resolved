@@ -1,5 +1,5 @@
 {
-  "originHash" : "03e8a0aba42497e5d4b725d6b3e8644479664ef518d0448fbb79754ca41ca997",
+  "originHash" : "11583b92f7ea59f534c93d0d05c3531e9128a17faf822d3607bb903cc5bf26e6",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "3b62f154d00019ae29a71e9738800bb6f18b236d",
         "version" : "10.19.2"
+      }
+    },
+    {
+      "identity" : "convex-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/get-convex/convex-swift",
+      "state" : {
+        "revision" : "125b71b2f8725931a5b0e8252f0799ef2adad120",
+        "version" : "0.8.1"
       }
     },
     {

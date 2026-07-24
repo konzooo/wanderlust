@@ -66,6 +66,14 @@ class TripOutputStore: ObservableStore {
     func send(_ action: Action) {
         switch action {
         case .onAppear:
+            // Group trips are display-only: the itinerary/suggestions come
+            // pre-loaded from the Convex action, so we must NEVER invoke the
+            // on-device LLM (that path reads the bundled OpenAI key).
+            if state.mode == .groupTrip {
+                fetchDestinationImage()
+                return
+            }
+
             // Just fetch Itinerary and Suggestions if they are not leaded yet
             if !state.itineraryResponse.isLoaded {
                 generateItinerary()
@@ -73,7 +81,7 @@ class TripOutputStore: ObservableStore {
             if !state.suggestionsResponse.isLoaded {
                 generateSuggestions()
             }
-            
+
             // Always try to fetch Images
             fetchDestinationImage()
             
@@ -96,7 +104,10 @@ class TripOutputStore: ObservableStore {
             }
             
         case .navigateBack:
-            if state.saved {
+            if state.mode == .groupTrip {
+                // Group output is read-only — just return to the dashboard.
+                router?.pop()
+            } else if state.saved {
                 if state.mode == .savedTrip {
                     // Trip is already saved, save changes and navigate back directly
                     reSaveTrip()
@@ -442,6 +453,11 @@ extension TripOutputStore.State {
     enum Mode {
         case newTrip
         case savedTrip
+        /// Read-only display of a group's generated trip. Never triggers
+        /// on-device generation (the itinerary/suggestions are produced by the
+        /// Convex action and passed in pre-loaded) and hides personal
+        /// save/delete affordances.
+        case groupTrip
     }
 }
 

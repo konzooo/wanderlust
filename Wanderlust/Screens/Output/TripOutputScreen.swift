@@ -130,11 +130,9 @@ struct TripOutputScreen: View {
         TopHeader(
             imageUrlState: store.state.imageUrlResponse,
             title: store.fullDestinationString,
-            chips: [
-                TripOrganizer.shared.tripDetails.month.simplified.capitalized,
-                TripOrganizer.shared.tripDetails.members.groupType.rawValue.capitalized
-            ],
-            saveState: store.saved
+            chips: headerChips,
+            saveState: store.saved,
+            showSaveButton: store.state.mode != .groupTrip
         ) {
             if store.state.mode == .savedTrip && store.saved {
                 store.send(.deleteTrip(confirmDeletion: false))
@@ -142,6 +140,15 @@ struct TripOutputScreen: View {
                 store.send(.saveTrip(confirmOverride: false))
             }
         }
+    }
+
+    /// Chips come from the trip's own `details` (not the global `TripOrganizer`
+    /// scratchpad) so a group trip shows its own month/party, not the solo one.
+    private var headerChips: [String] {
+        [
+            store.state.details.month.simplified.capitalized,
+            store.state.details.members.groupType.rawValue.capitalized
+        ]
     }
     
     var retryView: some View {
@@ -186,11 +193,11 @@ struct TripOutputScreen: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left")
-                Text("Saved Trips")
+                Text(store.state.mode == .groupTrip ? "Dashboard" : "Saved Trips")
             }
             .foregroundStyle(.white)
         }
-        .accessibilityLabel("Back to Saved Trips")
+        .accessibilityLabel(store.state.mode == .groupTrip ? "Back to Dashboard" : "Back to Saved Trips")
     }
 }
 

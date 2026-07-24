@@ -8,10 +8,9 @@ import SwiftUI
 
 public struct LoadingView: View {
     @State private var progress: CGFloat
-    @State private var showQuestion1: Bool
-    @State private var showAnswer1: Bool
-    @State private var showQuestion2: Bool
-    @State private var showAnswer2: Bool
+    @State private var currentFactIndex: Int
+    @State private var showQuestion: Bool
+    @State private var showAnswer: Bool
     @State private var rotateIcon: Bool
     let progressWidth: CGFloat = UIScreen.main.bounds.width * 0.8
     let animationDuration = 1.5
@@ -25,10 +24,9 @@ public struct LoadingView: View {
         rotateIcon: Bool = false
     ) {
         self._progress = State(initialValue: progress)
-        self._showQuestion1 = State(initialValue: showQuestion1)
-        self._showAnswer1 = State(initialValue: showAnswer1)
-        self._showQuestion2 = State(initialValue: showQuestion2)
-        self._showAnswer2 = State(initialValue: showAnswer2)
+        self._currentFactIndex = State(initialValue: showQuestion2 || showAnswer2 ? 1 : 0)
+        self._showQuestion = State(initialValue: showQuestion1 || showQuestion2)
+        self._showAnswer = State(initialValue: showAnswer1 || showAnswer2)
         self._rotateIcon = State(initialValue: rotateIcon)
     }
 
@@ -88,16 +86,16 @@ public struct LoadingView: View {
                 Spacer()
 
                 VStack(alignment: .center, spacing: 5) {
-                    if showQuestion1 {
-                        Text("The most visited country in the world?")
+                    if showQuestion {
+                        Text(currentFact.question)
                             .font(.system(size: 14))
                             .italic()
                             .foregroundColor(.black)
                             .transition(.opacity)
                     }
 
-                    if showAnswer1 {
-                        Text("France - with over 80 million visitors annually")
+                    if showAnswer {
+                        Text(currentFact.answer)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(Color(hex: "#586FF2"))
                             .multilineTextAlignment(.center)
@@ -105,61 +103,64 @@ public struct LoadingView: View {
                             .transition(.opacity)
                     }
                 }
-                .padding(.top, -50) // Moves the first fact even higher
-
-                VStack(alignment: .center, spacing: 5) {
-                    if showQuestion2 {
-                        Text("How many time zones does China have?")
-                            .font(.system(size: 14))
-                            .italic()
-                            .foregroundColor(.black)
-                            .transition(.opacity)
-                    }
-
-                    if showAnswer2 {
-                        Text("China only has one time zone - Beijing Time (UTC+8)")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color(hex: "#586FF2"))
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: UIScreen.main.bounds.width * 0.8)
-                            .transition(.opacity)
-                    }
-                }
+                .padding(.top, -50)
 
                 Spacer()
             }
             .padding()
         }
-        .onAppear {
+        .task {
             withAnimation(Animation.linear(duration: animationDuration).repeatForever(autoreverses: true)) {
                 progress = 1.0
             }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation(.easeIn(duration: 1)) {
-                    showQuestion1 = true
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.35)) {
+                    showQuestion = true
                 }
-            }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                withAnimation(.easeIn(duration: 1)) {
-                    showAnswer1 = true
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeIn(duration: 0.35)) {
+                    showAnswer = true
                 }
-            }
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + 7) {
-                withAnimation(.easeIn(duration: 1)) {
-                    showQuestion2 = true
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    showQuestion = false
+                    showAnswer = false
                 }
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
-                withAnimation(.easeIn(duration: 1)) {
-                    showAnswer2 = true
-                }
+                currentFactIndex = (currentFactIndex + 1) % Self.facts.count
             }
         }
     }
+
+    private var currentFact: TravelFact {
+        Self.facts[currentFactIndex]
+    }
+
+    private struct TravelFact: Equatable {
+        let question: String
+        let answer: String
+    }
+
+    private static let facts: [TravelFact] = [
+        .init(question: "How many time zones does China use?", answer: "Just one — the whole country follows China Standard Time."),
+        .init(question: "Which country has the only non-rectangular flag?", answer: "Nepal — its flag is formed from two stacked pennants."),
+        .init(question: "Can a commercial flight last under two minutes?", answer: "Yes — the hop between Westray and Papa Westray in Scotland can take about 90 seconds."),
+        .init(question: "How many islands make up Venice?", answer: "More than 100 small islands, linked by hundreds of bridges."),
+        .init(question: "Which city has the world’s longest urban cable-car network?", answer: "La Paz, Bolivia — its Mi Teleférico lines glide above the city."),
+        .init(question: "Where can you find the world’s largest salt flat?", answer: "Bolivia’s Salar de Uyuni — it becomes a giant mirror after rain."),
+        .init(question: "Why do Icelanders call their country the Land of Fire and Ice?", answer: "It has glaciers, volcanoes, geysers, and geothermal hot springs in one place."),
+        .init(question: "Which continent has no permanent residents?", answer: "Antarctica — scientists and support teams rotate through research stations."),
+        .init(question: "What is a passport’s most powerful feature?", answer: "It is your key to crossing borders, collecting stamps, and starting a new story."),
+        .init(question: "Where does the sun rise first each day?", answer: "Among the first inhabited places to greet it are islands in the Pacific Ocean."),
+        .init(question: "What makes Japan’s rail network famous?", answer: "Its high-speed trains are known for precision, comfort, and remarkable punctuality."),
+        .init(question: "Why is the Great Barrier Reef visible from space?", answer: "It is the world’s largest coral reef system, stretching along Australia’s coast.")
+    ]
 }
 
 struct LoadingScreenView_Previews: PreviewProvider {

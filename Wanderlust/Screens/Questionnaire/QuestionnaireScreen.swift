@@ -8,6 +8,8 @@ struct QuestionnaireScreen: View {
 
     @ObservedObject var store = QuestionnaireStore()
     @EnvironmentObject var router: NavigationRouter
+    @AppStorage(OnboardingPreferenceKey.questionnaireCardsDismissed) private var hasDismissedCardsOnboarding = false
+    @State private var isCardsOnboardingPresented = false
 
     private let swipeSubject = PassthroughSubject<SwipeDirection, Never>()
     private let undoSubject  = PassthroughSubject<Void,          Never>()
@@ -27,11 +29,27 @@ struct QuestionnaireScreen: View {
             Spacer()
 
             bothButton
-                .padding(.bottom, .Spacing.medium)
-//                .padding(, .Spacing.large)
+                .padding(.top, .Spacing.medium)
+                .padding(.bottom, .Spacing.large)
         }
         .gradientBackground()
         .cleanTopInsets()
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    router.pop()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+            }
+        }
         .onAppear {
             store.send(.start)
             AnalyticsTracker.shared.log(.screenViewed(.questionaire))
@@ -115,16 +133,53 @@ struct QuestionnaireScreen: View {
                 )
             },
             manualSwipe : swipeSubject.eraseToAnyPublisher(),
-            manualUndo  : undoSubject.eraseToAnyPublisher()
-        ) { card, _, _ in
+            manualUndo  : undoSubject.eraseToAnyPublisher(),
+            isInteractionEnabled: hasDismissedCardsOnboarding
+        ) { card, _, isTop in
             CardContentView(
                 imageName : card.image,
                 rightText : card.leftText,
                 leftText  : card.rightText
             )
+            .overlay {
+                if isTop && isCardsOnboardingPresented {
+                    QuestionnaireCardOnboardingOverlay {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isCardsOnboardingPresented = false
+                            hasDismissedCardsOnboarding = true
+                        }
+                    }
+                    .transition(
+                        .scale(scale: 0.96)
+                            .combined(with: .opacity)
+                    )
+                }
+            }
             .padding()
         }
+        .environment(
+            \.cardStackConfiguration,
+            CardStackConfiguration(maxVisibleCards: hasDismissedCardsOnboarding ? 5 : 1)
+        )
         .animation(.easeInOut, value: store.state.cardsCompleted)
+        .animation(.easeOut(duration: 0.3), value: hasDismissedCardsOnboarding)
+        .task(id: hasDismissedCardsOnboarding) {
+            guard !hasDismissedCardsOnboarding else {
+                isCardsOnboardingPresented = false
+                return
+            }
+
+            do {
+                try await Task.sleep(nanoseconds: 450_000_000)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
+                isCardsOnboardingPresented = true
+            }
+        }
     }
 
     var bothButton: some View {
@@ -146,6 +201,85 @@ struct QuestionnaireScreen: View {
             mode: .newTrip
         )
         router.goToItineraryResult(state, resetStack: true)
+    }
+}
+
+enum OnboardingPreferenceKey {
+    static let questionnaireCardsDismissed = "onboarding.questionnaireCards.dismissed"
+    static let newTripOutputPermanentlyDismissed = "onboarding.newTripOutput.permanentlyDismissed"
+}
+
+private struct QuestionnaireCardOnboardingOverlay: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall)
+                .fill(Color.black.opacity(0.56))
+                .overlay {
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall)
+                        .stroke(Color(.systemGray2), lineWidth: 2.5)
+                }
+
+            VStack(spacing: 16) {
+                ZStack {
+                    GeometryReader { geometry in
+                        Path { path in
+                            let centerX = geometry.size.width / 2
+                            path.move(to: CGPoint(x: centerX, y: 22))
+                            path.addLine(to: CGPoint(x: centerX, y: geometry.size.height - 4))
+                        }
+                        .stroke(
+                            Color.white.opacity(0.9),
+                            style: StrokeStyle(
+                                lineWidth: 2,
+                                lineCap: .round,
+                                dash: [6, 8]
+                            )
+                        )
+                        .accessibilityHidden(true)
+                    }
+
+                    HStack(spacing: 0) {
+                        swipeDirection(icon: "arrow.left", text: "tap or swipe left")
+                        swipeDirection(icon: "arrow.right", text: "tap or swipe right")
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 54)
+                }
+
+                Button(action: onDismiss) {
+                    Text("Got it")
+                        .font(.headline)
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color(.systemGray5))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .accessibilityHint("Dismisses the card instructions")
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall))
+        .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Choose your style by tapping or swiping left or right")
+    }
+
+    private func swipeDirection(icon: String, text: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 32, weight: .bold))
+            Text(text)
+                .font(.system(size: 15, weight: .semibold))
+                .italic()
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity)
     }
 }
 

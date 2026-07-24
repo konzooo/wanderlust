@@ -78,6 +78,12 @@ class NavigationRouter: ObservableObject {
         path.append(.unknown(message))
     }
 
+    /// Navigate to the internal debug menu.
+    func goToDebugMenu() {
+        guard path.last != .debugMenu else { return }
+        path.append(.debugMenu)
+    }
+
     /// Pop the last screen from the navigation stack.
     func pop() {
         _ = path.popLast()

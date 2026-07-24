@@ -131,7 +131,7 @@ enum OpenAIServiceError: Error {
 
 extension OpenAIService {
     enum Constants {
-        static let APIKey = "REDACTED_OPENAI_KEY_1"
+        static let APIKey = "REMOVED_OPENAI_KEY"
         static let assistantID = "asst_TcB4WiN4enei0jZRqShdJZW6"
 //        static let assistantID = "asst_6eZs6kr3eOhrhl03aBfRu5Pu"
         static let openAIInitialConfiguration = """

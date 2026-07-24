@@ -56,6 +56,7 @@ public struct CardStack<ID: Hashable,
     private let content     : (Data.Element, SwipeDirection?, Bool) -> Content
     private let manualSwipe : AnyPublisher<SwipeDirection, Never>
     private let manualUndo  : AnyPublisher<Void,          Never>
+    private let isInteractionEnabled: Bool
 
     // MARK: Environment
     @Environment(\.cardStackConfiguration) private var configuration
@@ -75,6 +76,7 @@ public struct CardStack<ID: Hashable,
         onEmptyStack: @escaping () -> Void,
         manualSwipe : AnyPublisher<SwipeDirection, Never> = Empty().eraseToAnyPublisher(),
         manualUndo  : AnyPublisher<Void,          Never> = Empty().eraseToAnyPublisher(),
+        isInteractionEnabled: Bool = true,
         cardTapSwipe: Binding<SwipeDirection?>   = .constant(nil),
         @ViewBuilder content: @escaping (Data.Element, SwipeDirection?, Bool) -> Content
     ) {
@@ -86,6 +88,7 @@ public struct CardStack<ID: Hashable,
         self.content      = content
         self.manualSwipe  = manualSwipe
         self.manualUndo   = manualUndo
+        self.isInteractionEnabled = isInteractionEnabled
         self._currentIndex = State(initialValue: data.startIndex)
         self._cardTapSwipe = cardTapSwipe
     }
@@ -98,6 +101,7 @@ public struct CardStack<ID: Hashable,
         onEmptyStack: @escaping () -> Void,
         manualSwipe : AnyPublisher<SwipeDirection, Never> = Empty().eraseToAnyPublisher(),
         manualUndo  : AnyPublisher<Void,          Never> = Empty().eraseToAnyPublisher(),
+        isInteractionEnabled: Bool = true,
         @ViewBuilder content: @escaping (Data.Element, SwipeDirection?, Bool) -> Content
     ) where Data.Element: Hashable, ID == Data.Element {
         self.init(direction: direction,
@@ -107,6 +111,7 @@ public struct CardStack<ID: Hashable,
                   onEmptyStack: onEmptyStack,
                   manualSwipe: manualSwipe,
                   manualUndo: manualUndo,
+                  isInteractionEnabled: isInteractionEnabled,
                   content: content)
     }
 
@@ -122,9 +127,11 @@ public struct CardStack<ID: Hashable,
             }
         }
         .onReceive(manualSwipe) { dir in
+            guard isInteractionEnabled else { return }
             cardTapSwipe = dir
         }
         .onReceive(manualUndo) { _ in
+            guard isInteractionEnabled else { return }
             undoLastSwipe()
         }
     }
@@ -134,6 +141,7 @@ public struct CardStack<ID: Hashable,
         CardView(
             direction  : direction,
             isOnTop    : relativeIndex == 0,
+            isInteractionEnabled: isInteractionEnabled,
             onSwipe    : { dir in
                 handleSwipe(of: data[index], at: index, direction: dir)
             },

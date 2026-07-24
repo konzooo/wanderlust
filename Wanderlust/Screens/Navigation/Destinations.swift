@@ -23,4 +23,6 @@ enum Destination: Hashable {
     case feedback
     /// An unknown or deprecated destination, for future-proofing and deep linking.
     case unknown(String? = nil)
+    /// The internal debug menu (QA toggles, design-in-progress previews). DEBUG builds only.
+    case debugMenu
 }

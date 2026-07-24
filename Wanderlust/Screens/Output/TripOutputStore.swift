@@ -25,27 +25,37 @@ class TripOutputStore: ObservableStore {
     // Navigation
     var router: NavigationRouter?
     
-    private let assistantsService: ItineraryAssistant<Trip.Itinerary> = ItineraryAssistant(
-        openAIClient: OpenAIClient(keyProvider: { try OAKeyManager.fetchAPIKey() }),
-        assistantId: OpenAIConstant.itineraryAssistantID
-    )
-    
-    private let suggestionsService: ItineraryAssistant<Trip.Suggestions> = ItineraryAssistant(
-        openAIClient: OpenAIClient(keyProvider: { try OAKeyManager.fetchAPIKey() }),
-        assistantId: OpenAIConstant.suggestionsAssistantID
-    )
-    
-    private let openAIService: OpenAIService
+    private let itineraryService: any ItineraryGenerating
+    private let suggestionsService: any SuggestionsGenerating
+
     private let imageService: ImageService
-    
+
     init(
         initialState: State,
-        openAIService: OpenAIService = OpenAIService(),
-        imageService: ImageService = UnsplashService()
+        imageService: ImageService = UnsplashService(),
+        itineraryService: (any ItineraryGenerating)? = nil,
+        suggestionsService: (any SuggestionsGenerating)? = nil
     ) {
         state = initialState
-        self.openAIService = openAIService
         self.imageService = imageService
+        self.itineraryService = itineraryService ?? Self.makeItineraryService()
+        self.suggestionsService = suggestionsService ?? Self.makeSuggestionsService()
+    }
+
+    /// Builds the itinerary service, substituting mock data when the debug flag is on.
+    private static func makeItineraryService() -> any ItineraryGenerating {
+        if DebugSettings.useMockTripData {
+            return MockItineraryService()
+        }
+        return TripPlanningServices.itinerary()
+    }
+
+    /// Builds the suggestions service, substituting mock data when the debug flag is on.
+    private static func makeSuggestionsService() -> any SuggestionsGenerating {
+        if DebugSettings.useMockTripData {
+            return MockSuggestionsService()
+        }
+        return TripPlanningServices.suggestions()
     }
     
     func setRouter(_ router: NavigationRouter) {
@@ -252,16 +262,16 @@ extension TripOutputStore {
         }
     }
 
-    /// Fetches and processes the itinerary data from OpenAI.
+    /// Fetches and processes itinerary data from the configured LLM provider.
     /// Updates state independently on the main thread.
     func generateItinerary() {
         state.itineraryResponse = .loading
         Task {
             do {
                 // Fetch and process the itinerary data
-                let response = try await assistantsService.run(userMessage: state.tripSummary) //openAIService.processAssistants(data: state.tripSummary)
+                let response = try await itineraryService.generate(userMessage: state.tripSummary)
                 
-                // Fetch destination Image again with the recognized destination from openAI
+                // Fetch the image again using the destination normalized by the LLM.
                 fetchDestinationImage()
                 
                 // Save itinerary response
@@ -282,7 +292,7 @@ extension TripOutputStore {
         Task {
             do {
                 // Fetch and process the itinerary data
-                let response = try await suggestionsService.run(userMessage: state.tripSummary)
+                let response = try await suggestionsService.generate(userMessage: state.tripSummary)
                 await MainActor.run {
                     state.suggestionsResponse = .loaded(response)
                 }
@@ -434,21 +444,4 @@ extension TripOutputStore.State {
         case savedTrip
     }
 }
-
-private enum OpenAIConstant {
-//    static let APIKey = "REDACTED_OPENAI_KEY_1"
-    
-#if DEBUG
-    static let itineraryAssistantID = "asst_6eZs6kr3eOhrhl03aBfRu5Pu"
-#else
-    static let itineraryAssistantID = "asst_TcB4WiN4enei0jZRqShdJZW6"
-#endif
-    
-#if DEBUG
-    static let suggestionsAssistantID = "asst_h37N5cPCsTH9shtYrPystV7k"
-#else
-    static let suggestionsAssistantID = "asst_HRaOX8m3cHczvden1N1B6Cko"
-#endif
-}
-
 

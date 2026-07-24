@@ -34,6 +34,23 @@ extension Trip {
             case solo
             case family
             case random
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                let rawValue = try container.decode(String.self).lowercased()
+                guard let value = Self(rawValue: rawValue) else {
+                    throw DecodingError.dataCorruptedError(
+                        in: container,
+                        debugDescription: "Unknown suggestion category ID: \(rawValue)"
+                    )
+                }
+                self = value
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
             
             public var iconName: String {
                 switch self {

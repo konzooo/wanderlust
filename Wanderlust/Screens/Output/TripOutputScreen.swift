@@ -16,6 +16,8 @@ struct TripOutputScreen: View {
     
     @State private var isDrawerOpen = false
     @State private var showRemoveFavoriteAlert = false // Local state for alert
+    @State private var hasDismissedOutputOnThisVisit = false
+    @AppStorage(OnboardingPreferenceKey.newTripOutputPermanentlyDismissed) private var hasPermanentlyDismissedOutputOnboarding = false
     
     init(initialState: TripOutputStore.State) {
         self._store = StateObject(wrappedValue: TripOutputStore(initialState: initialState))
@@ -52,8 +54,21 @@ struct TripOutputScreen: View {
                             }
                             .foregroundColor(.white)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
+        }
+
+        .overlay {
+            if shouldShowOutputOnboarding {
+                TripOutputOnboardingOverlay(
+                    onGotIt: { hasDismissedOutputOnThisVisit = true },
+                    onDontShowAgain: {
+                        hasDismissedOutputOnThisVisit = true
+                        hasPermanentlyDismissedOutputOnboarding = true
+                    }
+                )
+            }
         }
 
         .withAlertDialogs(store: store)
@@ -140,24 +155,123 @@ struct TripOutputScreen: View {
     }
     
     var emptyFavoritesView: some View {
-        ZStack {
-            VStack {
-                Spacer()
-                
-                Image(systemName: "heart")
-                    .font(.system(size: 64))
-                    .foregroundColor(.gray.opacity(0.4))
+        VStack(spacing: 10) {
+            Spacer()
 
-                Text("No favorites yet")
-                    .font(DS.Typography.displayLight)
-                    .foregroundStyle(Color.gray)
-                
-                Text("Tap the heart icon on items you like!")
-                    .font(.kanitLight(20))
-                    .foregroundStyle(Color.gray)
-                    .padding(.bottom, 40)
-                
-                Spacer()
+            Image(systemName: "heart")
+                .font(.system(size: 56))
+                .foregroundStyle(Color(.systemGray3))
+
+            Text("No favorites yet")
+                .font(DS.Typography.displayLight)
+                .foregroundStyle(.primary)
+
+            Text("Tap the heart icon on items you like!")
+                .font(.system(size: 16, design: .rounded))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 40)
+
+            Spacer()
+        }
+    }
+
+    private var shouldShowOutputOnboarding: Bool {
+        store.state.mode == .newTrip
+            && store.itineraryResponse.isLoaded
+            && !hasDismissedOutputOnThisVisit
+            && !hasPermanentlyDismissedOutputOnboarding
+    }
+}
+
+private struct TripOutputOnboardingOverlay: View {
+    let onGotIt: () -> Void
+    let onDontShowAgain: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.52)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("How it works")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityAddTraits(.isHeader)
+
+                Spacer(minLength: 24)
+
+                VStack(alignment: .leading, spacing: 28) {
+                    onboardingRow(
+                        icon: "safari",
+                        tint: .appTint,
+                        title: "Discover places and activities",
+                        subtitle: "Explore your itinerary and personalised suggestions"
+                    )
+                    onboardingRow(
+                        icon: "heart",
+                        tint: Color(hex: "#EE6262"),
+                        title: "Like your favourites",
+                        subtitle: "Create your own list by tapping the heart"
+                    )
+                    onboardingRow(
+                        icon: "bookmark",
+                        tint: Color(hex: "#68C86A"),
+                        title: "Save a trip to come back later",
+                        subtitle: "Bookmark your trip to access it anytime."
+                    )
+                }
+
+                Spacer(minLength: 44)
+
+                VStack(spacing: 14) {
+                    Button(action: onGotIt) {
+                        Text("Got it")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.appTint)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    Button(action: onDontShowAgain) {
+                        Text("Don’t show again")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .accessibilityHint("Hides this introduction permanently")
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 30)
+            .frame(maxWidth: 360)
+            .frame(height: 500)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 28))
+            .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
+            .padding(.horizontal, 28)
+        }
+    }
+
+    private func onboardingRow(icon: String, tint: Color, title: String, subtitle: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+                .background(tint.opacity(0.12))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.darkGray)
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -258,4 +372,3 @@ private struct ContentLoadPair: Equatable {
     let itineraryReady : Bool
     let suggestionsReady: Bool
 }
-

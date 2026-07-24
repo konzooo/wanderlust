@@ -17,11 +17,11 @@ struct WanderlustApp: App {
 
     init() {
         DS.applyUniformDesign()
-        
-        // oakey
-        do { try OAKeyManager.installIfNeeded() }
-        catch {
-            print("❌ OpenAI key install error: \(error)")
+
+        do {
+            try OAKeyManager.installIfNeeded()
+        } catch {
+            print("OpenAI key installation failed: \(error.localizedDescription)")
         }
     }
     

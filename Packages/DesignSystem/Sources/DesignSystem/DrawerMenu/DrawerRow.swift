@@ -13,32 +13,33 @@ public enum DrawerRow: Int, CaseIterable {
     case newTrip
     case feedback
     case none
-    
+
     var title: String {
         switch self {
         case .home:
             "Home"
         case .savedTrips:
-            "Saved Trips"
+            "Saved trips"
         case .newTrip:
-            "Start A New Trip"
+            "Start a new trip"
         case .feedback:
-            "Give Us Feedback"
+            "Give us feedback"
         case .none:
             "<invalid>"
         }
     }
-    
+
+    /// SF Symbol name for the row.
     var iconName: String {
         switch self {
         case .home:
-            "drawer-home"
+            "house"
         case .savedTrips:
-            "drawer-saved-trips"
+            "bookmark"
         case .newTrip:
-            "drawer-new-trip"
+            "plus.circle"
         case .feedback:
-            "drawer-feedback"
+            "bubble.left"
         case .none:
             ""
         }

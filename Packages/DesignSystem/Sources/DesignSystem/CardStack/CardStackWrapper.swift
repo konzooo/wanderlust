@@ -55,6 +55,7 @@ where Data: RandomAccessCollection,
     let onEmptyStack: () -> Void
     let manualSwipe : AnyPublisher<SwipeDirection, Never>
     let manualUndo  : AnyPublisher<Void,          Never>
+    let isInteractionEnabled: Bool
     let content     : (Data.Element, SwipeDirection?, Bool) -> Content
 
     // Local tap-to-swipe state
@@ -70,6 +71,7 @@ where Data: RandomAccessCollection,
             onEmptyStack: onEmptyStack,
             manualSwipe : manualSwipe,
             manualUndo  : manualUndo,
+            isInteractionEnabled: isInteractionEnabled,
             cardTapSwipe: $cardTapSwipe,
             content     : contentBuilder
         )
@@ -82,7 +84,7 @@ where Data: RandomAccessCollection,
     {
         ZStack {
             content(element, dir, isTop)
-                .overlay(isTop ? tapOverlay : nil)
+                .overlay(isTop && isInteractionEnabled ? tapOverlay : nil)
         }
     }
 
@@ -111,6 +113,7 @@ public extension CardStackWrapper where Data.Element: Identifiable,
         onEmptyStack: @escaping () -> Void,
         manualSwipe : AnyPublisher<SwipeDirection, Never>,
         manualUndo  : AnyPublisher<Void,          Never> = Empty().eraseToAnyPublisher(),
+        isInteractionEnabled: Bool = true,
         @ViewBuilder content: @escaping (Data.Element, SwipeDirection?, Bool) -> Content
     ) {
         self.init(data        : data,
@@ -120,6 +123,7 @@ public extension CardStackWrapper where Data.Element: Identifiable,
                   onEmptyStack: onEmptyStack,
                   manualSwipe : manualSwipe,
                   manualUndo  : manualUndo,
+                  isInteractionEnabled: isInteractionEnabled,
                   content     : content)
     }
 }

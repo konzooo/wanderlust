@@ -18,28 +18,29 @@ struct SegmentItineraryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Color.clear.frame(height: topContentOffset)
-            Text(segment.title)
+
+            Text(segment.title.withoutLeadingEmoji)
                 .font(.kanitMedium(19))
                 .padding(.leading, .Padding.md)
                 .padding(.trailing, .Padding.sm3)
                 .padding(.bottom, .Padding.sm3)
 
             if let morning = segment.description.morning {
-                ItinerarySegmentView(title: "Morning:", segments: morning, favorites: $favorites)
+                TimeBlock(title: "Morning", icon: "sunrise.fill", items: morning, favorites: $favorites)
                     .padding(.leading, .Padding.md)
                     .padding(.trailing, .Padding.sm3)
                     .padding(.bottom, .Padding.sm2)
             }
 
             if let afternoon = segment.description.afternoon {
-                ItinerarySegmentView(title: "Afternoon:", segments: afternoon, favorites: $favorites)
+                TimeBlock(title: "Afternoon", icon: "sun.max.fill", items: afternoon, favorites: $favorites)
                     .padding(.leading, .Padding.md)
                     .padding(.trailing, .Padding.sm3)
                     .padding(.bottom, .Padding.sm2)
             }
 
             if let evening = segment.description.evening {
-                ItinerarySegmentView(title: "Evening:", segments: evening, favorites: $favorites)
+                TimeBlock(title: "Evening", icon: "moon.stars.fill", items: evening, favorites: $favorites)
                     .padding(.leading, .Padding.md)
                     .padding(.trailing, .Padding.sm3)
                     .padding(.bottom, .Padding.lg)
@@ -56,45 +57,46 @@ struct SegmentItineraryView: View {
     }
 }
 
-// MARK: - Segment list
-struct ItinerarySegmentView: View {
+// MARK: - Time-of-day block (Morning / Afternoon / Evening)
+struct TimeBlock: View {
     let title: String
-    let daySegments: [LocationLinkableText]
+    let icon: String
+    let items: [LocationLinkableText]
     @Binding var favorites: Trip.Favorites
 
-    init(title: String, segments: [LocationLinkableText], favorites: Binding<Trip.Favorites>) {
-        self.title = title
-        self.daySegments = segments
-        self._favorites = favorites
-    }
-    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.kanit(18))
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.appTint)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+            }
 
-            ForEach(daySegments, id: \.text) { segment in
-                ZStack(alignment: .topLeading) {
-                    Text("• \(segment.linkedText)")
-                        .font(.kanit(16))
-                        .padding(.leading, .Spacing.medium)
-                        .padding(.trailing, 30) // Reduced from 60 to allow text closer to heart
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            favorites.toggle(segment.id)
-                        }) {
-                            HeartIcon(isFavorited: favorites.contains(segment.id))
-                        }
-                        .padding(.trailing, -8) // Move 20px more to the right so it's better aligned to the outside (was 12)
-                        .padding(.top, 4)
+            ForEach(items, id: \.id) { item in
+                HStack(alignment: .top, spacing: 10) {
+                    Circle()
+                        .fill(Color.appTint.opacity(0.5))
+                        .frame(width: 5, height: 5)
+                        .padding(.top, 8)
+
+                    Text(item.linkedText)
+                        .font(.system(size: 15.5, design: .rounded))
+                        .foregroundStyle(.primary)
+
+                    Spacer(minLength: 8)
+
+                    Button {
+                        favorites.toggle(item.id)
+                    } label: {
+                        HeartIcon(isFavorited: favorites.contains(item.id))
                     }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, 2)
                 }
             }
         }
+        .padding(.top, .Spacing.small)
     }
 }
 
@@ -103,54 +105,50 @@ struct SecretTipCard: View {
     let secretTip: Trip.Itinerary.SecretTip
     @Binding var favorites: Trip.Favorites
 
-    init(secretTip: Trip.Itinerary.SecretTip, favorites: Binding<Trip.Favorites>) {
-        self.secretTip = secretTip
-        self._favorites = favorites
-    }
-    
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("☝🏻")
-                .font(.system(size: 28))
-                .padding(.leading, .Spacing.medium)
-                .padding(.top, .Padding.md2)
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Secret Tip")
-                    .font(.kanitMediumItalic(18))
-
-                Text(secretTip.linkedText)
-                    .font(.kanit(16))
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.appTint.opacity(0.14))
+                    .frame(width: 34, height: 34)
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.appTint)
             }
-            .padding(.trailing, .Spacing.medium)
-            .padding(.vertical, .Spacing.medium)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Secret tip")
+                    .font(.kanitMediumItalic(15))
+                    .foregroundStyle(Color.appTint)
+                Text(secretTip.linkedText)
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall)
-                .fill(Color.infoCardBkg)
-                .shadow(color: .black.opacity(0.15), radius: 4, x: -5, y: -3)
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                .fill(Color.appTint.opacity(0.07))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                .stroke(Color.appTint.opacity(0.18), lineWidth: 1)
         )
     }
 }
 
-struct TextWithLink: View {
-    var body: some View {
-        // Compose the sentence with a tappable link using AttributedString
-        Text(buildAttributedString())
-            .font(.body)
-    }
-
-    private func buildAttributedString() -> AttributedString {
-        var string = AttributedString("End your night with a quiet drink at Dr. Stravinsky, a hidden cocktail bar in El Born.")
-
-        if let range = string.range(of: "Dr. Stravinsky") {
-            string[range].link = URL(string: "https://www.google.com/search?q=Dr.+Stravinsky+Barcelona")
-            string[range].foregroundColor = .blue
-            string[range].underlineStyle = .single
+private extension String {
+    /// Drops any leading emoji / symbol characters (and following whitespace)
+    /// so an LLM-supplied "🏙️ Day 1: …" renders as "Day 1: …".
+    var withoutLeadingEmoji: String {
+        var result = self
+        while let first = result.first, !(first.isLetter || first.isNumber) {
+            result.removeFirst()
         }
-
-        return string
+        return result
     }
 }
 

@@ -17,7 +17,7 @@ struct FavouritesListView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 14) {
                 ForEach(favorites, id: \.id) { favoriteItem in
                     FavoriteCard(
                         favoriteItem: favoriteItem,
@@ -25,13 +25,10 @@ struct FavouritesListView: View {
                         onRemoveFavorite: onRemoveFavorite
                     )
                 }
-                
-                Spacer()
             }
             .padding(20)
         }
-        .background(Color(red: 1.0, green: 0.97, blue: 0.97))//Color(red: 255/255, green: 250/255, blue: 240/255)) // very soft beige
-
+        .background(Color(.systemGroupedBackground))
     }
 }
 
@@ -41,58 +38,41 @@ struct FavoriteCard: View {
     let onRemoveFavorite: (UUID) -> Void
 
     var body: some View {
-        ZStack {
-            // Alternating background colors using #586FF2
-            Color(red: 228/255, green: 227/255, blue: 254/255) // light purple-ish
-            
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(favoriteItem.text.linkedText)
-                    .font(.kanit(16))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 15.5, design: .rounded))
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Context information in grey italic text - following existing UI patterns
+
                 Text(favoriteItem.context)
                     .font(.kanitItalic(14))
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
-            .padding(.trailing, 25) // Reduced from 40 to allow text closer to heart
-            
-            // Heart in BOTTOM right corner
-            heartView()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.compact)) // 🔐 Needed to clip ZStack background
-        .overlay(
-            RoundedRectangle(cornerRadius: CGFloat.Radius.field)
-                .stroke(Color.clear, lineWidth: 0) // Optional: Add border if needed
-        )
-    }
-    
-    private func heartView() -> some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                
-                Button(action: {
-                    onRemoveFavorite(favoriteItem.id)
-                }) {
-                    HeartIcon(
-                        size: 24, // Increased from 16.8 to 24 for better visibility
-                        isFavorited: isFavorited
-                    )
+
+            Spacer(minLength: 8)
+
+            Button {
+                onRemoveFavorite(favoriteItem.id)
+            } label: {
+                HeartIcon(size: 22, isFavorited: isFavorited)
                     .frame(width: 44, height: 44) // Minimum tap target size
-                }
-                .buttonStyle(PlainButtonStyle()) // Ensure no default button styling interferes
-                .padding(.trailing, 12)
-                .padding(.bottom, 12)
-                .background(Color.clear) // Ensure the button area is clear
-                .contentShape(Rectangle()) // Make the entire button area tappable
             }
+            .buttonStyle(PlainButtonStyle())
+            .contentShape(Rectangle())
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
     }
 }
 
@@ -100,23 +80,23 @@ struct FavoriteCard: View {
     FavouritesListView(
         favorites: [
             TripOutputStore.FavoriteWithContext(
-                id: UUID(), 
-                text: LocationLinkableText(text: "Catch the Sant Joan Festival — beach bonfires, fireworks, and all-night energy in late June."), 
+                id: UUID(),
+                text: LocationLinkableText(text: "Catch the Sant Joan Festival — beach bonfires, fireworks, and all-night energy in late June."),
                 context: "Evening"
             ),
             TripOutputStore.FavoriteWithContext(
-                id: UUID(), 
-                text: LocationLinkableText(text: "Visit the Picasso Museum."), 
+                id: UUID(),
+                text: LocationLinkableText(text: "Visit the Picasso Museum."),
                 context: "Afternoon"
             ),
             TripOutputStore.FavoriteWithContext(
-                id: UUID(), 
-                text: LocationLinkableText(text: "Grab a coffee at Surf House Barcelona."), 
+                id: UUID(),
+                text: LocationLinkableText(text: "Grab a coffee at Surf House Barcelona."),
                 context: "Morning"
             ),
             TripOutputStore.FavoriteWithContext(
-                id: UUID(), 
-                text: LocationLinkableText(text: "Try the hot chocolate with churros at La Nena."), 
+                id: UUID(),
+                text: LocationLinkableText(text: "Try the hot chocolate with churros at La Nena."),
                 context: "Secret Tip"
             )
         ],

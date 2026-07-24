@@ -74,13 +74,28 @@ struct DrawerMenu: View {
     
     private var drawerView: some View {
         HStack {
-            ZStack {
-                Rectangle()
-                    .fill(.white)
-                    .frame(width: totalWidth)
-                    .shadow(color: .green.opacity(0.1), radius: 5, x: 0, y: 3)
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(DrawerRow.allCases.filter{ $0 != .none }, id: \.self) { row in
+            VStack(alignment: .leading, spacing: 0) {
+                // Branded header
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.appTint.opacity(0.12))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "airplane.departure")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.appTint)
+                    }
+                    Text("Wanderlust")
+                        .font(.kanit(22))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 64)
+                .padding(.bottom, 18)
+
+                Divider().padding(.horizontal, 20)
+
+                VStack(spacing: 4) {
+                    ForEach(DrawerRow.allCases.filter { $0 != .none }, id: \.self) { row in
                         RowView(
                             isSelected: selected == row,
                             icon: row.iconName,
@@ -91,13 +106,17 @@ struct DrawerMenu: View {
                             viewModel.closeDrawer(with: $isOpen)
                         }
                     }
-                    Spacer()
                 }
-                .padding(.top, 100)
-                .frame(width: totalWidth)
-                .background(Color.white)
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+
+                Spacer()
             }
-            .padding(.top, 15)
+            .frame(width: totalWidth)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(Color(.systemBackground))
+            .ignoresSafeArea()
+            .shadow(color: .black.opacity(0.18), radius: 20, x: 6, y: 0)
             .offset(x: viewModel.drawerOffset(isActive: isOpen, width: totalWidth))
             Spacer()
         }
@@ -108,7 +127,7 @@ struct DrawerMenu: View {
 private extension DrawerMenu {
     /// Constants for drawer configuration
     enum Constants {
-        static let drawerWidth: CGFloat = 220
+        static let drawerWidth: CGFloat = 280
         static let edgeDragWidth: CGFloat = 40
         static let spring = Animation.spring(response: 0.4, dampingFraction: 0.85, blendDuration: 0.5)
     }
@@ -170,36 +189,34 @@ extension DrawerMenu {
         hideDivider: Bool = false,
         onTap: @escaping (()->())
     ) -> some View{
-        Button{
+        // "Give us feedback" keeps its green identity regardless of selection;
+        // every other row follows the normal selected/unselected tint.
+        let tint: Color = row == .feedback ? .green : (isSelected ? .appTint : .primary)
+
+        return Button {
             onTap()
         } label: {
-            HStack(spacing: 10){
-                Rectangle()
-                    .fill(isSelected ? Color.appTint.opacity(0.4) : .white)
-                    .frame(width: 5)
-                    .padding(.trailing, 15)
-                
-                Image(icon)
-                    .resizable()
-                    .renderingMode(.template)
-                    .foregroundColor(
-                        isSelected ? .appTint : (row == .feedback ? Color.green : Color(UIColor.darkGray))
-                    )
-                    .frame(width: 24, height: 32)
-                
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 26)
+
                 Text(title)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(
-                        isSelected ? .appTint : (row == .feedback ? Color.green : Color(UIColor.darkGray))
-                    )
-                
+                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                    .lineLimit(1)
+
                 Spacer()
             }
+            .foregroundStyle(tint)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? Color.appTint.opacity(0.12) : Color.clear)
+            )
+            .contentShape(Rectangle())
         }
-        .frame(height: 50)
-        .background(
-            isSelected ? Color.appTint.opacity(0.2) : .white
-        )
+        .buttonStyle(.plain)
     }
 }
 

@@ -57,6 +57,7 @@ extension CardStack {
         // Immutable
         let direction   : (Double) -> SwipeDirection?
         let isOnTop     : Bool
+        let isInteractionEnabled: Bool
         let onSwipe     : (SwipeDirection) -> Void
         let content     : (SwipeDirection?) -> ContentView
         let reentryFrom : SwipeDirection?
@@ -76,11 +77,11 @@ extension CardStack {
                     .onAppear { cardWidth = geo.size.width }
                     .offset(translation)
                     .rotationEffect(rotation(in: geo))
-                    .simultaneousGesture(isOnTop ? dragGesture(in: geo) : nil)
+                    .simultaneousGesture(isOnTop && isInteractionEnabled ? dragGesture(in: geo) : nil)
             }
             .transition(customTransition)
             .onChange(of: cardTapSwipe) { _, new in
-                guard let dir = new, isOnTop else { return }
+                guard let dir = new, isOnTop, isInteractionEnabled else { return }
                 performTapSwipe(dir)
             }
         }

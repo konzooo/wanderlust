@@ -9,27 +9,17 @@ struct SavedTripsScreen: View {
 
     @EnvironmentObject var router: NavigationRouter
     @State private var isDrawerOpen = false
-        
+
     init(store: SavedTripsStore = .init()) {
         self._store = StateObject(wrappedValue: store)
     }
-    
+
     var body: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [Color(.systemGray6), Color(.systemYellow).opacity(0.1)]),
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                titleSubtitle
-                
-                tripsList
-                    .padding(.horizontal, 16)
-                
-                Spacer()
-            }
+        VStack(spacing: 0) {
+            titleSubtitle
+
+            tripsList
+                .padding(.horizontal, 16)
         }
         .gradientBackground()
         .drawerToolbar(
@@ -38,7 +28,7 @@ struct SavedTripsScreen: View {
             router: router,
             trailingButton: AnyView(plusButton)
         )
-        
+
         // onAppear is only called the first time this screen is shown (not when returning via pop)
         .onAppear {
             store.send(.loadSavedTrips)
@@ -52,23 +42,29 @@ struct SavedTripsScreen: View {
             }
         }
     }
-    
+
     var titleSubtitle: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 2) {
             Text("Saved Trips")
                 .font(.kanit(34))
+
+            if case let .loaded(trips) = store.state.savedTrips, !trips.isEmpty {
+                Text(trips.count == 1 ? "1 trip" : "\(trips.count) trips")
+                    .font(DS.Typography.subtitle)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.top, 8)
+        .padding(.bottom, 14)
     }
-    
+
     var tripsList: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 18) {
                 switch store.state.savedTrips {
                 case let .loaded(trips):
                     if trips.isEmpty {
-                        Text("No saved trips yet.")
-                            .foregroundColor(.secondary)
-                            .padding(.top, 40)
+                        emptyState
                     } else {
                         ForEach(trips) { trip in
                             Button(action: { navigateToTripDetails(trip) }) {
@@ -77,21 +73,60 @@ struct SavedTripsScreen: View {
                             .buttonStyle(PlainButtonStyle())
                         }
                     }
-                    
+
                 case .loading, .initial:
                     ProgressView("Loading trips...")
                         .padding(.top, 40)
-                    
+
                 case let .error(error):
                     Text("Failed to load trips: \(error.localizedDescription)")
                         .foregroundColor(.red)
                         .padding(.top, 40)
                 }
             }
-            .padding(.top, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 24)
         }
     }
-    
+
+    var emptyState: some View {
+        VStack(spacing: 14) {
+            Spacer(minLength: 60)
+            ZStack {
+                Circle()
+                    .fill(Color.appTint.opacity(0.12))
+                    .frame(width: 92, height: 92)
+                Image(systemName: "suitcase.rolling")
+                    .font(.system(size: 40, weight: .regular))
+                    .foregroundStyle(Color.appTint)
+            }
+            Text("No trips yet")
+                .font(DS.Typography.displayLight)
+            Text("Plan your first adventure and it’ll live here.")
+                .font(DS.Typography.subtitle)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            Button {
+                router.goToBasicInfo(resetStack: true)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Plan a trip")
+                }
+                .font(.kanit(17))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(Capsule().fill(Color.appTint))
+                .shadow(color: Color.appTint.opacity(0.3), radius: 12, y: 6)
+            }
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     var plusButton: some View {
         Button(action: {
             // Navigate to new trip flow
@@ -103,12 +138,12 @@ struct SavedTripsScreen: View {
                 .foregroundColor(.appTint)
         }
     }
-    
+
     // should be part of a Store Action
     func navigateToTripDetails(_ trip: Trip) {
         let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
             .loaded(trip.suggestions!) : .initial
-        
+
         let state = TripOutputStore.State(
             tripSummary: trip.details.destination.name,
             details: trip.details,
@@ -119,7 +154,7 @@ struct SavedTripsScreen: View {
             itineraryResponse: .loaded(trip.itinerary),
             suggestionsResponse: suggestions
         )
-        
+
         router.goToItineraryResult(state, resetStack: false)
     }
 }

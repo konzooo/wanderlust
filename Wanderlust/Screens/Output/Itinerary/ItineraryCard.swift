@@ -20,6 +20,7 @@ struct ItineraryCard: View {
         self.tripItinerary = tripItinerary
         self._favorites = favorites
     }
+
     var body: some View {
         ZStack {
             switch tripItinerary {
@@ -46,16 +47,14 @@ struct ItineraryCard: View {
             case .loaded(let itinerary):
                 ZStack(alignment: .top) {
                     PageIndicator(currentPage: currentPage, totalPages: itinerary.segments.count)
-                        .shadow(color: .black.opacity(0.5), radius: 4)
-                        .scaleEffect(1.3)
                         .padding(.top, .Padding.md)
                         .padding(.bottom, .Padding.sm3)
-                    
+
                     TabView(selection: $currentPage) {
                         ForEach(itinerary.segments.indices, id: \ .self) { index in
                             let segment = itinerary.segments[index]
                             ScrollView {
-                                SegmentItineraryView(segment: segment, topContentOffset: 50, favorites: $favorites)
+                                SegmentItineraryView(segment: segment, topContentOffset: 46, favorites: $favorites)
                             }
                             .tag(index)
                         }
@@ -63,10 +62,14 @@ struct ItineraryCard: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }
                 .background(
-                    RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall)
-                        .fill(Color.blue.opacity(0.12))
-                        .shadow(radius: 4)
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge, style: .continuous)
+                        .fill(.thinMaterial)
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge, style: .continuous)
+                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.10), radius: 16, y: 8)
                 .frame(maxWidth: .infinity)
                 .transition(
                     .move(edge: .bottom)
@@ -90,10 +93,11 @@ struct PageIndicator: View {
         HStack(spacing: 8) {
             ForEach(0..<totalPages, id: \.self) { index in
                 Circle()
-                    .frame(width: 8, height: 8)
-                    .foregroundColor(index == currentPage ? .appTint : .appTint.opacity(0.28))
+                    .frame(width: 6, height: 6)
+                    .foregroundStyle(index == currentPage ? Color.appTint : Color.appTint.opacity(0.25))
             }
         }
+        .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
     }
 }
 

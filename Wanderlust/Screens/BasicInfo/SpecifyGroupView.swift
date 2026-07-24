@@ -39,22 +39,23 @@ struct SpecifyGroupView: View {
     // MARK: View
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    Text("Specify your group")
-                        .font(DS.Typography.sheetTitle)
-                        .frame(alignment: .center)
-                        .padding(.bottom, .Padding.md3)
+            ZStack {
+                SoftBackground()
 
-                    formView
+                ScrollView {
+                    VStack(spacing: 0) {
+                        header
+                            .padding(.top, 4)
+                            .padding(.bottom, 20)
 
-                    Spacer()
+                        formCard
+                    }
+                    .padding(.horizontal, .Padding.md3)
+                    .padding(.bottom, .Padding.md3)
                 }
             }
-            .background(Color.popoverBackground)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
@@ -71,39 +72,66 @@ struct SpecifyGroupView: View {
                         )
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                 }
             }
             .tint(Color.appTint)
         }
     }
 
-    var formView: some View {
-        VStack(alignment: .leading, spacing: .Padding.md2) {
-            averageAgeView
-
-            genderView
-
-            customDescriptionView
+    var header: some View {
+        VStack(spacing: 4) {
+            Text("Specify your group")
+                .font(DS.Typography.sheetTitle)
+            Text("Helps us tailor suggestions to your crew")
+                .font(.kanitLight(13))
+                .foregroundColor(Color(.systemGray))
         }
-        .padding(.horizontal, .Padding.md3)
+    }
+
+    var formCard: some View {
+        DS.GlassCard {
+            VStack(alignment: .leading, spacing: 16) {
+                averageAgeView
+                cardDivider
+                genderView
+                cardDivider
+                customDescriptionView
+            }
+        }
+    }
+
+    var cardDivider: some View {
+        Divider().overlay(Color.white.opacity(0.5))
+    }
+
+    func sectionLabel(_ text: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.appTint)
+            Text(text)
+                .font(DS.Typography.fieldLabel)
+        }
     }
 
     var averageAgeView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Average Age")
-                .font(DS.Typography.fieldCaption)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("Average age", icon: "number.circle.fill")
 
             TextField("e.g. 35", text: $averageAgeText)
-                .font(.kanitLightItalic(17))
+                .font(.kanit(17).weight(.medium))
                 .keyboardType(.numberPad)
-                .textFieldStyle(.roundedBorder)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 14)
+                .background(Color.white.opacity(0.9))
+                .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.field, style: .continuous))
         }
     }
 
     var genderView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Gender")
-                .font(DS.Typography.fieldCaption)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("Gender", icon: "person.fill")
 
             Picker("Gender", selection: $genderSelection) {
                 ForEach(Trip.Details.Gender.all, id: \.self) { gender in
@@ -113,25 +141,22 @@ struct SpecifyGroupView: View {
             }
             .pickerStyle(.segmented)
             .tint(Color.appTint)
+            .frame(height: 40)
         }
     }
 
     var customDescriptionView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Custom")
-                .font(DS.Typography.fieldCaption)
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("Anything else?", icon: "text.bubble.fill")
 
             PlaceholderTextEditor(
                 text: $customDescription,
                 placeholder: "e.g. 4 girls in a bachelorette weekend!"
             )
             .frame(height: 100)
-            .overlay(
-                RoundedRectangle(cornerRadius: CGFloat.Radius.compact)
-                    .stroke(Color.gray.opacity(0.5))
-            )
-            .background(Color.white)
-            .cornerRadius(CGFloat.Radius.compact)
+            .padding(8)
+            .background(Color.white.opacity(0.9))
+            .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.field, style: .continuous))
             .scrollContentBackground(.hidden)
         }
     }
@@ -150,16 +175,30 @@ struct PlaceholderTextEditor: View {
         ZStack(alignment: .topLeading) {
             TextEditor(text: $text)
                 .font(.kanitLight(17))
-                .background(Color.white)
-                .padding(4)
+                .background(Color.clear)
 
             if text.isEmpty {
                 Text(placeholder)
                     .font(.kanitLightItalic(17))
                     .foregroundColor(.gray.opacity(0.5))
-                    .padding(.top, 12)
-                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 5)
+                    .allowsHitTesting(false)
             }
         }
+    }
+}
+
+/// Calmer, unblurred version of the app's blue/purple/yellow gradient family —
+/// enough to tie this sheet visually to Next Trip without competing with the
+/// small form for attention.
+private struct SoftBackground: View {
+    var body: some View {
+        LinearGradient(
+            colors: [Color.gradientTop, Color.white, Color.gradientBottom],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
     }
 }

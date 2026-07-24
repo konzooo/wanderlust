@@ -26,6 +26,7 @@ DerivedData/
 
 # Other
 *.moved-aside
+*.bak
 *.swp
 *.xcuserstate
 *.DS_Store

@@ -111,6 +111,11 @@ extension HomeScreen {
             .resizable()
             .scaledToFit()
             .frame(height: 80)
+#if DEBUG
+            .onTapGesture(count: 3) {
+                router.goToDebugMenu()
+            }
+#endif
     }
 
     var subtitleText: some View {
@@ -192,6 +197,8 @@ private extension View {
                 FeedbackScreen(store: feedbackStore)
             case .savedTrips:
                 SavedTripsScreen()
+            case .debugMenu:
+                DebugMenuScreen()
             default: EmptyView()
             }
         }

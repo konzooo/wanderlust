@@ -26,7 +26,7 @@ class GPTManager: ObservableObject {
     @Published var errorMessage: String?
 
     // MARK: - API Configuration
-    private let apiKey = "REDACTED_OPENAI_KEY_2"
+    private let apiKey = "REMOVED_OPENAI_KEY"
     private let assistantID = "asst_V9luBiG8WYLGWy4Ey5NkNFcs" // Replace with your actual Assistant ID
     private let threadsEndpoint = "https://api.openai.com/v1/threads"
 

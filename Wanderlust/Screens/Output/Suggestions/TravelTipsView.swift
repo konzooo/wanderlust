@@ -59,11 +59,9 @@ public struct TravelTipsView: View {
                         Text("No travel tips available.")
                             .padding(.top, 30)
                     } else {
-                        VStack {
-                            ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
-                                SectionView(section: section, sectionIndex: index, favorites: $favorites)
-                                    .padding(.horizontal, 16)
-                                    .padding(.bottom, 16)
+                        VStack(spacing: 22) {
+                            ForEach(sections) { section in
+                                SectionView(section: section, favorites: $favorites)
                             }
                         }
                         .padding(.vertical, 20)
@@ -78,24 +76,14 @@ public struct TravelTipsView: View {
             TipsSection(
                 id: category.ID ?? Self.temporaryAssignTipSectionID(),
                 title: category.title,
-                cards: category.texts.map { locationText in
-                    TextCard(
-                        id: locationText.id,
-                        text: locationText.linkedText
-                    )
-                }
+                cards: category.texts.map { TextCard(id: $0.id, text: $0.linkedText) }
             )
         }
         + suggestions.staticSuggestions.map { category in
             TipsSection(
                 id: category.ID ?? Self.temporaryAssignTipSectionID(),
                 title: category.title,
-                cards: category.texts.map { locationText in
-                    TextCard(
-                        id: locationText.id,
-                        text: locationText.linkedText
-                    )
-                }
+                cards: category.texts.map { TextCard(id: $0.id, text: $0.linkedText) }
             )
         }
     }
@@ -104,74 +92,70 @@ public struct TravelTipsView: View {
 extension TravelTipsView {
     private struct SectionView: View {
         let section: TipsSection
-        let sectionIndex: Int
         @Binding var favorites: Trip.Favorites
-        
-        init(section: TipsSection, sectionIndex: Int, favorites: Binding<Trip.Favorites>) {
-            self.section = section
-            self.sectionIndex = sectionIndex
-            self._favorites = favorites
-        }
-        
+
         var body: some View {
-            let sectionColor = sectionIndex.isMultiple(of: 2) ? Color.suggestionTintA : Color.suggestionTintB
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 // ---------- Header ----------
-                HStack(alignment: .firstTextBaseline, spacing:10) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Image(section.id.iconName)
                         .resizable()
                         .renderingMode(.template)
                         .scaledToFit()
                         .frame(width: 20, height: 20)
                         .offset(y: 4)
-                        .foregroundColor(Color.black.opacity(0.8))
-                    
+                        .foregroundStyle(Color.appTint)
+
                     Text(section.title)
                         .font(.kanitMedium(18))
-                        .foregroundStyle(Color.black.opacity(0.7))
+                        .foregroundStyle(.primary)
                 }
-                .foregroundColor(.primary)
-                
+                .padding(.horizontal, 16)
+
                 // ---------- Carousel ----------
-                CardsCarousel(items: section.cards,
-                              cardSize: CGSize(width: 300, height: 130),
-                              cardSpacing: 24) { card in
-                    ZStack {
-                        // Alternating background colors using #586FF2
-                        sectionColor
-                        
-                        Text(card.text)
-                            .padding()
-                            .padding(.trailing, 25) // Reduced from 40 to allow text closer to heart
-                            .font(.kanit(16))
-                            .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        // Heart in BOTTOM right corner
-                        heartView(card: card)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(section.cards) { card in
+                            SuggestionCard(card: card, favorites: $favorites)
+                        }
                     }
+                    .padding(.horizontal, 16)
                 }
+                .scrollTargetBehavior(.viewAligned)
             }
         }
-        
-        private func heartView(card: TextCard) -> some View {
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    
-                    Button(action: {
-                        favorites.toggle(card.id)
-                    }) {
-                        HeartIcon(
-                            size: 16.8,
-                            isFavorited: favorites.contains(card.id)
-                        )
-                    }
-                    .padding(.trailing, 12)
-                    .padding(.bottom, 12)
+    }
+
+    private struct SuggestionCard: View {
+        let card: TextCard
+        @Binding var favorites: Trip.Favorites
+
+        var body: some View {
+            ZStack(alignment: .bottomTrailing) {
+                Text(card.text)
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .padding(14)
+                    .padding(.trailing, 6)
+                    .frame(width: 270, height: 130, alignment: .topLeading)
+
+                Button {
+                    favorites.toggle(card.id)
+                } label: {
+                    HeartIcon(size: 18, isFavorited: favorites.contains(card.id))
                 }
+                .padding(10)
             }
+            .frame(width: 270, height: 130)
+            .background(
+                RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
         }
     }
 }
@@ -181,7 +165,7 @@ struct TextCardWithOriginalID: Identifiable, Hashable {
     public let id = UUID() // For ForEach identification
     public let text: AttributedString
     public let originalID: UUID // The original LocationLinkableText ID for favorites
-    
+
     public init(text: AttributedString, originalID: UUID) {
         self.text = text
         self.originalID = originalID
@@ -217,7 +201,7 @@ extension TipsSection {
 }
 
 #Preview {
-    TravelTipsView(suggestions: .mock,favorites: .constant(.init()))
+    TravelTipsView(suggestions: .mock, favorites: .constant(.init()))
 }
 
 extension AsyncValue where Value == Trip.Suggestions {

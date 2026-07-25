@@ -15,7 +15,9 @@ struct GroupOnboardingOverlay: View {
             Color.black.opacity(0.52)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            // No greedy Spacers: the card hugs its content for a compact,
+            // balanced composition instead of stretching to full height.
+            VStack(spacing: 24) {
                 VStack(spacing: 4) {
                     Text("What's your style?")
                         .font(.title2.weight(.bold))
@@ -27,32 +29,29 @@ struct GroupOnboardingOverlay: View {
                 .frame(maxWidth: .infinity)
                 .accessibilityAddTraits(.isHeader)
 
-                Spacer(minLength: 26)
-
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 20) {
                     row(
-                        icon: "person.fill",
-                        tint: Color.appTint,
+                        icon: "person.fill.checkmark",
+                        tint: Color(.systemGray),
                         title: "Your personal preferences",
                         subtitle: "Swipe according to your own personal preferences. Others will swipe for theirs."
                     )
                     row(
-                        icon: "clock.fill",
+                        icon: "checkmark.icloud.fill",
                         tint: Color(hex: "#68C86A"),
                         title: "Wait for others to finish",
                         subtitle: "Once everyone has swiped, you'll find the result in My Group Trips."
                     )
                     row(
                         icon: "person.3.fill",
-                        tint: Color(hex: "#5B5BD6"),
+                        tint: Color.appTint,
                         title: "One joint trip",
                         subtitle: "We'll find the best mix of suggestions for your group."
                     )
                 }
+                .padding(.vertical, 4)
 
-                Spacer(minLength: 30)
-
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     Button(action: onGotIt) {
                         Text("Got it")
                             .font(.headline)
@@ -71,9 +70,10 @@ struct GroupOnboardingOverlay: View {
                     .accessibilityHint("Hides this introduction permanently")
                 }
             }
-            .padding(.horizontal, 26)
-            .padding(.vertical, 28)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 26)
             .frame(maxWidth: 360)
+            .fixedSize(horizontal: false, vertical: true)
             .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 28))
             .shadow(color: .black.opacity(0.2), radius: 20, y: 8)

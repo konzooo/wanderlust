@@ -7,6 +7,9 @@ struct GroupDashboardScreen: View {
     @ObservedObject var store: GroupDashboardStore
     @State private var newMemberName = ""
     @State private var didCopyLink = false
+    @State private var isEditingRoster = false
+    @State private var isAddingMember = false
+    @State private var pendingGenerateWarning = false
 
     @EnvironmentObject var router: NavigationRouter
 
@@ -39,14 +42,27 @@ struct GroupDashboardScreen: View {
 
     private func content(_ group: GroupDTO) -> some View {
         VStack(spacing: 0) {
-            header(group)
+            header
                 .padding(.top, 8)
                 .padding(.bottom, 18)
 
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 16) {
                     shareLinkCard(group)
                     statusCard(group)
+
+                    // Group name as a title, visually separated above the box.
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(group.name)
+                            .font(.kanit(24))
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Text("\(group.completedCount)/\(group.memberCount) completed")
+                            .font(.kanit(13))
+                            .foregroundColor(Color.appTint)
+                    }
+                    .padding(.top, 4)
+
                     rosterCard(group)
 
                     if let actionError = store.state.actionError {
@@ -63,11 +79,21 @@ struct GroupDashboardScreen: View {
                     .padding(.bottom, 8)
             }
         }
+        .confirmationDialog(
+            "Generate without everyone?",
+            isPresented: $pendingGenerateWarning,
+            titleVisibility: .visible
+        ) {
+            Button("Generate anyway", role: .destructive) { store.send(.generate) }
+            Button("Keep waiting", role: .cancel) {}
+        } message: {
+            Text(incompleteWarningMessage(group))
+        }
     }
 
-    private func header(_ group: GroupDTO) -> some View {
+    private var header: some View {
         VStack(spacing: 4) {
-            Text(group.name).font(DS.Typography.displayRegular)
+            Text("Group Trip").font(DS.Typography.displayRegular)
             Text("Different personalities — One Trip!")
                 .font(DS.Typography.subtitle)
                 .foregroundColor(Color(.systemGray))
@@ -109,12 +135,10 @@ struct GroupDashboardScreen: View {
                 icon: "clock.fill",
                 tint: Color.appTint,
                 title: "Waiting for members",
-                // Push is deferred, so we point to My Group Trips rather than
-                // promising a notification.
                 body: "Your trip appears here — and under My Group Trips — once everyone has submitted their choices."
             )
         case .generating:
-            infoBanner(icon: "sparkles", tint: Color.appTint, title: "Creating your group trip…", body: "Blending everyone's preferences into one plan. This takes a moment.")
+            generatingBanner
         case .ready:
             Button { router.goToGroupOutput(group) } label: {
                 infoBanner(icon: "checkmark.circle.fill", tint: .green, title: "Your group trip is ready", body: "Tap to view your itinerary and suggestions.", chevron: true)
@@ -131,16 +155,28 @@ struct GroupDashboardScreen: View {
         }
     }
 
+    private var generatingBanner: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "sparkles").foregroundStyle(Color.appTint).font(.system(size: 18, weight: .semibold))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Creating your group trip").font(.kanitMedium(15)).foregroundColor(.black)
+                    AnimatedDots()
+                }
+                Text("Blending everyone's preferences into one plan. This should only take a minute.")
+                    .font(.kanit(13)).foregroundColor(Color(.systemGray))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(Color.appTint.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous))
+    }
+
     private func rosterCard(_ group: GroupDTO) -> some View {
         DS.GlassCard {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    label(group.name, icon: "person.2.fill")
-                    Spacer()
-                    Text("\(group.completedCount)/\(group.memberCount) completed")
-                        .font(.kanit(12)).foregroundColor(Color.appTint)
-                }
-
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(spacing: 10) {
                     ForEach(group.members) { member in
                         memberRow(member, group: group)
@@ -149,7 +185,7 @@ struct GroupDashboardScreen: View {
 
                 if group.viewerIsAdmin && group.status == .collecting {
                     cardDivider
-                    addMemberField
+                    rosterFooter(group)
                 }
             }
         }
@@ -157,6 +193,19 @@ struct GroupDashboardScreen: View {
 
     private func memberRow(_ member: MemberDTO, group: GroupDTO) -> some View {
         HStack(spacing: 8) {
+            // Reserve the leading slot for every row in edit mode so names stay
+            // aligned (classic iOS list-edit behavior).
+            if isEditingRoster {
+                if isRemovable(member) {
+                    Button { store.send(.removeMember(member.memberId)) } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.system(size: 20))
+                    }
+                } else {
+                    Color.clear.frame(width: 20, height: 20)
+                }
+            }
             Image(systemName: "person.circle.fill").foregroundStyle(Color(.systemGray3))
             Text(member.name).font(.kanit(16)).foregroundColor(.black)
             if member.isYou {
@@ -164,9 +213,44 @@ struct GroupDashboardScreen: View {
             }
             Spacer()
             statusPill(member.status)
-            if group.viewerIsAdmin && group.status == .collecting && !member.isAdmin && member.status != .completed {
-                Button { store.send(.removeMember(member.memberId)) } label: {
-                    Image(systemName: "minus.circle").foregroundStyle(Color(.systemGray2))
+        }
+        .animation(.easeInOut(duration: 0.2), value: isEditingRoster)
+    }
+
+    private func rosterFooter(_ group: GroupDTO) -> some View {
+        HStack(spacing: 8) {
+            if isAddingMember {
+                SelectAllTextField("Name", text: $newMemberName, onCommit: addMember)
+                    .frame(height: 20)
+                    .padding(.vertical, 9).padding(.horizontal, 12)
+                    .background(Color.white.opacity(0.9))
+                    .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.field, style: .continuous))
+                Button(action: addMember) {
+                    Image(systemName: "plus.circle.fill").font(.system(size: 26)).foregroundStyle(Color.appTint)
+                }
+                .disabled(newMemberName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } else {
+                Button {
+                    withAnimation { isAddingMember = true }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add another member")
+                    }
+                    .font(.kanit(15))
+                    .foregroundColor(Color.appTint)
+                }
+
+                Spacer()
+
+                if hasRemovableMembers(group) {
+                    Button {
+                        withAnimation { isEditingRoster.toggle() }
+                    } label: {
+                        Text(isEditingRoster ? "Done" : "Edit")
+                            .font(.kanit(15))
+                            .foregroundColor(isEditingRoster ? Color.appTint : Color(.systemGray))
+                    }
                 }
             }
         }
@@ -193,29 +277,22 @@ struct GroupDashboardScreen: View {
             .clipShape(Capsule())
     }
 
-    private var addMemberField: some View {
-        HStack(spacing: 8) {
-            SelectAllTextField("Add another member", text: $newMemberName, onCommit: addMember)
-                .frame(height: 20)
-                .padding(.vertical, 10).padding(.horizontal, 12)
-                .background(Color.white.opacity(0.9))
-                .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.field, style: .continuous))
-            Button(action: addMember) {
-                Image(systemName: "plus.circle.fill").font(.system(size: 26)).foregroundStyle(Color.appTint)
-            }
-            .disabled(newMemberName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-    }
-
     private func addMember() {
         store.send(.addMember(newMemberName))
         newMemberName = ""
+        withAnimation { isAddingMember = false }
     }
 
     @ViewBuilder
     private func adminGenerateButton(_ group: GroupDTO) -> some View {
         if group.status == .collecting && group.completedCount >= 1 {
-            Button { store.send(.generate) } label: {
+            Button {
+                if group.canAutoGenerate {
+                    store.send(.generate)
+                } else {
+                    pendingGenerateWarning = true
+                }
+            } label: {
                 Text(group.canAutoGenerate
                      ? "Generate group trip"
                      : "Generate with \(group.completedCount) of \(group.memberCount) members")
@@ -224,7 +301,27 @@ struct GroupDashboardScreen: View {
         }
     }
 
-    // MARK: - Building blocks
+    // MARK: - Helpers
+
+    private func isRemovable(_ member: MemberDTO) -> Bool {
+        !member.isAdmin && member.status != .completed
+    }
+
+    private func hasRemovableMembers(_ group: GroupDTO) -> Bool {
+        group.members.contains(where: isRemovable)
+    }
+
+    private func incompleteWarningMessage(_ group: GroupDTO) -> String {
+        let pending = group.members.filter { $0.status == .pending }.map(\.name)
+        let names: String
+        switch pending.count {
+        case 0: names = "Some members"
+        case 1: names = pending[0]
+        case 2: names = "\(pending[0]) and \(pending[1])"
+        default: names = "\(pending.prefix(2).joined(separator: ", ")) and \(pending.count - 2) more"
+        }
+        return "\(names) haven't finished yet. We'll generate the trip from the \(group.completedCount) member\(group.completedCount == 1 ? "" : "s") who did, and this closes the group."
+    }
 
     private func infoBanner(icon: String, tint: Color, title: String, body: String, chevron: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 12) {
@@ -260,7 +357,7 @@ struct GroupDashboardScreen: View {
     }
 
     private var backButton: some View {
-        Button { router.popToRoot() } label: {
+        Button { router.pop() } label: {
             Image(systemName: "chevron.left")
                 .font(.title3.weight(.semibold)).foregroundStyle(.primary)
                 .frame(width: 44, height: 44, alignment: .leading).contentShape(Rectangle())
@@ -270,5 +367,25 @@ struct GroupDashboardScreen: View {
 
     private func shareLink(for code: String) -> String {
         "https://get-catalyst.app/join/\(code)"
+    }
+}
+
+/// Three dots that fade in sequence — a subtle "working…" indicator.
+private struct AnimatedDots: View {
+    @State private var phase = 0
+    private let timer = Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(Color.appTint)
+                    .frame(width: 5, height: 5)
+                    .opacity(phase == i ? 1 : 0.3)
+            }
+        }
+        .onReceive(timer) { _ in
+            phase = (phase + 1) % 3
+        }
     }
 }

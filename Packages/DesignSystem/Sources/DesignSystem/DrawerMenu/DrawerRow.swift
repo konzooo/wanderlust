@@ -8,10 +8,12 @@
 import Foundation
 
 public enum DrawerRow: Int, CaseIterable {
+    // Display order follows this declaration order (the drawer renders
+    // `allCases` filtered of `.none`).
     case home = 0
-    case savedTrips
     case newTrip
     case groupTrip
+    case savedTrips
     case feedback
     case none
 
@@ -19,12 +21,12 @@ public enum DrawerRow: Int, CaseIterable {
         switch self {
         case .home:
             "Home"
-        case .savedTrips:
-            "Saved trips"
         case .newTrip:
             "Start a new trip"
         case .groupTrip:
             "Start or join group trip"
+        case .savedTrips:
+            "My Trips"
         case .feedback:
             "Give us feedback"
         case .none:
@@ -37,12 +39,12 @@ public enum DrawerRow: Int, CaseIterable {
         switch self {
         case .home:
             "house"
-        case .savedTrips:
-            "bookmark"
         case .newTrip:
             "plus.circle"
         case .groupTrip:
             "person.3"
+        case .savedTrips:
+            "suitcase.fill"
         case .feedback:
             "bubble.left"
         case .none:

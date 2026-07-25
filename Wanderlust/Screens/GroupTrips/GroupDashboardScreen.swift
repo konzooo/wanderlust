@@ -79,13 +79,9 @@ struct GroupDashboardScreen: View {
                     .padding(.bottom, 8)
             }
         }
-        .confirmationDialog(
-            "Generate without everyone?",
-            isPresented: $pendingGenerateWarning,
-            titleVisibility: .visible
-        ) {
+        .alert("Generate without everyone?", isPresented: $pendingGenerateWarning) {
             Button("Generate anyway", role: .destructive) { store.send(.generate) }
-            Button("Keep waiting", role: .cancel) {}
+            Button("Go back", role: .cancel) {}
         } message: {
             Text(incompleteWarningMessage(group))
         }
@@ -135,7 +131,7 @@ struct GroupDashboardScreen: View {
                 icon: "clock.fill",
                 tint: Color.appTint,
                 title: "Waiting for members",
-                body: "Your trip appears here — and under My Group Trips — once everyone has submitted their choices."
+                body: "Your trip appears here once everyone has submitted."
             )
         case .generating:
             generatingBanner
@@ -157,7 +153,7 @@ struct GroupDashboardScreen: View {
 
     private var generatingBanner: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "sparkles").foregroundStyle(Color.appTint).font(.system(size: 18, weight: .semibold))
+            Image(systemName: "map.fill").foregroundStyle(Color.appTint).font(.system(size: 18, weight: .semibold))
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text("Creating your group trip").font(.kanitMedium(15)).foregroundColor(.black)

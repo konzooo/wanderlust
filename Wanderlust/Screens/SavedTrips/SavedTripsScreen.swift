@@ -212,8 +212,13 @@ struct SavedTripsScreen: View {
 
     var plusButton: some View {
         Button(action: {
-            // Navigate to new trip flow
-            router.goToBasicInfo(resetStack: true)
+            // Context-aware: match the active segment.
+            switch segment {
+            case .myTrips:
+                router.goToBasicInfo(resetStack: true)
+            case .myGroupTrips:
+                router.goToGroupCreate(resetStack: true)
+            }
         }) {
             Image(systemName: "plus")
                 .resizable()

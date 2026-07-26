@@ -44,6 +44,8 @@ export default defineSchema({
     itinerary: v.optional(v.any()),
     suggestions: v.optional(v.any()),
     imageUrl: v.optional(v.string()),
+    /** Destination photo for the invite link's rich preview (cached from Unsplash). */
+    shareImageUrl: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_code", ["code"]),
 

@@ -10,10 +10,12 @@
 
 import type * as generate from "../generate.js";
 import type * as groups from "../groups.js";
+import type * as http from "../http.js";
 import type * as lib_codes from "../lib/codes.js";
 import type * as lib_dto from "../lib/dto.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as share from "../share.js";
 
 import type {
   ApiFromModules,
@@ -24,10 +26,12 @@ import type {
 declare const fullApi: ApiFromModules<{
   generate: typeof generate;
   groups: typeof groups;
+  http: typeof http;
   "lib/codes": typeof lib_codes;
   "lib/dto": typeof lib_dto;
   "lib/tokens": typeof lib_tokens;
   "lib/validators": typeof lib_validators;
+  share: typeof share;
 }>;
 
 /**

@@ -77,8 +77,11 @@ async function fetchUnsplashImage(query: string): Promise<string | null> {
 
 // MARK: - HTML ----------------------------------------------------------------
 
+// Neutral travel image (airplane wing over clouds) — deliberately NOT a
+// recognizable landmark, so a missing key / failed lookup never implies a
+// specific (wrong) destination.
 const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1200&h=630&fit=crop&q=80";
+  "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=1200&h=630&fit=crop&q=80";
 
 type Meta = {
   groupId: string;

@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["JVC4H9U29T.com.wanderlust.client"],
+        "appIDs": ["JVC4H9U29T.app.kk.wanderlust"],
         "components": [
           {
             "/": "/join/*",

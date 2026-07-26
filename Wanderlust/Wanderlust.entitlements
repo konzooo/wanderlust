@@ -4,7 +4,9 @@
 <dict>
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <string>applinks:get-catalyst.app</string>
+        <!-- Canonical host is www; the apex 308-redirects to it and Apple
+             does not follow redirects when fetching the AASA. -->
+        <string>applinks:www.get-catalyst.app</string>
     </array>
     <key>com.apple.security.app-sandbox</key>
     <true/>

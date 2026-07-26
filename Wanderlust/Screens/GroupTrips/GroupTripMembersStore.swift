@@ -108,7 +108,7 @@ extension GroupTripMembersStore {
         var hasAddedSelf: Bool { members.contains { $0.isAdmin } }
 
         var shareLink: String {
-            "https://get-catalyst.app/join/\(code)"
+            "https://www.get-catalyst.app/join/\(code)"
         }
     }
 

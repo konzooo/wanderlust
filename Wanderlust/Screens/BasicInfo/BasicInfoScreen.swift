@@ -14,8 +14,14 @@ struct BasicInfoScreen: View {
     @ObservedObject var store: BasicInfoStore = BasicInfoStore()
     @FocusState private var destinationFocused: Bool
     @State private var isDrawerOpen = false
+    @State private var didInitializeProfileSelection = false
+    @ObservedObject private var tripOrganizer = TripOrganizer.shared
 
     @EnvironmentObject var router: NavigationRouter
+
+    init(store: BasicInfoStore = BasicInfoStore()) {
+        self.store = store
+    }
 
     var body: some View {
         ZStack {
@@ -45,9 +51,19 @@ struct BasicInfoScreen: View {
         }
         .animation(.easeInOut, value: store.state.presentSpecifySheet)
         .drawerToolbar(isOpen: $isDrawerOpen, selected: .newTrip, router: router)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)
+            }
+        }
         .simultaneousGesture(
             TapGesture().onEnded { _ in destinationFocused = false }
         )
+        .onAppear {
+            guard !didInitializeProfileSelection else { return }
+            didInitializeProfileSelection = true
+            tripOrganizer.selectedProfileID = TravellerProfileLibrary.shared.defaultSelectionID
+        }
     }
 }
 

@@ -18,14 +18,29 @@ struct GroupSwipeScreen: View {
     @State private var submitError: String?
     @State private var pendingDraft: MemberPreferences?
     @State private var didStartResume = false
+    @State private var selectedProfileID: UUID?
 
     private let credentials: GroupTripCredentials?
     private let service: GroupTripService
 
-    init(groupId: String, service: GroupTripService = .shared) {
+    init(
+        groupId: String,
+        initialProfileSelection: ProfileTripSelection = .useDefault,
+        service: GroupTripService = .shared
+    ) {
         self.groupId = groupId
         self.service = service
         self.credentials = GroupTripCredentialsStore.load(groupId: groupId)
+        let resolvedProfileID: UUID?
+        switch initialProfileSelection {
+        case .useDefault:
+            resolvedProfileID = TravellerProfileLibrary.shared.defaultSelectionID
+        case .none:
+            resolvedProfileID = nil
+        case let .profile(id):
+            resolvedProfileID = id
+        }
+        _selectedProfileID = State(initialValue: resolvedProfileID)
     }
 
     var body: some View {
@@ -36,6 +51,7 @@ struct GroupSwipeScreen: View {
                 } else {
                     QuestionnaireScreen(
                         mode: .group(groupID: groupId, memberID: credentials.memberId),
+                        profileSelection: $selectedProfileID,
                         onGroupCompletion: { preferences in
                             submit(preferences, credentials: credentials)
                         }

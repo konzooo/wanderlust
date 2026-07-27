@@ -7,6 +7,12 @@
 
 import Foundation
 
+enum ProfileTripSelection: Hashable {
+    case useDefault
+    case none
+    case profile(UUID)
+}
+
 /// Represents all possible navigation destinations in the app.
 enum Destination: Hashable {
     /// The home screen (root).
@@ -24,7 +30,7 @@ enum Destination: Hashable {
     /// The group trip members screen, with its state.
     case groupMembers(GroupTripMembersStore.State)
     /// The group questionnaire (swipe) screen for a given group.
-    case groupSwipe(groupId: String)
+    case groupSwipe(groupId: String, profileSelection: ProfileTripSelection = .useDefault)
     /// The live group dashboard for a given group.
     case groupDashboard(groupId: String)
     /// The read-only group trip output, with its pre-loaded state.
@@ -35,6 +41,8 @@ enum Destination: Hashable {
     case sharedTrip(code: String)
     /// The feedback screen.
     case feedback
+    /// Local Traveller DNA profile management.
+    case profiles
     /// An unknown or deprecated destination, for future-proofing and deep linking.
     case unknown(String? = nil)
     /// The internal debug menu (QA toggles, design-in-progress previews). DEBUG builds only.

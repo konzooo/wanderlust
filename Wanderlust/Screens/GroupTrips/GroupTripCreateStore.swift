@@ -56,6 +56,7 @@ extension GroupTripCreateStore {
         var joinCode: String = ""
         /// Set once creation succeeds; the screen observes this to navigate forward.
         var createdGroup: GroupTripService.CreatedGroup?
+        var selectedProfileID: UUID?
 
         var readyToCreate: Bool {
             !groupName.isEmpty && !destination.isEmpty && duration > 0

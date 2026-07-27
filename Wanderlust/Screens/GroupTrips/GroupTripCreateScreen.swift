@@ -6,6 +6,7 @@ import SwiftUI
 struct GroupTripCreateScreen: View {
     @ObservedObject var store: GroupTripCreateStore = GroupTripCreateStore()
     @State private var isDrawerOpen = false
+    @State private var didInitializeProfileSelection = false
 
     @EnvironmentObject var router: NavigationRouter
 
@@ -55,6 +56,11 @@ struct GroupTripCreateScreen: View {
         }
         .cleanTopInsets()
         .drawerToolbar(isOpen: $isDrawerOpen, selected: .groupTrip, router: router)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ProfileSelectionButton(selection: $store.state.selectedProfileID)
+            }
+        }
         .simultaneousGesture(
             TapGesture().onEnded { _ in hideKeyboard() }
         )
@@ -66,9 +72,15 @@ struct GroupTripCreateScreen: View {
                     code: createdGroup.code,
                     groupName: store.state.groupName,
                     destination: store.state.destination,
-                    adminToken: createdGroup.adminToken
+                    adminToken: createdGroup.adminToken,
+                    selectedProfileID: store.state.selectedProfileID
                 )
             )
+        }
+        .onAppear {
+            guard !didInitializeProfileSelection else { return }
+            didInitializeProfileSelection = true
+            store.state.selectedProfileID = TravellerProfileLibrary.shared.defaultSelectionID
         }
     }
 }

@@ -4,7 +4,11 @@ import { Doc, Id } from "./_generated/dataModel";
 import { randomInviteCode } from "./lib/codes";
 import { hashToken, newToken, tokenMatchesHash } from "./lib/tokens";
 import { toGroupDTO } from "./lib/dto";
-import { memberPreferences, QUESTIONNAIRE_VERSIONS } from "./lib/validators";
+import {
+  memberPreferences,
+  QUESTIONNAIRE_VERSIONS,
+  TRAVELLER_DNA_VERSIONS,
+} from "./lib/validators";
 import { startGeneration } from "./generate";
 
 /** Loads a group's roster, ordered oldest-first so the admin sits at the top. */
@@ -338,6 +342,36 @@ export const submitPreferences = mutation({
       !expected.every((id) => answeredSet.has(id))
     ) {
       throw new ConvexError("Answers don't match the questionnaire");
+    }
+
+    const profile = args.preferences.profile;
+    if (profile) {
+      const expectedDNA = TRAVELLER_DNA_VERSIONS[profile.questionnaireVersion];
+      const dimensions = profile.scaleAnswers.map((answer) => answer.dimension);
+      const dimensionSet = new Set(dimensions);
+      const hasValidScaleValues = profile.scaleAnswers.every(
+        (answer) =>
+          Number.isInteger(answer.value) &&
+          answer.value >= 1 &&
+          answer.value <= 5,
+      );
+      const hasValidText =
+        profile.usuallySkip.length <= 5 &&
+        profile.mustHaves.length <= 5 &&
+        profile.usuallySkip.every((value) => value.length <= 100) &&
+        profile.mustHaves.every((value) => value.length <= 100) &&
+        (profile.additionalNotes === undefined ||
+          profile.additionalNotes.length <= 500);
+      if (
+        !expectedDNA ||
+        dimensions.length !== expectedDNA.length ||
+        dimensionSet.size !== expectedDNA.length ||
+        !expectedDNA.every((id) => dimensionSet.has(id as typeof dimensions[number])) ||
+        !hasValidScaleValues ||
+        !hasValidText
+      ) {
+        throw new ConvexError("Traveller DNA doesn't match the supported profile version");
+      }
     }
 
     await ctx.db.patch(args.memberId, {

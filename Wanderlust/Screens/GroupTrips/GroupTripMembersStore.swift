@@ -99,6 +99,7 @@ extension GroupTripMembersStore {
         let groupName: String
         let destination: String
         let adminToken: String
+        let selectedProfileID: UUID?
         var members: [GroupTripMemberRow] = []
         var newMemberName: String = ""
         var isAddingMember: Bool = false

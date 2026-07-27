@@ -182,7 +182,11 @@ extension GroupTripMembersScreen {
 
     var startSwipingButton: some View {
         Button(action: {
-            router.goToGroupSwipe(store.state.groupId)
+            router.goToGroupSwipe(
+                store.state.groupId,
+                profileSelection: store.state.selectedProfileID.map(ProfileTripSelection.profile)
+                    ?? .none
+            )
         }) {
             HStack(spacing: 6) {
                 Text("Start with your preferences")
@@ -216,7 +220,8 @@ extension GroupTripMembersScreen {
                     code: "12345",
                     groupName: "Barcelona Squad",
                     destination: "Barcelona",
-                    adminToken: "preview-token"
+                    adminToken: "preview-token",
+                    selectedProfileID: nil
                 )
             )
         )

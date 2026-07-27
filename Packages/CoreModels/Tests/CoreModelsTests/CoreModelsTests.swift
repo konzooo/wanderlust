@@ -55,3 +55,58 @@ import Testing
     #expect(suggestions.dynamicSuggestions[0].ID == nil)
     #expect(suggestions.dynamicSuggestions[0].texts[0].text == "Still useful advice")
 }
+
+@Test func travellerProfileSnapshotContainsEveryScaleAndOmitsLocalIdentity() throws {
+    let answers = TravellerDNADimension.allCases.map {
+        ProfileScaleAnswer(dimension: $0, value: 4)
+    }
+    let profile = TravellerProfile(
+        name: "Me",
+        scaleAnswers: answers,
+        usuallySkip: ["Crowded tours"],
+        mustHaves: ["Morning coffee"]
+    )
+
+    #expect(profile.snapshot.hasEveryScaleAnswer)
+    #expect(profile.snapshot.score(for: .structure) == 4)
+
+    let object = try #require(
+        JSONSerialization.jsonObject(with: JSONEncoder().encode(profile.snapshot))
+            as? [String: Any]
+    )
+    #expect(object["id"] == nil)
+    #expect(object["name"] == nil)
+}
+
+@Test func legacyMemberPreferencesDecodeWithoutProfile() throws {
+    let data = Data(
+        """
+        {
+          "questionnaireVersion": 1,
+          "answers": [{"questionID": "1", "choice": "left"}]
+        }
+        """.utf8
+    )
+
+    let decoded = try JSONDecoder().decode(MemberPreferences.self, from: data)
+
+    #expect(decoded.profile == nil)
+}
+
+@Test func archetypeUsesStrongestBehaviouralDimension() {
+    let values: [TravellerDNADimension: Int] = [
+        .adviceDetail: 5,
+        .physicalEnergy: 3,
+        .experienceBreadth: 1,
+        .dayRhythm: 5,
+        .structure: 4
+    ]
+    let profile = TravellerProfile(
+        name: "Deep traveler",
+        scaleAnswers: TravellerDNADimension.allCases.map {
+            ProfileScaleAnswer(dimension: $0, value: values[$0] ?? 3)
+        }
+    )
+
+    #expect(profile.archetype == "The Deep Diver")
+}

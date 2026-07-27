@@ -15,13 +15,19 @@ struct QuestionnaireScreen: View {
     private let swipeSubject = PassthroughSubject<SwipeDirection, Never>()
     private let undoSubject  = PassthroughSubject<Void,          Never>()
     private let onGroupCompletion: ((MemberPreferences) -> Void)?
+    private let profileSelection: Binding<UUID?>
 
     init(
         mode: QuestionnaireStore.Mode = .solo,
+        profileSelection: Binding<UUID?>? = nil,
         onGroupCompletion: ((MemberPreferences) -> Void)? = nil
     ) {
         self.store = QuestionnaireStore(mode: mode)
         self.onGroupCompletion = onGroupCompletion
+        self.profileSelection = profileSelection ?? Binding(
+            get: { TripOrganizer.shared.selectedProfileID },
+            set: { TripOrganizer.shared.selectedProfileID = $0 }
+        )
     }
 
     /// The tap/swipe tutorial overlay is solo-only: the group flow's own
@@ -65,10 +71,16 @@ struct QuestionnaireScreen: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     questionnaireBackButton
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ProfileSelectionButton(selection: profileSelection)
+                }
                 .sharedBackgroundVisibility(.hidden)
             } else {
                 ToolbarItem(placement: .navigationBarLeading) {
                     questionnaireBackButton
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ProfileSelectionButton(selection: profileSelection)
                 }
             }
         }
@@ -156,7 +168,10 @@ struct QuestionnaireScreen: View {
                         )
                     )
                 case .group:
-                    if let preferences = store.groupPreferences() {
+                    let snapshot = TravellerProfileLibrary.shared
+                        .profile(id: profileSelection.wrappedValue)?
+                        .snapshot
+                    if let preferences = store.groupPreferences(profile: snapshot) {
                         onGroupCompletion?(preferences)
                     }
                 }
@@ -237,8 +252,11 @@ struct QuestionnaireScreen: View {
 
     // MARK: Navigation helper
     private func generateItinerary() {
+        let profile = TravellerProfileLibrary.shared
+            .profile(id: profileSelection.wrappedValue)?
+            .snapshot
         let state = TripOutputStore.State(
-            tripSummary: TripOrganizer.shared.generateTripSummary(),
+            tripSummary: TripOrganizer.shared.generateTripSummary(profile: profile),
             details    : TripOrganizer.shared.tripDetails,
             mode: .newTrip
         )

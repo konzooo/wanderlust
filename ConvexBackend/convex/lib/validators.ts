@@ -17,6 +17,28 @@ export const preferenceAnswer = v.object({
   choice: preferenceChoice,
 });
 
+export const travellerDNADimension = v.union(
+  v.literal("advice_detail"),
+  v.literal("physical_energy"),
+  v.literal("experience_breadth"),
+  v.literal("day_rhythm"),
+  v.literal("structure"),
+);
+
+export const profileScaleAnswer = v.object({
+  dimension: travellerDNADimension,
+  value: v.number(),
+});
+
+/** Privacy-minimized snapshot; local profile IDs and display names are omitted. */
+export const travellerProfileSnapshot = v.object({
+  questionnaireVersion: v.number(),
+  scaleAnswers: v.array(profileScaleAnswer),
+  usuallySkip: v.array(v.string()),
+  mustHaves: v.array(v.string()),
+  additionalNotes: v.optional(v.string()),
+});
+
 /**
  * A member's structured questionnaire answers. Mirrors the Swift
  * `MemberPreferences`. Stored on the `members` table only once a member
@@ -25,7 +47,18 @@ export const preferenceAnswer = v.object({
 export const memberPreferences = v.object({
   questionnaireVersion: v.number(),
   answers: v.array(preferenceAnswer),
+  profile: v.optional(travellerProfileSnapshot),
 });
+
+export const TRAVELLER_DNA_VERSIONS: Record<number, readonly string[]> = {
+  1: [
+    "advice_detail",
+    "physical_energy",
+    "experience_breadth",
+    "day_rhythm",
+    "structure",
+  ],
+};
 
 /** Group lifecycle. `collecting` is the only state that accepts joins/submits. */
 export const groupStatus = v.union(

@@ -89,11 +89,15 @@ class NavigationRouter: ObservableObject {
     }
 
     /// Navigate to the group questionnaire (swipe) screen.
-    func goToGroupSwipe(_ groupId: String, resetStack: Bool = false) {
+    func goToGroupSwipe(
+        _ groupId: String,
+        profileSelection: ProfileTripSelection = .useDefault,
+        resetStack: Bool = false
+    ) {
         if resetStack {
             path.removeAll()
         }
-        path.append(.groupSwipe(groupId: groupId))
+        path.append(.groupSwipe(groupId: groupId, profileSelection: profileSelection))
     }
 
     /// Navigate to the live group dashboard.
@@ -152,6 +156,11 @@ class NavigationRouter: ObservableObject {
             return
         }
         path.append(.feedback)
+    }
+
+    func goToProfiles() {
+        guard path.last != .profiles else { return }
+        path.append(.profiles)
     }
 
     /// Navigate to an unknown or deprecated destination (for deep linking or migration).
@@ -223,6 +232,8 @@ extension NavigationRouter: DrawerNavigating {
             goToHome()
         case .savedTrips:
             goToSavedTrips()
+        case .profiles:
+            goToProfiles()
         case .newTrip:
             goToBasicInfo(resetStack: true)
         case .groupTrip:

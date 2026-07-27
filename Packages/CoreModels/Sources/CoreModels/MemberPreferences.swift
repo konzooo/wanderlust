@@ -18,9 +18,18 @@ public struct MemberPreferences: Equatable, Hashable, Codable, Sendable {
     /// keys on ``PreferenceAnswer/questionID``.
     public var answers: [PreferenceAnswer]
 
-    public init(questionnaireVersion: Int, answers: [PreferenceAnswer]) {
+    /// Optional persistent Traveller DNA captured as an immutable trip snapshot.
+    /// Trip-specific `answers` always take precedence when the two disagree.
+    public var profile: TravellerProfileSnapshot?
+
+    public init(
+        questionnaireVersion: Int,
+        answers: [PreferenceAnswer],
+        profile: TravellerProfileSnapshot? = nil
+    ) {
         self.questionnaireVersion = questionnaireVersion
         self.answers = answers
+        self.profile = profile
     }
 }
 

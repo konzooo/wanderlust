@@ -195,8 +195,8 @@ private extension View {
                 GroupTripCreateScreen()
             case let .groupMembers(state):
                 GroupTripMembersScreen(store: GroupTripMembersStore(initialState: state))
-            case let .groupSwipe(groupId):
-                GroupSwipeScreen(groupId: groupId)
+            case let .groupSwipe(groupId, profileSelection):
+                GroupSwipeScreen(groupId: groupId, initialProfileSelection: profileSelection)
             case let .groupDashboard(groupId):
                 GroupDashboardScreen(groupId: groupId)
             case let .groupOutput(state):
@@ -209,6 +209,8 @@ private extension View {
                 TripOutputScreen(initialState: state)
             case .feedback:
                 FeedbackScreen(store: feedbackStore)
+            case .profiles:
+                ProfilesScreen()
             case .savedTrips:
                 SavedTripsScreen()
             case .debugMenu:

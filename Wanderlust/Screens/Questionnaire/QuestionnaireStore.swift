@@ -75,9 +75,11 @@ class QuestionnaireStore: ObservableStore {
     }
 
     /// The collected answers for a group run, ready to submit. `nil` in solo mode.
-    func groupPreferences() -> MemberPreferences? {
+    func groupPreferences(profile: TravellerProfileSnapshot? = nil) -> MemberPreferences? {
         guard case let .group(_, _, questionnaireVersion) = mode else { return nil }
-        return session.preferences(questionnaireVersion: questionnaireVersion)
+        var preferences = session.preferences(questionnaireVersion: questionnaireVersion)
+        preferences.profile = profile
+        return preferences
     }
 }
 

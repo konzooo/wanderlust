@@ -6,6 +6,8 @@
 //
 
 import XCTest
+import CoreModels
+@testable import Wanderlust
 
 final class WanderlustTests: XCTestCase {
 
@@ -30,6 +32,56 @@ final class WanderlustTests: XCTestCase {
         measure {
             // Put the code you want to measure the time of here.
         }
+    }
+
+    @MainActor
+    func testProfileLibraryMaintainsMainAndDefaultInvariants() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = TravellerProfileLibrary(
+            fileURL: directory.appendingPathComponent("profiles.json")
+        )
+
+        let first = makeProfile(name: "Me")
+        let second = makeProfile(name: "Family")
+        try library.save(first)
+        try library.save(second)
+
+        XCTAssertEqual(library.mainProfileID, first.id)
+        XCTAssertTrue(library.attachByDefault)
+
+        library.makeMain(second.id)
+        library.delete(second.id)
+        XCTAssertEqual(library.mainProfileID, first.id)
+
+        library.delete(first.id)
+        XCTAssertNil(library.mainProfileID)
+        XCTAssertFalse(library.attachByDefault)
+    }
+
+    @MainActor
+    func testProfileLibraryRejectsDuplicateNames() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = TravellerProfileLibrary(
+            fileURL: directory.appendingPathComponent("profiles.json")
+        )
+
+        try library.save(makeProfile(name: "Me"))
+        XCTAssertThrowsError(try library.save(makeProfile(name: "me")))
+    }
+
+    private func makeProfile(name: String) -> TravellerProfile {
+        TravellerProfile(
+            name: name,
+            scaleAnswers: TravellerDNADimension.allCases.map {
+                ProfileScaleAnswer(dimension: $0, value: 3)
+            }
+        )
     }
 
 }

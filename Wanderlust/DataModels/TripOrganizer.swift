@@ -6,6 +6,7 @@ class TripOrganizer: ObservableObject {
     private init() {}
 
     var tripDetails: Trip.Details = Trip.Details()
+    @Published var selectedProfileID: UUID?
     private(set) var questionaireList: [QuestionaireStep] = TripOrganizer.defaultQuestionaire
 }
 
@@ -72,7 +73,7 @@ extension TripOrganizer {
 }
 
 extension TripOrganizer {
-    func generateTripSummary() -> String {
+    func generateTripSummary(profile: TravellerProfileSnapshot? = nil) -> String {
         // 1. Compute the numeric month index
         //    (so that January = 1, February = 2, etc.)
         let monthIndex = Month.all.firstIndex(of: tripDetails.month) ?? 0
@@ -112,6 +113,11 @@ extension TripOrganizer {
 
             // Here, `step.id` is the question number in your default data
             summary += "\nQuestion \(step.id): \(responseString)"
+        }
+
+        if let profile {
+            summary += "\n\nTraveller DNA (persistent fallback context):"
+            summary += profile.promptSummary
         }
 
         print("\n ---- SUMMARY: ---- \n\(summary)")

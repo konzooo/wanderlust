@@ -18,6 +18,13 @@ struct WanderlustApp: App {
     init() {
         DS.applyUniformDesign()
 
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing-reset-profiles") {
+            TravellerProfileLibrary.shared.resetForUITesting()
+            UserDefaults.standard.removeObject(forKey: "profiles.introduction.dismissed")
+        }
+#endif
+
         do {
             try OAKeyManager.installIfNeeded()
         } catch {

@@ -30,6 +30,45 @@ final class WanderlustUITests: XCTestCase {
         // Use XCTAssert and related functions to verify your tests produce the correct results.
     }
 
+    func testTravellerDNAEntryFromNewTrip() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-ui-testing-reset-profiles")
+        app.launch()
+
+        app.buttons["Get Started"].tap()
+
+        let profileButton = app.buttons["profile-selection-button"]
+        XCTAssertTrue(profileButton.waitForExistence(timeout: 3))
+        profileButton.tap()
+
+        let introCTA = app.buttons["Create my Traveller DNA"]
+        XCTAssertTrue(introCTA.waitForExistence(timeout: 3))
+        introCTA.tap()
+
+        let profileNameField = app.textFields["profile-name-field"]
+        XCTAssertTrue(profileNameField.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 2))
+        profileNameField.typeText("Me")
+        XCTAssertEqual(profileNameField.value as? String, "Me")
+        profileNameField.typeText("\n")
+
+        for _ in 0..<5 {
+            let middleAnswer = app.buttons["Position 3 of 5"]
+            XCTAssertTrue(middleAnswer.waitForExistence(timeout: 2))
+            middleAnswer.tap()
+
+            let nextButton = app.buttons["Next"]
+            XCTAssertTrue(nextButton.waitForExistence(timeout: 2))
+            nextButton.tap()
+        }
+
+        let skipEntryField = app.textFields["e.g. crowded viewpoints"]
+        XCTAssertTrue(skipEntryField.waitForExistence(timeout: 3))
+        skipEntryField.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(skipEntryField.isHittable)
+    }
+
     func testLaunchPerformance() throws {
         if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
             // This measures how long it takes to launch your application.

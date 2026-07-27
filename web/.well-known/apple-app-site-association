@@ -7,6 +7,10 @@
           {
             "/": "/join/*",
             "comment": "Group trip invite links open the app on /join/<code>"
+          },
+          {
+            "/": "/t/*",
+            "comment": "Shared trip links open the app on /t/<code>"
           }
         ]
       }

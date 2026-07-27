@@ -21,9 +21,16 @@ struct TopHeader: View {
     var saveState: Bool
     /// Save button callback
     let onSaveTapped: (() -> Void)?
-    /// Whether to show the save/bookmark button. Group trips hide it — they
-    /// aren't personal saved trips.
+    /// Whether to show the save/bookmark button. Group and shared trips hide
+    /// it — they aren't personal saved trips.
     var showSaveButton: Bool
+    /// Whether to show the share button. Hidden for received (shared-with-me)
+    /// and group trips — they are view-only and not the viewer's to re-share.
+    var showShareButton: Bool
+    /// Shows a spinner in place of the share icon while publishing.
+    var isSharing: Bool
+    /// Share button callback
+    let onShareTapped: (() -> Void)?
 
     /// Maximum header height (in points, not pixels).
     private let maxHeight: CGFloat = 230
@@ -37,6 +44,9 @@ struct TopHeader: View {
         chips: [String],
         saveState: Bool,
         showSaveButton: Bool = true,
+        showShareButton: Bool = false,
+        isSharing: Bool = false,
+        onShareTapped: (() -> Void)? = nil,
         onSaveTapped: (() -> Void)? = nil,
         imageCache: any ImageCacheStrategy = InMemoryImageCacheStrategy.shared
     ) {
@@ -45,6 +55,9 @@ struct TopHeader: View {
         self.chips = chips
         self.saveState = saveState
         self.showSaveButton = showSaveButton
+        self.showShareButton = showShareButton
+        self.isSharing = isSharing
+        self.onShareTapped = onShareTapped
         self.onSaveTapped = onSaveTapped
         self.imageCache = imageCache
     }
@@ -86,10 +99,15 @@ struct TopHeader: View {
 
                 Spacer()
 
-                if showSaveButton {
-                    saveButton
-                        .padding(.trailing, 14)
+                HStack(spacing: 10) {
+                    if showShareButton {
+                        shareButton
+                    }
+                    if showSaveButton {
+                        saveButton
+                    }
                 }
+                .padding(.trailing, 14)
             }
         }
         .padding(.bottom, 24)
@@ -112,6 +130,27 @@ struct TopHeader: View {
             saveState ? AnyShapeStyle(Color.green) : AnyShapeStyle(Material.thinMaterial.opacity(0.5)),
             in: Circle()
         )
+    }
+
+    var shareButton: some View {
+        Button(action: {
+            onShareTapped?()
+        }) {
+            if isSharing {
+                ProgressView()
+                    .tint(.white)
+                    .frame(width: 20, height: 20)
+            } else {
+                Image(systemName: "square.and.arrow.up")
+                    .resizable()
+                    .scaledToFit()
+                    .tint(.white)
+                    .frame(width: 20, height: 20)
+            }
+        }
+        .disabled(isSharing)
+        .padding(6)
+        .background(Material.thinMaterial.opacity(0.5), in: Circle())
     }
 
 }

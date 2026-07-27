@@ -33,3 +33,37 @@ export const setShareImage = internalMutation({
     await ctx.db.patch(args.groupId, { shareImageUrl: args.url });
   },
 });
+
+/**
+ * Public-safe metadata for a shared trip's rich preview (Open Graph card).
+ * Used by the /t HTTP endpoint (see http.ts). Never exposes `ownerTokenHash`.
+ */
+export const sharedTripMeta = internalQuery({
+  args: { code: v.string() },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db
+      .query("sharedTrips")
+      .withIndex("by_code", (q) => q.eq("code", args.code))
+      .unique();
+    if (!doc) return null;
+    return {
+      tripId: doc._id,
+      title: doc.title,
+      destination: doc.destination,
+      startMonth: doc.startMonth,
+      durationDays: doc.durationDays,
+      imageUrl: doc.imageUrl ?? null,
+      shareImageUrl: doc.shareImageUrl ?? null,
+    };
+  },
+});
+
+/** Caches the resolved OG-card photo for a shared trip. */
+export const setSharedTripImage = internalMutation({
+  args: { tripId: v.id("sharedTrips"), url: v.string() },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.tripId);
+    if (!doc || doc.shareImageUrl) return;
+    await ctx.db.patch(args.tripId, { shareImageUrl: args.url });
+  },
+});

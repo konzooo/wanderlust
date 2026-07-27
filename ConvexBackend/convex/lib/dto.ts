@@ -49,6 +49,35 @@ export function toMemberDTO(
   };
 }
 
+export type SharedTripDTO = {
+  code: string;
+  title: string;
+  destination: string;
+  durationDays: number;
+  startMonth: string;
+  groupType: string;
+  itinerary: unknown;
+  suggestions: unknown | null;
+  favorites: unknown | null;
+  imageUrl: string | null;
+};
+
+/** Never includes `ownerTokenHash` — the code alone is the read capability. */
+export function toSharedTripDTO(doc: Doc<"sharedTrips">): SharedTripDTO {
+  return {
+    code: doc.code,
+    title: doc.title,
+    destination: doc.destination,
+    durationDays: doc.durationDays,
+    startMonth: doc.startMonth,
+    groupType: doc.groupType,
+    itinerary: doc.itinerary,
+    suggestions: doc.suggestions ?? null,
+    favorites: doc.favorites ?? null,
+    imageUrl: doc.imageUrl ?? null,
+  };
+}
+
 export function toGroupDTO(
   group: Doc<"groups">,
   members: Doc<"members">[],

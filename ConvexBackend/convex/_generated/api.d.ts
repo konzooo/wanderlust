@@ -16,6 +16,7 @@ import type * as lib_dto from "../lib/dto.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as share from "../share.js";
+import type * as sharedTrips from "../sharedTrips.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tokens": typeof lib_tokens;
   "lib/validators": typeof lib_validators;
   share: typeof share;
+  sharedTrips: typeof sharedTrips;
 }>;
 
 /**

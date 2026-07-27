@@ -17,10 +17,14 @@ import UIKit
 @dynamicMemberLookup
 class TripOutputStore: ObservableStore {
     @Published var state: State
-    
+
     // UI Bindings
     @Published var retryCount: Int = 0
     @Published var presentSaveToast: Bool = false
+    @Published var isPublishingShare: Bool = false
+    /// Non-nil → present the native share sheet for this URL.
+    @Published var shareSheetURL: URL?
+    @Published var shareErrorMessage: String?
     
     // Navigation
     var router: NavigationRouter?
@@ -66,11 +70,17 @@ class TripOutputStore: ObservableStore {
     func send(_ action: Action) {
         switch action {
         case .onAppear:
-            // Group trips are display-only: the itinerary/suggestions come
-            // pre-loaded from the Convex action, so we must NEVER invoke the
+            // Group and shared trips are display-only: their itinerary/
+            // suggestions come pre-loaded (from the Convex action, or from a
+            // locally-cached received trip), so we must NEVER invoke the
             // on-device LLM (that path reads the bundled OpenAI key).
-            if state.mode == .groupTrip {
-                fetchDestinationImage()
+            if state.mode.isReadOnly {
+                // A pre-loaded (server- or locally-cache-supplied) image must
+                // win: refetching would silently swap it for a different
+                // Unsplash pick every time this screen reappears.
+                if !state.imageUrlResponse.isLoaded {
+                    fetchDestinationImage()
+                }
                 return
             }
 
@@ -92,7 +102,11 @@ class TripOutputStore: ObservableStore {
             
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
-            
+
+        case .shareTrip:
+            shareTrip()
+
+
         case .removeFavorite(let id, let confirmRemoval):
             if confirmRemoval {
                 state.favorites.toggle(id)
@@ -104,8 +118,13 @@ class TripOutputStore: ObservableStore {
             }
             
         case .navigateBack:
-            if state.mode == .groupTrip {
-                // Group output is read-only — just return to the dashboard.
+            if state.mode == .sharedTrip {
+                // Unlike `.groupTrip` (no local file, favorite toggles are
+                // silently discarded), a shared trip IS a real local file —
+                // persist any favorite changes to the recipient's own copy.
+                persistReceivedTripFavorites()
+                router?.pop()
+            } else if state.mode == .groupTrip {
                 router?.pop()
             } else if state.saved {
                 if state.mode == .savedTrip {
@@ -150,6 +169,10 @@ extension TripOutputStore {
         var favorites: Trip.Favorites = .init()
         var saved: Bool = false
         let mode: Mode
+        /// The code this trip was published under (if the owner has shared it)
+        /// or received via (if this is a locally-cached shared trip). `nil` for
+        /// a trip that has never been shared.
+        var shareCode: String? = nil
 
         var itineraryResponse: AsyncValue<Trip.Itinerary> = .initial
         var suggestionsResponse: AsyncValue<Trip.Suggestions> = .initial
@@ -179,6 +202,7 @@ extension TripOutputStore {
         case closeAlert
         case retry
         case saveTrip(confirmOverride: Bool = false)
+        case shareTrip
         case removeFavorite(UUID, confirmRemoval: Bool = false)
         case navigateBack
         case saveAndNavigateBack
@@ -317,12 +341,19 @@ extension TripOutputStore {
     }
 
     /// Fetches the destination image URL from the image service.
-    /// Updates state independently on the main thread.
+    /// Updates state independently on the main thread. (Read-only modes guard
+    /// the *call site* in `onAppear` against refetching a pre-loaded image —
+    /// this function itself stays unconditional, since `.newTrip`/`.savedTrip`
+    /// intentionally call it a second time once generation normalizes the
+    /// destination name.)
     func fetchDestinationImage() {
         Task {
             do {
-                // Get destination name and fetch corresponding image
-                let destinationName = state.itineraryResponse.data?.destination ?? TripOrganizer.shared.tripDetails.destination.name
+                // Get destination name and fetch corresponding image. The
+                // fallback is this trip's OWN details — never the global solo
+                // scratchpad (`TripOrganizer.shared`), which would show the
+                // wrong destination for a group or shared trip.
+                let destinationName = state.itineraryResponse.data?.destination ?? state.details.destination.name
                 let response = try await imageService.fetchImageURL(for: destinationName)
                 await MainActor.run {
                     state.imageUrlResponse = .loaded(response)
@@ -347,9 +378,10 @@ extension TripOutputStore {
             details: state.details,
             itinerary: itinerary,
             suggestions: suggestions,
-            favorites: state.favorites
+            favorites: state.favorites,
+            shareCode: state.shareCode
         )
-        
+
         Task {
              do {
                  let storage = try TripStorage()
@@ -372,9 +404,10 @@ extension TripOutputStore {
             details: state.details,
             itinerary: itinerary,
             suggestions: state.suggestionsResponse.data ?? .init(),
-            favorites: state.favorites
+            favorites: state.favorites,
+            shareCode: state.shareCode
         )
-       
+
         // Save
         Task {
             do {
@@ -419,7 +452,8 @@ extension TripOutputStore {
                     details: state.details,
                     itinerary: itinerary,
                     suggestions: suggestions,
-                    favorites: state.favorites
+                    favorites: state.favorites,
+                    shareCode: state.shareCode
                 )
                 try storage.delete(trip)
                 await MainActor.run {
@@ -428,6 +462,67 @@ extension TripOutputStore {
                 }
             } catch {
                 print("Failed to delete trip: \(error)")
+            }
+        }
+    }
+
+    private func shareTrip() {
+        // Already published: content is immutable once generated, so
+        // re-sharing is a pure client-side reopen — no network, no new code.
+        if let code = state.shareCode {
+            shareSheetURL = SharedTripLink.url(for: code)
+            return
+        }
+
+        guard case let .loaded(itinerary) = state.itineraryResponse, !isPublishingShare else { return }
+        isPublishingShare = true
+        shareErrorMessage = nil
+
+        Task { @MainActor in
+            defer { isPublishingShare = false }
+            do {
+                let code = try await SharedTripService.shared.publish(
+                    title: itinerary.title ?? state.fullDestinationString,
+                    destination: state.fullDestinationString,
+                    durationDays: state.details.duration,
+                    startMonth: state.details.month.rawValue,
+                    groupType: state.details.members.groupType.rawValue,
+                    itinerary: itinerary,
+                    suggestions: state.suggestionsResponse.data,
+                    favorites: state.favorites,
+                    imageUrl: state.imageUrlResponse.data?.absoluteString
+                )
+                state.shareCode = code
+                // Persist the code onto the saved file, if there is one. If the
+                // trip isn't saved yet, the code still lives in `state` and
+                // will land on disk the next time `saveTrip`/`reSaveTrip` runs.
+                if state.saved {
+                    reSaveTrip()
+                }
+                shareSheetURL = SharedTripLink.url(for: code)
+            } catch {
+                shareErrorMessage = "Couldn't create a share link. Check your connection and try again."
+            }
+        }
+    }
+
+    /// Saves the recipient's current favorite selections back onto their local
+    /// copy of a received shared trip. Fire-and-forget, mirroring `reSaveTrip`.
+    private func persistReceivedTripFavorites() {
+        guard case let .loaded(itinerary) = state.itineraryResponse, let code = state.shareCode else { return }
+        let trip = Trip(
+            details: state.details,
+            itinerary: itinerary,
+            suggestions: state.suggestionsResponse.data,
+            favorites: state.favorites,
+            shareCode: code
+        )
+        Task {
+            do {
+                let storage = try ReceivedSharedTripStorage.received()
+                try storage.save(trip)
+            } catch {
+                print("Failed to persist received trip favorites: \(error)")
             }
         }
     }
@@ -458,6 +553,23 @@ extension TripOutputStore.State {
         /// Convex action and passed in pre-loaded) and hides personal
         /// save/delete affordances.
         case groupTrip
+        /// Read-only display of a trip received via a share link. The content
+        /// is already a durable local copy (`ReceivedSharedTripStorage`), so —
+        /// unlike `.groupTrip` — there is nothing to re-fetch on later opens.
+        /// Never triggers on-device generation; hides save/delete (nothing to
+        /// save, it's already saved) and hides the share button (not the
+        /// viewer's trip to re-share).
+        case sharedTrip
+    }
+}
+
+extension TripOutputStore.State.Mode {
+    /// Server- or locally-cache-supplied, display-only. Gates on-device LLM
+    /// generation and back-navigation semantics. (`Mode` has no associated
+    /// values, so it already conforms to `Equatable` for free — no explicit
+    /// declaration needed, and adding one would be a redundant-conformance error.)
+    var isReadOnly: Bool {
+        self == .groupTrip || self == .sharedTrip
     }
 }
 

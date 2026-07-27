@@ -27,9 +27,10 @@ struct WanderlustApp: App {
     
     var body: some Scene {
         WindowGroup {
-            NavigationStack(path: $navigationRouter.path) {
-                HomeScreen()
-            }
+            // HomeScreen owns the app's NavigationStack and destination
+            // registrations. Wrapping it in a second stack bound to the same
+            // path makes deep links push onto an unregistered outer stack.
+            HomeScreen()
             .preferredColorScheme(.light)
             .environmentObject(navigationRouter)
             .environmentObject(metricsTracker)

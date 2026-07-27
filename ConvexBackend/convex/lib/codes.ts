@@ -18,3 +18,12 @@ export function randomInviteCode(): string {
 export function normalizeInviteCode(input: string): string {
   return input.replace(/\D/g, "").slice(0, 5).padStart(5, "0");
 }
+
+/**
+ * Unguessable share code for a published trip. Unlike an invite code, nobody
+ * types this — it IS the read capability for the whole trip, so 5 digits
+ * (enumerable in minutes) would not be safe here. 32 hex chars, ~122 bits.
+ */
+export function randomShareCode(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}

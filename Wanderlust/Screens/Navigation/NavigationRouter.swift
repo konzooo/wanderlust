@@ -137,6 +137,15 @@ class NavigationRouter: ObservableObject {
         path.append(.groupJoin(code: code))
     }
 
+    /// Navigate to a trip shared via a share link.
+    func goToSharedTrip(code: String, resetStack: Bool = false) {
+        if resetStack {
+            path.removeAll()
+        }
+        guard path.last != .sharedTrip(code: code) else { return }
+        path.append(.sharedTrip(code: code))
+    }
+
     /// Navigate to the feedback screen.
     func goToFeedback() {
         guard path.last != .feedback else {
@@ -182,6 +191,17 @@ class NavigationRouter: ObservableObject {
             let code = segments[joinIndex + 1].filter(\.isNumber)
             if !code.isEmpty {
                 goToGroupJoin(code: code, resetStack: true)
+                return
+            }
+        }
+
+        // Shared trip links are `/t/<32-hex>`. Unlike invite codes these are
+        // NOT digits-only, so they need their own filter — `\.isNumber` would
+        // mangle a hex code.
+        if let tIndex = segments.firstIndex(of: "t"), tIndex + 1 < segments.count {
+            let code = segments[tIndex + 1].filter { $0.isHexDigit }.lowercased()
+            if code.count == 32 {
+                goToSharedTrip(code: code, resetStack: true)
                 return
             }
         }

@@ -31,6 +31,8 @@ enum Destination: Hashable {
     case groupOutput(TripOutputStore.State)
     /// The join-a-group-trip screen for a given invite code.
     case groupJoin(code: String)
+    /// A trip shared via a share link, resolved by its share code.
+    case sharedTrip(code: String)
     /// The feedback screen.
     case feedback
     /// An unknown or deprecated destination, for future-proofing and deep linking.

@@ -203,6 +203,8 @@ private extension View {
                 TripOutputScreen(initialState: state)
             case let .groupJoin(code):
                 GroupJoinScreen(code: code)
+            case let .sharedTrip(code):
+                SharedTripScreen(code: code)
             case let .itineraryResult(state):
                 TripOutputScreen(initialState: state)
             case .feedback:

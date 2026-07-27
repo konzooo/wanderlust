@@ -70,7 +70,7 @@ struct TripOutputScreen: View {
         }
 
         .withAlertDialogs(store: store)
-        
+
         // Successful save toast
         .toast(
             style: .success,
@@ -79,6 +79,24 @@ struct TripOutputScreen: View {
             isPresented: $store.presentSaveToast,
             position: .top
         )
+
+        // Native share sheet, presented once a share link exists.
+        .sheet(item: Binding(
+            get: { store.shareSheetURL.map(IdentifiableURL.init) },
+            set: { store.shareSheetURL = $0?.url }
+        )) { item in
+            ActivityShareSheet(url: item.url)
+        }
+
+        // Share publish failure
+        .alert("Couldn't share", isPresented: Binding(
+            get: { store.shareErrorMessage != nil },
+            set: { if !$0 { store.shareErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { store.shareErrorMessage = nil }
+        } message: {
+            Text(store.shareErrorMessage ?? "")
+        }
 
         // On appear trigger Itinerary generation
         .onAppear {
@@ -127,19 +145,29 @@ struct TripOutputScreen: View {
     }
     
     var itineraryHeader: some View {
+        // Explicit argument labels throughout (no trailing closure): TopHeader
+        // has two closure-typed parameters now, and Swift's trailing-closure
+        // backward-scan can silently re-bind an unlabeled trailing closure to
+        // the wrong one if the parameter list is ever reordered.
         TopHeader(
             imageUrlState: store.state.imageUrlResponse,
             title: store.fullDestinationString,
             chips: headerChips,
             saveState: store.saved,
-            showSaveButton: store.state.mode != .groupTrip
-        ) {
-            if store.state.mode == .savedTrip && store.saved {
-                store.send(.deleteTrip(confirmDeletion: false))
-            } else if store.state.mode == .newTrip {
-                store.send(.saveTrip(confirmOverride: false))
+            showSaveButton: store.state.mode == .newTrip || store.state.mode == .savedTrip,
+            showShareButton: store.state.mode == .newTrip || store.state.mode == .savedTrip,
+            isSharing: store.isPublishingShare,
+            onShareTapped: {
+                store.send(.shareTrip)
+            },
+            onSaveTapped: {
+                if store.state.mode == .savedTrip && store.saved {
+                    store.send(.deleteTrip(confirmDeletion: false))
+                } else if store.state.mode == .newTrip {
+                    store.send(.saveTrip(confirmOverride: false))
+                }
             }
-        }
+        )
     }
 
     /// Chips come from the trip's own `details` (not the global `TripOrganizer`
@@ -193,11 +221,15 @@ struct TripOutputScreen: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left")
-                Text(store.state.mode == .groupTrip ? "Dashboard" : "Saved Trips")
+                Text(backButtonTitle)
             }
             .foregroundStyle(.white)
         }
-        .accessibilityLabel(store.state.mode == .groupTrip ? "Back to Dashboard" : "Back to Saved Trips")
+        .accessibilityLabel("Back to \(backButtonTitle)")
+    }
+
+    private var backButtonTitle: String {
+        store.state.mode == .groupTrip ? "Dashboard" : "Trips"
     }
 }
 

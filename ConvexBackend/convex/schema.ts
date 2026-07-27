@@ -62,4 +62,43 @@ export default defineSchema({
   })
     .index("by_group", ["groupId"])
     .index("by_token", ["memberTokenHash"]),
+
+  /**
+   * A solo trip explicitly published by tapping Share. Nothing lands here
+   * until then (publish-on-share only — solo trips are otherwise 100% local).
+   * The public `code` grants read access; there is no write/update/revoke
+   * mutation in v1 — once a recipient opens a shared trip, it becomes a
+   * durable local copy on their device (see `ReceivedSharedTripStore.swift`),
+   * so there is nothing to keep "live" server-side after the first fetch.
+   */
+  sharedTrips: defineTable({
+    /** Unguessable 32-hex code — this code IS the read capability. */
+    code: v.string(),
+    /**
+     * SHA-256 hash of an owner token, minted now so a future revoke feature
+     * needs no migration. Unused client-side in v1 — nothing calls it yet.
+     */
+    ownerTokenHash: v.string(),
+    title: v.string(),
+    destination: v.string(),
+    durationDays: v.number(),
+    /** `Month` rawValue from CoreModels — MIXED CASE ("June", "january"). */
+    startMonth: v.string(),
+    /** `Trip.Details.GroupType` rawValue ("solo", "couple", …). */
+    groupType: v.string(),
+    /**
+     * Deliberately untyped, like `groups.itinerary`/`groups.suggestions` —
+     * shapes mirror CoreModels; re-validating risks breaking the app's own
+     * strict decoders on a schema mismatch.
+     */
+    itinerary: v.any(),
+    suggestions: v.optional(v.any()),
+    /** `Trip.Favorites` — shown read-only-but-editable on the recipient's local copy. */
+    favorites: v.optional(v.any()),
+    /** The destination photo the app already resolved while generating. */
+    imageUrl: v.optional(v.string()),
+    /** OG-card-sized (1200x630) photo, cached by the /t endpoint. */
+    shareImageUrl: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_code", ["code"]),
 });

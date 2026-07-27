@@ -11,10 +11,16 @@ struct SavedTripsScreen: View {
     @State private var isDrawerOpen = false
     @State private var segment: Segment = .myTrips
     @State private var groupSummaries: [GroupTripSummary] = []
+    @State private var sharedTrips: [Trip] = []
 
+    // Shortened labels so all three fit the segmented control on small
+    // devices and at larger Dynamic Type sizes ("My Group Trips" / "Shared
+    // with me" would truncate). The feature itself is still called "My Group
+    // Trips" everywhere else.
     private enum Segment: String, CaseIterable {
         case myTrips = "My Trips"
-        case myGroupTrips = "My Group Trips"
+        case myGroupTrips = "Group Trips"
+        case shared = "Shared"
     }
 
     init(store: SavedTripsStore = .init()) {
@@ -39,6 +45,9 @@ struct SavedTripsScreen: View {
             case .myGroupTrips:
                 groupTripsList
                     .padding(.horizontal, 16)
+            case .shared:
+                sharedTripsList
+                    .padding(.horizontal, 16)
             }
         }
         .gradientBackground()
@@ -53,6 +62,7 @@ struct SavedTripsScreen: View {
         .onAppear {
             store.send(.loadSavedTrips)
             groupSummaries = GroupTripCredentialsStore.summaries
+            sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
         }
         // Use onChange to detect when navigation returns to SavedTripsScreen and refresh the data.
         // (SwiftUI NavigationStack does not call onAppear again when popping back to this screen)
@@ -61,6 +71,7 @@ struct SavedTripsScreen: View {
             if newPath.last == .savedTrips || newPath.isEmpty {
                 store.send(.loadSavedTrips)
                 groupSummaries = GroupTripCredentialsStore.summaries
+                sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
             }
         }
     }
@@ -128,7 +139,7 @@ struct SavedTripsScreen: View {
 
     var titleSubtitle: some View {
         VStack(spacing: 2) {
-            Text("Saved Trips")
+            Text("Trips")
                 .font(.kanit(34))
 
             if case let .loaded(trips) = store.state.savedTrips, !trips.isEmpty {
@@ -211,20 +222,61 @@ struct SavedTripsScreen: View {
     }
 
     var plusButton: some View {
-        Button(action: {
-            // Context-aware: match the active segment.
-            switch segment {
-            case .myTrips:
-                router.goToBasicInfo(resetStack: true)
-            case .myGroupTrips:
-                router.goToGroupCreate(resetStack: true)
+        Group {
+            // Nothing to create on "Shared" — links only arrive from friends.
+            if segment != .shared {
+                Button(action: {
+                    // Context-aware: match the active segment.
+                    switch segment {
+                    case .myTrips:
+                        router.goToBasicInfo(resetStack: true)
+                    case .myGroupTrips:
+                        router.goToGroupCreate(resetStack: true)
+                    case .shared:
+                        break
+                    }
+                }) {
+                    Image(systemName: "plus")
+                        .resizable()
+                        .frame(width: 18, height: 18)
+                        .foregroundColor(.appTint)
+                }
             }
-        }) {
-            Image(systemName: "plus")
-                .resizable()
-                .frame(width: 18, height: 18)
-                .foregroundColor(.appTint)
         }
+    }
+
+    var sharedTripsList: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                if sharedTrips.isEmpty {
+                    sharedEmptyState
+                } else {
+                    ForEach(sharedTrips) { trip in
+                        Button(action: { navigateToSharedTripDetails(trip) }) {
+                            TripCard(trip: trip)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 24)
+        }
+    }
+
+    var sharedEmptyState: some View {
+        VStack(spacing: 14) {
+            Spacer(minLength: 60)
+            ZStack {
+                Circle().fill(Color.appTint.opacity(0.12)).frame(width: 92, height: 92)
+                Image(systemName: "paperplane.fill").font(.system(size: 36)).foregroundStyle(Color.appTint)
+            }
+            Text("No shared trips yet").font(DS.Typography.displayLight)
+            Text("Trips your friends share with you will land here.")
+                .font(DS.Typography.subtitle).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // should be part of a Store Action
@@ -239,6 +291,28 @@ struct SavedTripsScreen: View {
             favorites: trip.favorites,
             saved: true,
             mode: .savedTrip,
+            shareCode: trip.shareCode,
+            itineraryResponse: .loaded(trip.itinerary),
+            suggestionsResponse: suggestions
+        )
+
+        router.goToItineraryResult(state, resetStack: false)
+    }
+
+    /// A trip in "Shared" is already a durable local copy
+    /// (`ReceivedSharedTripStorage`) — opens instantly, no network.
+    func navigateToSharedTripDetails(_ trip: Trip) {
+        let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
+            .loaded(trip.suggestions!) : .initial
+
+        let state = TripOutputStore.State(
+            tripSummary: trip.details.destination.name,
+            details: trip.details,
+            selectedContentTab: .itinerary,
+            favorites: trip.favorites,
+            saved: false,
+            mode: .sharedTrip,
+            shareCode: trip.shareCode,
             itineraryResponse: .loaded(trip.itinerary),
             suggestionsResponse: suggestions
         )

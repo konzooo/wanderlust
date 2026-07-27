@@ -102,6 +102,11 @@
 		95123D3ADEACD8AB626EEC85 /* GroupTripCredentialsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1899E73E07BC2D97B8B362BA /* GroupTripCredentialsStore.swift */; };
 		E62E79C0F76A809743B787BE /* SelectAllTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5838D40D1A8A278054EEEB7 /* SelectAllTextField.swift */; };
 		A887CF9705BFA0B357DE90EE /* GroupTripMembersScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6BFE05A83ECAD26C59B9866 /* GroupTripMembersScreen.swift */; };
+		FC63151A3CC99E5100D47810 /* ReceivedSharedTripStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D97467F388B4A3C47D271BB4 /* ReceivedSharedTripStore.swift */; };
+		4E35B1C0B19EF792653D6F35 /* ActivityShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C7E374DD36AE3836902FA4 /* ActivityShareSheet.swift */; };
+		BF3E1E7EBA14B1DA603CD911 /* SharedTripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7FFC331298734584BE3852 /* SharedTripService.swift */; };
+		F8B6C3F9E2E41317B0C568F0 /* SharedTripStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C71F79703F7699836FA63E /* SharedTripStore.swift */; };
+		40E6FFCCF4682F2C425E53E2 /* SharedTripScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA7FF4BB5A6E8C86D5D7282 /* SharedTripScreen.swift */; };
 		C0DE019F8F54000100000001 /* QuestionnaireConceptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE019F8F54000100000002 /* QuestionnaireConceptLab.swift */; };
 		D59368E70C3420299BF88A3D /* GroupDashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4057D1E9A5E0D37EA9B0301 /* GroupDashboardScreen.swift */; };
 		EB1C12E35EA1BF6C1A59DD0F /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = DE4D79994C3CA95E87EFB613 /* ConvexMobile */; };
@@ -228,6 +233,11 @@
 		DC51194E8795E9C6BE21138B /* GroupQuestionnaireDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupQuestionnaireDraftStore.swift; sourceTree = "<group>"; };
 		E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugMenuScreen.swift; sourceTree = "<group>"; };
 		E6BFE05A83ECAD26C59B9866 /* GroupTripMembersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripMembersScreen.swift; sourceTree = "<group>"; };
+		D97467F388B4A3C47D271BB4 /* ReceivedSharedTripStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedSharedTripStore.swift; sourceTree = "<group>"; };
+		E8C7E374DD36AE3836902FA4 /* ActivityShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityShareSheet.swift; sourceTree = "<group>"; };
+		AC7FFC331298734584BE3852 /* SharedTripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTripService.swift; sourceTree = "<group>"; };
+		F6C71F79703F7699836FA63E /* SharedTripStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTripStore.swift; sourceTree = "<group>"; };
+		3FA7FF4BB5A6E8C86D5D7282 /* SharedTripScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTripScreen.swift; sourceTree = "<group>"; };
 		F65888532CB087B100E421A1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPlanningService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -273,6 +283,25 @@
 				A5838D40D1A8A278054EEEB7 /* SelectAllTextField.swift */,
 			);
 			path = GroupTrips;
+			sourceTree = "<group>";
+		};
+		74FED7F7DA9C0093102C3726 /* SharedTrips */ = {
+			isa = PBXGroup;
+			children = (
+				AC7FFC331298734584BE3852 /* SharedTripService.swift */,
+				D97467F388B4A3C47D271BB4 /* ReceivedSharedTripStore.swift */,
+				E8C7E374DD36AE3836902FA4 /* ActivityShareSheet.swift */,
+			);
+			path = SharedTrips;
+			sourceTree = "<group>";
+		};
+		086341C879E835844EFFBBEA /* SharedTrips */ = {
+			isa = PBXGroup;
+			children = (
+				F6C71F79703F7699836FA63E /* SharedTripStore.swift */,
+				3FA7FF4BB5A6E8C86D5D7282 /* SharedTripScreen.swift */,
+			);
+			path = SharedTrips;
 			sourceTree = "<group>";
 		};
 		42A08076E193CCE03D918A55 /* GroupTrips */ = {
@@ -411,6 +440,7 @@
 			children = (
 				5D85EE6F2D40024100C39EBD /* Screens */,
 				332E555BE7A79746BC21D315 /* GroupTrips */,
+				74FED7F7DA9C0093102C3726 /* SharedTrips */,
 				5D37CAAF2D2C288B00E5C85E /* DataModels */,
 				5D730F642DEF210200465BC3 /* Resources */,
 				5D37CAB72D2C3D4D00E5C85E /* Other */,
@@ -466,6 +496,7 @@
 				61BEB3462E17F2A100811242 /* SavedTrips */,
 				5D37CAB42D2C3CC200E5C85E /* BasicInfo */,
 				42A08076E193CCE03D918A55 /* GroupTrips */,
+				086341C879E835844EFFBBEA /* SharedTrips */,
 				5D37CAB52D2C3D0100E5C85E /* Questionnaire */,
 				5D37CAB62D2C3D1B00E5C85E /* Output */,
 				A2C1F68FE6EE8AAFCB6E438E /* Debug */,
@@ -861,6 +892,11 @@
 				22C70A98EBDD52A6B339A03F /* GroupTripCreateScreen.swift in Sources */,
 				F16301D3AAB415962565DB9E /* GroupTripMembersStore.swift in Sources */,
 				A887CF9705BFA0B357DE90EE /* GroupTripMembersScreen.swift in Sources */,
+				FC63151A3CC99E5100D47810 /* ReceivedSharedTripStore.swift in Sources */,
+				4E35B1C0B19EF792653D6F35 /* ActivityShareSheet.swift in Sources */,
+				BF3E1E7EBA14B1DA603CD911 /* SharedTripService.swift in Sources */,
+				F8B6C3F9E2E41317B0C568F0 /* SharedTripStore.swift in Sources */,
+				40E6FFCCF4682F2C425E53E2 /* SharedTripScreen.swift in Sources */,
 				2376A248BA52548A813D14B0 /* GroupOnboardingSheet.swift in Sources */,
 				1D6283A9FFC00BC44F5935A1 /* GroupDashboardStore.swift in Sources */,
 				D59368E70C3420299BF88A3D /* GroupDashboardScreen.swift in Sources */,

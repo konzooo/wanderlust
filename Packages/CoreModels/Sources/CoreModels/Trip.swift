@@ -13,17 +13,26 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     public let itinerary: Itinerary
     public let suggestions: Suggestions?
     public var favorites: Favorites
-    
+    /// The share code associated with this trip file. On a trip in `TripStorage`
+    /// ("My Trips"), it means "I published this trip under this code." On a trip
+    /// in the separate received-trips store ("Shared"), it means "I received this
+    /// trip via this code." The two live in different folders, so there's no
+    /// ambiguity between the two meanings in practice. `nil` for every trip saved
+    /// before trip sharing shipped — decodes via `decodeIfPresent`, no migration.
+    public var shareCode: String?
+
     public init(
         details: Details,
         itinerary: Itinerary,
         suggestions: Suggestions?,
-        favorites: Favorites = .init()
+        favorites: Favorites = .init(),
+        shareCode: String? = nil
     ) {
         self.details     = details
         self.itinerary   = itinerary
         self.suggestions = suggestions
         self.favorites   = favorites
+        self.shareCode   = shareCode
     }
     
     public var destination: String {

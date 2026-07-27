@@ -20,6 +20,29 @@ extension Trip {
             public let ID: TipSectionID?
             public let title: String
             public let texts: [LocationLinkableText]
+
+            public init(ID: TipSectionID?, title: String, texts: [LocationLinkableText]) {
+                self.ID = ID
+                self.title = title
+                self.texts = texts
+            }
+
+            /// Custom decode so an unrecognized category ID degrades to `nil`
+            /// instead of throwing and failing the whole `Suggestions` decode.
+            /// This matters for shared trips: their suggestions round-trip
+            /// through a server that doesn't validate this shape, so a future
+            /// app version's new category must not make an older client's
+            /// decode blow up entirely.
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                title = try container.decode(String.self, forKey: .title)
+                texts = try container.decode([LocationLinkableText].self, forKey: .texts)
+                ID = try? container.decodeIfPresent(TipSectionID.self, forKey: .ID)
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case ID, title, texts
+            }
         }
         
         public enum TipSectionID: String, CaseIterable, Codable, Sendable {

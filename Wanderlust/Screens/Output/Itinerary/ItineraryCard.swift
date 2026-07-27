@@ -54,12 +54,25 @@ struct ItineraryCard: View {
                         ForEach(itinerary.segments.indices, id: \ .self) { index in
                             let segment = itinerary.segments[index]
                             ScrollView {
-                                SegmentItineraryView(segment: segment, topContentOffset: 46, favorites: $favorites)
+                                SegmentItineraryView(segment: segment, topContentOffset: 52, favorites: $favorites)
                             }
                             .tag(index)
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    // Scrolled content dissolves under the page dots instead of being
+                    // sliced in half by the card's top edge.
+                    .mask(
+                        VStack(spacing: 0) {
+                            LinearGradient(
+                                colors: [.clear, .black],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 40)
+                            Color.black
+                        }
+                    )
                 }
                 .background(
                     RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge, style: .continuous)

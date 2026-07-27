@@ -111,12 +111,16 @@ extension Trip {
         
         public struct Location: Hashable, Codable, Equatable, Sendable {
             public let linkSubstring: String
+            /// Fully searchable name, city included ("Brunch & Cake, Barcelona") so a
+            /// place without coordinates can still be found by name.
             public let placeName: String
-            public let latitude: String
-            public let longitude: String
+            /// Nil whenever the model isn't confident about the exact spot — the link
+            /// then falls back to a Maps search rather than pinning the wrong block.
+            public let latitude: String?
+            public let longitude: String?
             public let placeID: String?
-            
-            public init(linkSubstring: String, placeName: String, latitude: String, longitude: String, placeID: String?) {
+
+            public init(linkSubstring: String, placeName: String, latitude: String? = nil, longitude: String? = nil, placeID: String? = nil) {
                 self.linkSubstring = linkSubstring
                 self.placeName = placeName
                 self.latitude = latitude

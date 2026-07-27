@@ -46,6 +46,25 @@ struct LocationLinkBuilder {
                                     placeID: placeID)
     }
 
+    /// Builds a link for a place we can name but not pin, using the same app order.
+    /// A Maps *search* never claims a precise spot, so a name we can't resolve to
+    /// coordinates degrades into "here are the results" instead of a wrong pin.
+    @MainActor static func searchURL(name: String) -> URL? {
+        let enc = encoded(name)
+
+        if let url = URL(string: "comgooglemaps://?q=\(enc)"),
+           UIApplication.shared.canOpenURL(url) {
+            return url
+        }
+
+        if let url = URL(string: "maps://?q=\(enc)"),
+           UIApplication.shared.canOpenURL(url) {
+            return url
+        }
+
+        return URL(string: "https://www.google.com/maps/search/?api=1&query=\(enc)")
+    }
+
     /// Opens the place card immediately, using the same fallback order.
     @MainActor static func openPlace(name: String,
                           latitude: Double,
@@ -69,13 +88,20 @@ struct LocationLinkBuilder {
 
     // ---------- PRIVATE BUILDERS ----------
 
+    /// `.urlQueryAllowed` leaves `&`, `+` and `=` intact, which splits a place name
+    /// like "Brunch & Cake" into two query parameters. Escape those too.
+    private static func encoded(_ name: String) -> String {
+        let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&+=?#"))
+        return name.addingPercentEncoding(withAllowedCharacters: allowed) ?? name
+    }
+
     private static func googleMapsAppURL(
         name: String,
         latitude: Double,
         longitude: Double,
         zoom: Int
     ) -> URL? {
-        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
+        let enc = encoded(name)
         return URL(string: "comgooglemaps://?q=\(enc)&center=\(latitude),\(longitude)&zoom=\(zoom)")
     }
 
@@ -84,7 +110,7 @@ struct LocationLinkBuilder {
         latitude: Double,
         longitude: Double
     ) -> URL? {
-        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
+        let enc = encoded(name)
         return URL(string: "maps://?q=\(enc)&ll=\(latitude),\(longitude)")
     }
 
@@ -94,7 +120,7 @@ struct LocationLinkBuilder {
         longitude: Double,
         placeID: String?
     ) -> URL? {
-        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
+        let enc = encoded(name)
         var url = "https://www.google.com/maps/search/?api=1&query=\(enc)"
         if let pid = placeID, !pid.isEmpty {
             url += "&query_place_id=\(pid)"

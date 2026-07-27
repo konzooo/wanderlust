@@ -127,6 +127,11 @@ extension TravelTipsView {
     }
 
     private struct SuggestionCard: View {
+        // Fixed so the carousel keeps its uniform rhythm; sized to fit the 150-character
+        // ceiling the prompt sets (about five lines) with the last line clear of the heart.
+        private static let cardWidth: CGFloat = 270
+        private static let cardHeight: CGFloat = 138
+
         let card: TextCard
         @Binding var favorites: Trip.Favorites
 
@@ -137,7 +142,8 @@ extension TravelTipsView {
                     .foregroundStyle(.primary)
                     .padding(14)
                     .padding(.trailing, 6)
-                    .frame(width: 270, height: 130, alignment: .topLeading)
+                    .padding(.bottom, 14)
+                    .frame(width: Self.cardWidth, height: Self.cardHeight, alignment: .topLeading)
 
                 Button {
                     favorites.toggle(card.id)
@@ -146,7 +152,7 @@ extension TravelTipsView {
                 }
                 .padding(10)
             }
-            .frame(width: 270, height: 130)
+            .frame(width: Self.cardWidth, height: Self.cardHeight)
             .background(
                 RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
                     .fill(.regularMaterial)

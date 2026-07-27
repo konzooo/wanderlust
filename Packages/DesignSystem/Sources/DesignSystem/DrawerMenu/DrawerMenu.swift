@@ -76,21 +76,12 @@ struct DrawerMenu: View {
         HStack {
             VStack(alignment: .leading, spacing: 0) {
                 // Branded header
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.appTint.opacity(0.12))
-                            .frame(width: 40, height: 40)
-                        Image(systemName: "airplane.departure")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.appTint)
-                    }
-                    Text("Wanderlust")
-                        .font(.kanit(22))
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 64)
-                .padding(.bottom, 18)
+                Text("Wanderlust")
+                    .font(.kanit(22))
+                    .padding(.leading, 76)
+                    .padding(.trailing, 20)
+                    .padding(.top, 64)
+                    .padding(.bottom, 18)
 
                 Divider().padding(.horizontal, 20)
 

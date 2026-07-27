@@ -4,8 +4,9 @@
 <dict>
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <!-- Canonical host is www; the apex 308-redirects to it and Apple
-             does not follow redirects when fetching the AASA. -->
+        <!-- New Wanderlust links use the dedicated subdomain. Keep the legacy
+             www host so links shared by older app builds continue to open. -->
+        <string>applinks:wanderlust.get-catalyst.app</string>
         <string>applinks:www.get-catalyst.app</string>
     </array>
     <key>com.apple.security.app-sandbox</key>

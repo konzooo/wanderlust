@@ -6,7 +6,7 @@ import Foundation
 /// Centralizes the share-link URL so it can't drift from the deep-link parser
 /// in `NavigationRouter.handleDeepLink`.
 enum SharedTripLink {
-    static let host = "https://www.get-catalyst.app"
+    static let host = "https://wanderlust.get-catalyst.app"
     static func url(for code: String) -> URL { URL(string: "\(host)/t/\(code)")! }
 }
 

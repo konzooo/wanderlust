@@ -1,0 +1,23 @@
+{
+  "rewrites": [
+    {
+      "source": "/join/:code",
+      "destination": "https://affable-pika-176.convex.site/join?code=:code"
+    },
+    {
+      "source": "/t/:code",
+      "destination": "https://affable-pika-176.convex.site/t?code=:code"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    }
+  ]
+}

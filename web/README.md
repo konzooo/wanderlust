@@ -1,11 +1,12 @@
-# Wanderlust — Group invite links (Universal Links)
+# Wanderlust share links (Universal Links)
 
-The app already parses group invite deep links (`NavigationRouter.handleDeepLink`)
-and is hooked to `.onOpenURL`. Two forms are supported:
+The app parses both group invites and shared solo trips in
+`NavigationRouter.handleDeepLink` and is hooked to `.onOpenURL`.
 
-- **Production:** Universal Link `https://get-catalyst.app/join/<code>`
-- **Dev/testing:** custom scheme `wanderlust://join/<code>` (registered in
-  `Info.plist`; works in the simulator today — see below)
+- **Production group invite:** `https://wanderlust.get-catalyst.app/join/<code>`
+- **Production shared trip:** `https://wanderlust.get-catalyst.app/t/<code>`
+- **Legacy:** Existing `https://www.get-catalyst.app/...` links stay supported.
+- **Dev/testing:** `wanderlust://join/<code>` and `wanderlust://t/<code>`
 
 ## Test the deep link now (simulator, no domain needed)
 
@@ -13,25 +14,24 @@ and is hooked to `.onOpenURL`. Two forms are supported:
 xcrun simctl openurl booted "wanderlust://join/12345"
 ```
 
-The app opens straight into the Join screen for code `12345`.
+The app opens straight into the Join screen for code `12345`. To test a shared
+trip, use an existing 32-character share code:
 
-## Ship Universal Links (needs YOUR domain + Apple Team ID)
+```bash
+xcrun simctl openurl booted "wanderlust://t/<code>"
+```
 
-1. **Host the AASA file** at exactly:
-   `https://get-catalyst.app/.well-known/apple-app-site-association`
-   - Serve it as `application/json`, **no `.json` extension, no redirect**.
-   - Use `web/.well-known/apple-app-site-association` here as the template and
-     replace `REPLACE_TEAM_ID` with your Apple Developer Team ID (so the appID is
-     `<TEAMID>.com.wanderlust.client`).
-2. **Host the fallback page** `web/join.html` at `https://get-catalyst.app/join/<code>`
-   (any static host: GitHub Pages, Vercel, Netlify, S3). It shows the code and an
-   "Open in app" button for people without the app installed.
-3. **Add the Associated Domains capability** in Xcode → target → Signing &
-   Capabilities → Associated Domains → `applinks:get-catalyst.app`. (Do this in Xcode so
-   the provisioning profile gets the entitlement — don't hand-edit the
-   entitlements file.)
-4. **In-app share URL** — already set to `https://get-catalyst.app/join/<code>`
-   in `GroupTripMembersScreen.swift` and `GroupDashboardScreen.swift`.
-5. Test **cold launch, warm launch, and a repeated link** on a real device
-   (Universal Links don't fully work in the simulator). Apple's CDN can take a
-   while to pick up the AASA — start early.
+## Hosting
+
+`vercel.json` proxies both production paths to Convex, which renders the
+per-trip page and Open Graph preview. The AASA file is served directly at:
+
+`https://wanderlust.get-catalyst.app/.well-known/apple-app-site-association`
+
+It must return `200`, use `application/json`, and never redirect. The iOS target
+keeps both `applinks:wanderlust.get-catalyst.app` and the legacy
+`applinks:www.get-catalyst.app` entitlement.
+
+After changing Associated Domains, install a fresh app build on the real device.
+Test cold launch, warm launch, and repeated links. Apple's AASA CDN can take time
+to refresh.

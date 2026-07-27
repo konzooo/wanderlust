@@ -362,7 +362,7 @@ struct GroupDashboardScreen: View {
     }
 
     private func shareLink(for code: String) -> String {
-        "https://www.get-catalyst.app/join/\(code)"
+        "https://wanderlust.get-catalyst.app/join/\(code)"
     }
 }
 

@@ -312,9 +312,9 @@ struct SavedTripsScreen: View {
         let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
             .loaded(trip.suggestions!) : .initial
 
-        let state = TripOutputStore.State(
+        var state = TripOutputStore.State(
             details: trip.details,
-            selectedContentTab: .itinerary,
+            selectedContentTab: .discover,
             favorites: trip.favorites,
             saved: true,
             mode: .savedTrip,
@@ -322,6 +322,12 @@ struct SavedTripsScreen: View {
             itineraryResponse: .loaded(trip.itinerary),
             suggestionsResponse: suggestions
         )
+        // The traveller's own trip: their decisions and their paid-for deep
+        // dives come back with it. Anything missing on an older file is simply
+        // absent, never regenerated.
+        state.worthItItems = trip.worthItItems
+        state.worthItDecisions = trip.worthItDecisions ?? [:]
+        state.deepDives = trip.deepDives
 
         router.goToItineraryResult(state, resetStack: false)
     }
@@ -340,9 +346,9 @@ struct SavedTripsScreen: View {
         let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
             .loaded(trip.suggestions!) : .initial
 
-        let state = TripOutputStore.State(
+        var state = TripOutputStore.State(
             details: trip.details,
-            selectedContentTab: .itinerary,
+            selectedContentTab: .discover,
             favorites: trip.favorites,
             saved: false,
             mode: .sharedTrip,
@@ -350,6 +356,13 @@ struct SavedTripsScreen: View {
             itineraryResponse: .loaded(trip.itinerary),
             suggestionsResponse: suggestions
         )
+        // A received trip is the recipient's own local file, so these are the
+        // recipient's decisions, restored. The *sender's* never arrive: the
+        // share payload carries content only, and the recipient gets the cards
+        // undecided the first time — deciding is the point.
+        state.worthItItems = trip.worthItItems
+        state.worthItDecisions = trip.worthItDecisions ?? [:]
+        state.deepDives = trip.deepDives
 
         router.goToItineraryResult(state, resetStack: false)
     }

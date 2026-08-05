@@ -15,7 +15,6 @@ struct TripOutputScreen: View {
     @EnvironmentObject var router: NavigationRouter
     
     @State private var isDrawerOpen = false
-    @State private var showRemoveFavoriteAlert = false // Local state for alert
     @State private var hasDismissedOutputOnThisVisit = false
     @State private var previousFavoriteCount = 0
     @AppStorage(OnboardingPreferenceKey.newTripOutputPermanentlyDismissed) private var hasPermanentlyDismissedOutputOnboarding = false
@@ -81,6 +80,18 @@ struct TripOutputScreen: View {
             position: .top
         )
 
+        // Favourites: a full-screen sheet off the header pill, not a tab.
+        .sheet(isPresented: $store.isFavouritesSheetPresented) {
+            FavouritesSheet(
+                destination: store.fullDestinationString,
+                sections: store.favouriteSections,
+                onRemoveFavorite: { favoriteId in
+                    store.send(.removeFavorite(favoriteId))
+                },
+                onClose: { store.isFavouritesSheetPresented = false }
+            )
+        }
+
         // Native share sheet, presented once a share link exists.
         .sheet(item: Binding(
             get: { store.shareSheetURL.map(IdentifiableURL.init) },
@@ -118,40 +129,78 @@ struct TripOutputScreen: View {
         VStack(spacing: 0) {
             // -- HEADER
             itineraryHeader
-            
+
             // -- TAB BAR
-            DS.ContentTabBar(selection: $store.state.selectedContentTab)
-            
+            DS.ContentTabBar(
+                selection: $store.state.selectedContentTab,
+                tabs: store.visibleTabs
+            )
+
             // -- CONTENT
             switch store.selectedContentTab {
-            case .itinerary:
-                ItineraryCard(tripItinerary: store.itineraryResponse, favorites: $store.state.favorites)
+            case .discover:
+                discoverTab
 
-            case .suggestions:
-                TravelTipsView(suggestions: store.suggestionsResponse, favorites: $store.state.favorites)
-                    .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
-                
-            case .favourites:
-                let favouriteItems = store.favouritesWithContext
-                if !favouriteItems.isEmpty {
-                    FavouritesListView(
-                        favorites: favouriteItems,
-                        favoritesBinding: $store.state.favorites,
-                        onRemoveFavorite: { favoriteId in
-                            store.send(.removeFavorite(favoriteId, confirmRemoval: false))
-                        }
-                    )
-                    // Temporarily removed transition to test touch events
-                    // .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
-                } else {
-                    emptyFavoritesView
-                }
+            case .nearYou:
+                // Gated off until the MapKit grounding exists. Reachable only if
+                // the flag is flipped, and then it is honest about what it is.
+                KnowBeforeYouGoPlaceholder(destination: store.fullDestinationString)
+
+            case .knowBeforeYouGo:
+                KnowBeforeYouGoPlaceholder(destination: store.fullDestinationString)
             }
         }
         .gradientBackground()
         .animation(.easeInOut, value: store.state.selectedContentTab)
     }
-    
+
+    /// Discover: the sticky pill row, then whichever band it selected. The pills
+    /// live outside the content's scroll view so they stay put while it moves.
+    @ViewBuilder
+    var discoverTab: some View {
+        DiscoverPillBar(
+            selection: $store.state.discoverSegment,
+            segments: store.discoverSegments
+        )
+
+        switch store.state.discoverSegment {
+        case .suggestions:
+            TravelTipsView(
+                suggestions: store.suggestionsResponse,
+                favorites: $store.state.favorites,
+                onRetry: canRetry ? { store.send(.retryComponent(.suggestions)) } : nil
+            )
+            .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
+
+        case .worthIt:
+            WorthItSkipView(
+                items: store.worthItCards,
+                decision: { store.worthItDecision(for: $0) },
+                onDecide: { store.send(.decideWorthIt($0, $1)) }
+            )
+            .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
+
+        case .itinerary:
+            // No inline retry here on purpose: the itinerary is the *required*
+            // component, so this screen never gets as far as the tabs without
+            // it. Its loading and its recovery are the screen-level `LoadingView`
+            // and `RetryErrorView` above — an inline "Try again" inside a
+            // segment you can only reach once it succeeded would be unreachable.
+            ItineraryCard(
+                tripItinerary: store.itineraryResponse,
+                favorites: $store.state.favorites
+            )
+        }
+    }
+
+    /// A read-only trip has nothing to re-request — its content was generated
+    /// elsewhere and simply arrived, so offering "Try again" would be a button
+    /// that does nothing.
+    private var canRetry: Bool {
+        !store.state.mode.isReadOnly
+    }
+
+
     var itineraryHeader: some View {
         // Explicit argument labels throughout (no trailing closure): TopHeader
         // has two closure-typed parameters now, and Swift's trailing-closure
@@ -165,6 +214,8 @@ struct TripOutputScreen: View {
             showSaveButton: store.state.mode == .newTrip || store.state.mode == .savedTrip,
             showShareButton: store.state.mode == .newTrip || store.state.mode == .savedTrip,
             isSharing: store.isPublishingShare,
+            favouriteCount: store.favouriteCount,
+            showFavouritesButton: true,
             onShareTapped: {
                 store.send(.shareTrip)
             },
@@ -174,6 +225,9 @@ struct TripOutputScreen: View {
                 } else if store.state.mode == .newTrip {
                     store.send(.saveTrip(confirmOverride: false))
                 }
+            },
+            onFavouritesTapped: {
+                store.isFavouritesSheetPresented = true
             }
         )
     }
@@ -195,27 +249,6 @@ struct TripOutputScreen: View {
         }
     }
     
-    var emptyFavoritesView: some View {
-        VStack(spacing: 10) {
-            Spacer()
-
-            Image(systemName: "heart")
-                .font(.system(size: 56))
-                .foregroundStyle(Color(.systemGray3))
-
-            Text("No favorites yet")
-                .font(DS.Typography.displayLight)
-                .foregroundStyle(.primary)
-
-            Text("Tap the heart icon on items you like!")
-                .font(.system(size: 16, design: .rounded))
-                .foregroundStyle(.secondary)
-                .padding(.bottom, 40)
-
-            Spacer()
-        }
-    }
-
     private var shouldShowOutputOnboarding: Bool {
         store.state.mode == .newTrip
             && store.itineraryResponse.isLoaded
@@ -355,14 +388,6 @@ extension View {
                 Button("Override", role: .destructive) { store.send(.saveTrip(confirmOverride: true)) }
                 Button("Cancel", role: .cancel) { store.send(.closeAlert) }
                 
-            case .removeFavorite:
-                Button("Remove", role: .destructive) {
-                    if let favoriteId = store.state.favoriteToRemove {
-                        store.send(.removeFavorite(favoriteId, confirmRemoval: true))
-                    }
-                }
-                Button("Cancel", role: .cancel) { store.send(.closeAlert) }
-                
             case .deleteTrip:
                 Button("Delete", role: .destructive) { store.send(.deleteTrip(confirmDeletion: true)) }
                 Button("Cancel", role: .cancel) { store.send(.closeAlert) }
@@ -378,8 +403,6 @@ extension View {
             switch alert.wrappedValue {
             case .override:
                 Text("A trip with the same details already exists.\nDo you want to override it?")
-            case .removeFavorite:
-                Text("Are you sure you want to remove this item from your favorites?")
             case .deleteTrip:
                 Text("Are you sure you want to unsave this trip?")
             case .unsavedTrip:
@@ -397,21 +420,16 @@ extension View {
             initialState: .init(
                 generationRequest: .init(input: .mock),
                 details: .mock,
-                selectedContentTab: .itinerary,
+                selectedContentTab: .discover,
                 mode: .newTrip,
                 itineraryResponse: .loaded(.mock),
                 suggestionsResponse: .loaded(.mock),
                 imageUrlResponse: .loaded(URL(
                     string: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1080&q=80")!
-                )
+                ),
+                worthItItems: Trip.WorthItItem.mockSet
             )
         )
     }
     .environmentObject(NavigationRouter())
-}
-
-/// Changes whenever either flag toggles
-private struct ContentLoadPair: Equatable {
-    let itineraryReady : Bool
-    let suggestionsReady: Bool
 }

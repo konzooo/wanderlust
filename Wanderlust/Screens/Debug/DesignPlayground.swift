@@ -8,6 +8,7 @@
 //  merged it into the real screen or ruled it out.
 //
 
+import CoreModels
 import SwiftUI
 
 /// A single design-exploration entry shown in the Debug Menu's Design Playground list.
@@ -69,10 +70,36 @@ enum DesignPlayground {
             VibeMixerPrototype()
         }
     ]
+    /// The output shell, wired to mock content so the tabs, the sticky pills,
+    /// the favourites sheet and the Worth-it/Skip decisions can be looked at
+    /// without generating a trip. `.savedTrip` with no `generationRequest`, so
+    /// opening it costs nothing and calls nothing.
+    private static let outputVariants: [DesignVariant] = [
+        DesignVariant(
+            id: "output-shell",
+            title: "Trip Output — Discover / Know Before You Go shell",
+            subtitle: "Tabs, sticky Discover pills, Worth-it/Skip decisions and the favourites sheet, on mock content."
+        ) {
+            TripOutputScreen(
+                initialState: {
+                    var state = TripOutputStore.State(
+                        details: .mock,
+                        saved: true,
+                        mode: .savedTrip
+                    )
+                    state.itineraryResponse = .loaded(.mock)
+                    state.suggestionsResponse = .loaded(.mock)
+                    state.worthItItems = Trip.WorthItItem.mockSet
+                    return state
+                }()
+            )
+        }
+    ]
 #else
     private static let questionnaireVariants: [DesignVariant] = []
+    private static let outputVariants: [DesignVariant] = []
 #endif
 
     /// Registry of in-progress design explorations. Add/remove entries here.
-    static let variants: [DesignVariant] = questionnaireVariants
+    static let variants: [DesignVariant] = outputVariants + questionnaireVariants
 }

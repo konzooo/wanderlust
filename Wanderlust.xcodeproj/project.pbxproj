@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA6000010000000000000001 /* OutputFeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6000020000000000000002 /* OutputFeatureFlags.swift */; };
+		AA6100010000000000000001 /* DiscoverSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6100020000000000000002 /* DiscoverSegment.swift */; };
+		AA6200010000000000000001 /* WorthItSkipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6200020000000000000002 /* WorthItSkipView.swift */; };
+		AA6300010000000000000001 /* KnowBeforeYouGoPlaceholder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6300020000000000000002 /* KnowBeforeYouGoPlaceholder.swift */; };
+		AA6400010000000000000001 /* ComponentStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6400020000000000000002 /* ComponentStateView.swift */; };
+		AA6500010000000000000001 /* FavouritesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6500020000000000000002 /* FavouritesSheet.swift */; };
+		AA6600010000000000000001 /* WorthItDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6600020000000000000002 /* WorthItDecisionTests.swift */; };
+		AA6700010000000000000001 /* FavouritesPlumbingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6700020000000000000002 /* FavouritesPlumbingTests.swift */; };
 		AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000020000000000000002 /* AnalyticsStoreTests.swift */; };
 		AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3000020000000000000002 /* TripPersistenceTests.swift */; };
 		AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */; };
@@ -60,7 +68,6 @@
 		5DED710D2D4BE57700FFC8A4 /* Card.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DED710C2D4BE57700FFC8A4 /* Card.swift */; };
 		5DF6543D2D99937600B01E37 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF6543B2D99937600B01E37 /* APIModels.swift */; };
 		5DF6543F2D99937600B01E37 /* OpenAI+Request.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF6543C2D99937600B01E37 /* OpenAI+Request.swift */; };
-		5DF66D832DDB814300904309 /* LocationLinkBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF66D812DDB814300904309 /* LocationLinkBuilder.swift */; };
 		5DF66D9A2DDB969800904309 /* FontsOLD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF66D982DDB969800904309 /* FontsOLD.swift */; };
 		5DF66D9B2DDB969800904309 /* Kanit-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5DF66D932DDB969800904309 /* Kanit-SemiBold.ttf */; };
 		5DF66D9C2DDB969800904309 /* Kanit-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5DF66D8D2DDB969800904309 /* Kanit-Italic.ttf */; };
@@ -138,6 +145,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA6000020000000000000002 /* OutputFeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputFeatureFlags.swift; sourceTree = "<group>"; };
+		AA6100020000000000000002 /* DiscoverSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverSegment.swift; sourceTree = "<group>"; };
+		AA6200020000000000000002 /* WorthItSkipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorthItSkipView.swift; sourceTree = "<group>"; };
+		AA6300020000000000000002 /* KnowBeforeYouGoPlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowBeforeYouGoPlaceholder.swift; sourceTree = "<group>"; };
+		AA6400020000000000000002 /* ComponentStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentStateView.swift; sourceTree = "<group>"; };
+		AA6500020000000000000002 /* FavouritesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavouritesSheet.swift; sourceTree = "<group>"; };
+		AA6600020000000000000002 /* WorthItDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorthItDecisionTests.swift; sourceTree = "<group>"; };
+		AA6700020000000000000002 /* FavouritesPlumbingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavouritesPlumbingTests.swift; sourceTree = "<group>"; };
 		AA1000020000000000000002 /* AnalyticsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsStoreTests.swift; sourceTree = "<group>"; };
 		AA3000020000000000000002 /* TripPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPersistenceTests.swift; sourceTree = "<group>"; };
 		AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -195,7 +210,6 @@
 		5DED710C2D4BE57700FFC8A4 /* Card.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Card.swift; sourceTree = "<group>"; };
 		5DF6543B2D99937600B01E37 /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModels.swift; sourceTree = "<group>"; };
 		5DF6543C2D99937600B01E37 /* OpenAI+Request.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OpenAI+Request.swift"; sourceTree = "<group>"; };
-		5DF66D812DDB814300904309 /* LocationLinkBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationLinkBuilder.swift; sourceTree = "<group>"; };
 		5DF66D852DDB969800904309 /* Kanit-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Kanit-Black.ttf"; sourceTree = "<group>"; };
 		5DF66D862DDB969800904309 /* Kanit-BlackItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Kanit-BlackItalic.ttf"; sourceTree = "<group>"; };
 		5DF66D872DDB969800904309 /* Kanit-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Kanit-Bold.ttf"; sourceTree = "<group>"; };
@@ -283,6 +297,30 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		AA6A00000000000000000001 /* Discover */ = {
+			isa = PBXGroup;
+			children = (
+				AA6100020000000000000002 /* DiscoverSegment.swift */,
+			);
+			path = Discover;
+			sourceTree = "<group>";
+		};
+		AA6B00000000000000000001 /* WorthIt */ = {
+			isa = PBXGroup;
+			children = (
+				AA6200020000000000000002 /* WorthItSkipView.swift */,
+			);
+			path = WorthIt;
+			sourceTree = "<group>";
+		};
+		AA6C00000000000000000001 /* KnowBeforeYouGo */ = {
+			isa = PBXGroup;
+			children = (
+				AA6300020000000000000002 /* KnowBeforeYouGoPlaceholder.swift */,
+			);
+			path = KnowBeforeYouGo;
+			sourceTree = "<group>";
+		};
 		332E555BE7A79746BC21D315 /* GroupTrips */ = {
 			isa = PBXGroup;
 			children = (
@@ -401,10 +439,13 @@
 			isa = PBXGroup;
 			children = (
 				619B3D372E2704AF00B33648 /* Favorites */,
+				AA6A00000000000000000001 /* Discover */,
+				AA6B00000000000000000001 /* WorthIt */,
+				AA6C00000000000000000001 /* KnowBeforeYouGo */,
+				AA6000020000000000000002 /* OutputFeatureFlags.swift */,
 				6199854A2E1BF8B5003A8A61 /* TripStore.swift */,
 				61A1603F2E0D7A8600AA4EB0 /* Suggestions */,
 				61A1603E2E0D7A8000AA4EB0 /* Itinerary */,
-				619243F02DFE6BCF00AC8124 /* Tools */,
 				5DF66D842DDB814600904309 /* Components */,
 				5D37CABF2D2C3DD700E5C85E /* TripOutputStore.swift */,
 				FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */,
@@ -468,6 +509,8 @@
 				AA1000020000000000000002 /* AnalyticsStoreTests.swift */,
 				AA3000020000000000000002 /* TripPersistenceTests.swift */,
 				AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */,
+				AA6600020000000000000002 /* WorthItDecisionTests.swift */,
+				AA6700020000000000000002 /* FavouritesPlumbingTests.swift */,
 				5D4EFFC52CB05B0F007E3FF2 /* WanderlustTests.swift */,
 			);
 			path = WanderlustTests;
@@ -578,6 +621,7 @@
 		5DF66D842DDB814600904309 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				AA6400020000000000000002 /* ComponentStateView.swift */,
 				619B3D352E22C89700B33648 /* HeartIcon.swift */,
 				61519E8B2DF85D7900627DF4 /* TopHeader.swift */,
 				61519E892DF85D5800627DF4 /* Chip.swift */,
@@ -628,17 +672,10 @@
 			path = Subviews;
 			sourceTree = "<group>";
 		};
-		619243F02DFE6BCF00AC8124 /* Tools */ = {
-			isa = PBXGroup;
-			children = (
-				5DF66D812DDB814300904309 /* LocationLinkBuilder.swift */,
-			);
-			path = Tools;
-			sourceTree = "<group>";
-		};
 		619B3D372E2704AF00B33648 /* Favorites */ = {
 			isa = PBXGroup;
 			children = (
+				AA6500020000000000000002 /* FavouritesSheet.swift */,
 				619B3D382E2704B500B33648 /* FavouritesListView.swift */,
 			);
 			path = Favorites;
@@ -879,7 +916,6 @@
 				61CA97072E16C64D00791288 /* NavigationRouter.swift in Sources */,
 				5DD77BF02D6781C40029D79F /* GPTManager.swift in Sources */,
 				5DD77BF12D6781C40029D79F /* InputBasicInfoView.swift in Sources */,
-				5DF66D832DDB814300904309 /* LocationLinkBuilder.swift in Sources */,
 				5DD77BF22D6781C40029D79F /* InputView.swift in Sources */,
 				5D91792D2D5128E3009AE347 /* OpenAIService.swift in Sources */,
 				61BEB3452E17F29E00811242 /* SavedTripsScreen.swift in Sources */,
@@ -889,6 +925,12 @@
 				FA57A0012D2C3DD700E5C85E /* TripPlanningService.swift in Sources */,
 				AA2000010000000000000001 /* TripGenerationService.swift in Sources */,
 				AA4000010000000000000001 /* TripGenerationCoordinator.swift in Sources */,
+				AA6000010000000000000001 /* OutputFeatureFlags.swift in Sources */,
+				AA6100010000000000000001 /* DiscoverSegment.swift in Sources */,
+				AA6200010000000000000001 /* WorthItSkipView.swift in Sources */,
+				AA6300010000000000000001 /* KnowBeforeYouGoPlaceholder.swift in Sources */,
+				AA6400010000000000000001 /* ComponentStateView.swift in Sources */,
+				AA6500010000000000000001 /* FavouritesSheet.swift in Sources */,
 				619B3D392E2704B500B33648 /* FavouritesListView.swift in Sources */,
 				5D8E4D1E2D6BB915004579EE /* URLRequest+OpenAI.swift in Sources */,
 				5DF66D9A2DDB969800904309 /* FontsOLD.swift in Sources */,
@@ -936,6 +978,8 @@
 				AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */,
 				AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */,
 				AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */,
+				AA6600010000000000000001 /* WorthItDecisionTests.swift in Sources */,
+				AA6700010000000000000001 /* FavouritesPlumbingTests.swift in Sources */,
 				5D4EFFC62CB05B0F007E3FF2 /* WanderlustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -13,10 +13,17 @@ import CoreArchitecture
 public struct TravelTipsView: View {
     let suggestions: AsyncValue<Trip.Suggestions>
     @Binding var favorites: Trip.Favorites
+    /// `nil` where there is nothing to re-request (read-only trips).
+    let onRetry: (() -> Void)?
 
-    public init(suggestions: AsyncValue<Trip.Suggestions>, favorites: Binding<Trip.Favorites>) {
+    public init(
+        suggestions: AsyncValue<Trip.Suggestions>,
+        favorites: Binding<Trip.Favorites>,
+        onRetry: (() -> Void)? = nil
+    ) {
         self.suggestions = suggestions
         self._favorites = favorites
+        self.onRetry = onRetry
     }
 
     // MARK: - Temporary Helper (Remove when backend sends category IDs)
@@ -30,42 +37,27 @@ public struct TravelTipsView: View {
     // MARK: - Temporary Helper (Remove when backend sends category IDs)
 
     public var body: some View {
-        Group {
-            switch suggestions {
-            case .initial, .loading:
-                ProgressView()
-                    .padding(.top, 30)
-                    .transition(.opacity)
-                Spacer()
-            case .error(let error):
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 32))
-                        .foregroundColor(.red)
-                    Text("Failed to load travel tips.")
-                        .font(.headline)
-                    if let error = error as? LocalizedError {
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                }
-                .padding(.top, 30)
-            case .loaded(let tripSuggestions):
-                let sections = Self.mapSections(from: tripSuggestions)
-                ScrollView(.vertical, showsIndicators: false) {
-                    if sections.isEmpty {
-                        Text("No travel tips available.")
-                            .padding(.top, 30)
-                    } else {
-                        VStack(spacing: 22) {
-                            ForEach(sections) { section in
-                                SectionView(section: section, favorites: $favorites)
-                            }
+        ComponentStateView(
+            value: suggestions,
+            subject: "your suggestions",
+            onRetry: onRetry
+        ) { tripSuggestions in
+            let sections = Self.mapSections(from: tripSuggestions)
+            ScrollView(.vertical, showsIndicators: false) {
+                if sections.isEmpty {
+                    // Reached only when the model genuinely returned nothing —
+                    // a still-running or failed call never gets this far.
+                    Text("No suggestions for this trip.")
+                        .font(.kanit(15))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 30)
+                } else {
+                    VStack(spacing: 22) {
+                        ForEach(sections) { section in
+                            SectionView(section: section, favorites: $favorites)
                         }
-                        .padding(.vertical, 20)
                     }
+                    .padding(.vertical, 20)
                 }
             }
         }
@@ -107,7 +99,7 @@ extension TravelTipsView {
                         .foregroundStyle(Color.appTint)
 
                     Text(section.title)
-                        .font(.kanitMedium(18))
+                        .font(DS.Typography.sectionHeader)
                         .foregroundStyle(.primary)
                 }
                 .padding(.horizontal, 16)
@@ -138,7 +130,7 @@ extension TravelTipsView {
         var body: some View {
             ZStack(alignment: .bottomTrailing) {
                 Text(card.text)
-                    .font(.system(size: 15, design: .rounded))
+                    .font(DS.Typography.generatedBody)
                     .foregroundStyle(.primary)
                     .padding(14)
                     .padding(.trailing, 6)

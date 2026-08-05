@@ -100,6 +100,11 @@ final class SharedTripStore: ObservableObject {
         if let suggestions = trip.suggestions {
             output.suggestionsResponse = .loaded(suggestions)
         }
+        // Shared content carries over; the personal layer is the recipient's own
+        // — theirs if this local copy already has some, undecided if not.
+        output.worthItItems = trip.worthItItems
+        output.worthItDecisions = trip.worthItDecisions ?? [:]
+        output.deepDives = trip.deepDives
         return output
     }
 }

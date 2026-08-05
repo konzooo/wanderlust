@@ -8,24 +8,36 @@
 import SwiftUI
 
 // MARK: - Model
+
+/// The top-level sections of the trip output.
+///
+/// Favourites used to be the third tab. It is no longer a tab at all: it is a
+/// pill in the header opening a full-screen sheet, because it is a *view of*
+/// this trip's content rather than a fourth kind of content.
 public enum OutputTab: Int, CaseIterable, Identifiable {
-    case itinerary, suggestions, favourites
-    
+    /// Everything the model wrote about the destination: suggestions, the
+    /// worth-it/skip cards, the sample itinerary.
+    case discover
+    /// Address-grounded picks around where the traveller is staying.
+    case nearYou
+    /// Destination-wide practical preparation.
+    case knowBeforeYouGo
+
     public var id: Int { rawValue }
-    
+
     public var title: String {
         switch self {
-        case .itinerary:   return "Itinerary"
-        case .suggestions: return "Suggestions"
-        case .favourites:  return "Favourites"
+        case .discover: "Discover"
+        case .nearYou: "Near You"
+        case .knowBeforeYouGo: "Know Before You Go"
         }
     }
-    
+
     public var icon: String {
         switch self {
-        case .itinerary:   return "doc.text"         // feel free to swap
-        case .suggestions: return "square.grid.2x2"
-        case .favourites:  return "heart.fill"
+        case .discover: "sparkles"
+        case .nearYou: "location"
+        case .knowBeforeYouGo: "lightbulb"
         }
     }
 }
@@ -34,21 +46,24 @@ public enum OutputTab: Int, CaseIterable, Identifiable {
 extension DS {
     public struct ContentTabBar: View {
         @Binding var selection: OutputTab
+        /// Which tabs this screen actually shows. Visibility is per-mode — a
+        /// group trip has no personal layer, and a tab whose content is not
+        /// wired up yet is simply not passed in — so the bar renders what it is
+        /// given rather than every case of the enum.
+        private let tabs: [OutputTab]
         @Namespace private var underline   // for the matched-geometry animation
-        
-        /// Accent colour taken from Assets › "AccentColor" (or hard-code your own)
+
         private let accent = Color.appTint
-        
-        public  init(selection: Binding<OutputTab>) {
+
+        public init(selection: Binding<OutputTab>, tabs: [OutputTab] = OutputTab.allCases) {
             self._selection = selection
+            self.tabs = tabs
         }
-        
+
         public var body: some View {
             VStack(spacing: 0) {
-                
-                // --- Two tab buttons -------------------------------------------------
                 HStack(alignment: .bottom, spacing: 0) {
-                    ForEach(OutputTab.allCases) { tab in
+                    ForEach(tabs) { tab in
                         Button {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selection = tab
@@ -58,35 +73,48 @@ extension DS {
                         }
                         .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
+                        .accessibilityAddTraits(selection == tab ? [.isSelected, .isButton] : .isButton)
                     }
                 }
-                .padding(.top, 12)   // little breathing-room like in screenshot
-                
-                // --- 1-pt grey divider under the bar --------------------------------
+                .padding(.top, .Padding.sm2)
+
                 Rectangle()
                     .fill(Color(.separator))
                     .frame(height: 1)
             }
             .background(Color(.systemBackground))
+            // A selection outside `tabs` would leave the bar with nothing
+            // highlighted and the screen showing a tab the traveller cannot get
+            // back to. Correcting it here means every caller gets the guarantee
+            // rather than each one remembering it.
+            .onAppear(perform: normalizeSelection)
+            .onChange(of: tabs) { _, _ in normalizeSelection() }
         }
-        
-        /// Builds the text+icon + (when selected) the blue underline
+
+        private func normalizeSelection() {
+            guard !tabs.contains(selection), let first = tabs.first else { return }
+            selection = first
+        }
+
+        /// Icon stacked above the label, so "Know Before You Go" fits the same
+        /// equal-width column as "Discover".
         @ViewBuilder
         private func tabLabel(for tab: OutputTab) -> some View {
-            VStack(spacing: 6) {
-                // Title
-                HStack(spacing: 6) {
+            VStack(spacing: 5) {
+                VStack(spacing: 3) {
                     Image(systemName: tab.icon)
                         .font(.system(size: 16, weight: .semibold))
+
                     Text(tab.title)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(DS.Typography.tabLabel)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 .foregroundStyle(selection == tab ? accent : Color(.systemGray))
+                .padding(.horizontal, 4)
                 .padding(.top, 3)
-                .padding(.bottom, 8)
-                
-                // Blue underline
-                // - With matched-geometry underline
+                .padding(.bottom, 7)
+
                 if selection == tab {
                     Rectangle()
                         .fill(accent)
@@ -94,7 +122,7 @@ extension DS {
                         .frame(height: 3)
                         .alignmentGuide(.bottom) { d in d[.bottom] }
                 } else {
-                    // invisible spacer to keep both stacks equal height
+                    // invisible spacer to keep every stack the same height
                     Rectangle()
                         .fill(Color.clear)
                         .frame(height: 3)
@@ -106,27 +134,25 @@ extension DS {
 
 // MARK: - Example usage / preview
 struct ContentTabBarPreview: View {
-    @State private var currentTab: OutputTab = .itinerary
-    
+    @State private var currentTab: OutputTab = .discover
+    let tabs: [OutputTab]
+
     var body: some View {
         VStack(spacing: 0) {
-            DS.ContentTabBar(selection: $currentTab)
-            
-            // replace with your real content
-            if currentTab == .itinerary {
-                Text("Itinerary page")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.green))
-            } else {
-                Text("Suggestions page")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGroupedBackground))
-            }
+            DS.ContentTabBar(selection: $currentTab, tabs: tabs)
+
+            Text(currentTab.title)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemGroupedBackground))
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }
 }
 
-#Preview {
-    ContentTabBarPreview()
+#Preview("All tabs") {
+    ContentTabBarPreview(tabs: OutputTab.allCases)
+}
+
+#Preview("Near You hidden") {
+    ContentTabBarPreview(tabs: [.discover, .knowBeforeYouGo])
 }

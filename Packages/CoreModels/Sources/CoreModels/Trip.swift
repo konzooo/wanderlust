@@ -43,6 +43,10 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// provenance, and migrated independently. Rendered inline in the feed.
     public var deepDives: [Suggestions.Category]?
 
+    /// The Worth-it/Skip cards themselves. Shared content — it travels in a
+    /// share; the *decisions* below deliberately do not.
+    public var worthItItems: [WorthItItem]?
+
     /// The traveller's Worth-it/Skip decisions. An absent entry is *undecided*,
     /// which is a real and common state — see ``WorthItDecision``.
     public var worthItDecisions: [UUID: WorthItDecision]?
@@ -77,6 +81,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         itinerary: Itinerary,
         suggestionsState: ComponentState<Suggestions>,
         deepDives: [Suggestions.Category]? = nil,
+        worthItItems: [WorthItItem]? = nil,
         worthItDecisions: [UUID: WorthItDecision]? = nil,
         accommodation: CoarseAccommodation? = nil,
         favorites: Favorites = .init(),
@@ -89,6 +94,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.itinerary = itinerary
         self.suggestionsState = suggestionsState
         self.deepDives = deepDives
+        self.worthItItems = worthItItems
         self.worthItDecisions = worthItDecisions
         self.accommodation = accommodation
         self.favorites = favorites
@@ -132,6 +138,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         /// v2 shape: an explicit `ComponentState`.
         case suggestionsState
         case deepDives
+        case worthItItems
         case worthItDecisions
         case accommodation
         case favorites
@@ -160,6 +167,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         }
 
         deepDives = try container.decodeIfPresent([Suggestions.Category].self, forKey: .deepDives)
+        worthItItems = try container.decodeIfPresent([WorthItItem].self, forKey: .worthItItems)
         worthItDecisions = try container.decodeIfPresent(
             [UUID: WorthItDecision].self, forKey: .worthItDecisions
         )
@@ -178,6 +186,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         try container.encode(itinerary, forKey: .itinerary)
         try container.encode(suggestionsState, forKey: .suggestionsState)
         try container.encodeIfPresent(deepDives, forKey: .deepDives)
+        try container.encodeIfPresent(worthItItems, forKey: .worthItItems)
         try container.encodeIfPresent(worthItDecisions, forKey: .worthItDecisions)
         try container.encodeIfPresent(accommodation, forKey: .accommodation)
         try container.encode(favorites, forKey: .favorites)
@@ -206,6 +215,7 @@ public extension Trip {
             itinerary: itinerary,
             suggestionsState: suggestionsState.merged(over: stored.suggestionsState),
             deepDives: deepDives ?? stored.deepDives,
+            worthItItems: worthItItems ?? stored.worthItItems,
             worthItDecisions: worthItDecisions ?? stored.worthItDecisions,
             accommodation: accommodation ?? stored.accommodation,
             favorites: favorites,

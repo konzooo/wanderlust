@@ -31,6 +31,15 @@ struct TopHeader: View {
     var isSharing: Bool
     /// Share button callback
     let onShareTapped: (() -> Void)?
+    /// How many things the traveller has hearted, shown on the favourites pill.
+    var favouriteCount: Int
+    /// Whether to show the favourites pill. This is the only entry point to the
+    /// favourites list now that it isn't a tab, so it stays visible at zero —
+    /// hiding it until the first heart would hide the feature from exactly the
+    /// people who haven't found it.
+    var showFavouritesButton: Bool
+    /// Favourites pill callback
+    let onFavouritesTapped: (() -> Void)?
 
     /// Maximum header height (in points, not pixels).
     private let maxHeight: CGFloat = 230
@@ -46,8 +55,11 @@ struct TopHeader: View {
         showSaveButton: Bool = true,
         showShareButton: Bool = false,
         isSharing: Bool = false,
+        favouriteCount: Int = 0,
+        showFavouritesButton: Bool = false,
         onShareTapped: (() -> Void)? = nil,
         onSaveTapped: (() -> Void)? = nil,
+        onFavouritesTapped: (() -> Void)? = nil,
         imageCache: any ImageCacheStrategy = InMemoryImageCacheStrategy.shared
     ) {
         self.imageUrlState = imageUrlState
@@ -57,8 +69,11 @@ struct TopHeader: View {
         self.showSaveButton = showSaveButton
         self.showShareButton = showShareButton
         self.isSharing = isSharing
+        self.favouriteCount = favouriteCount
+        self.showFavouritesButton = showFavouritesButton
         self.onShareTapped = onShareTapped
         self.onSaveTapped = onSaveTapped
+        self.onFavouritesTapped = onFavouritesTapped
         self.imageCache = imageCache
     }
     
@@ -97,6 +112,10 @@ struct TopHeader: View {
             HStack(spacing: 8) {
                 ForEach(chips, id: \.self) { Chip(text: $0) }
 
+                if showFavouritesButton {
+                    favouritesPill
+                }
+
                 Spacer()
 
                 HStack(spacing: 10) {
@@ -115,6 +134,24 @@ struct TopHeader: View {
 
     }
         
+    /// Sits with the chips rather than with the share/save icons: it opens
+    /// content, it doesn't act on the trip.
+    var favouritesPill: some View {
+        Button(action: { onFavouritesTapped?() }) {
+            HStack(spacing: 5) {
+                Image(systemName: favouriteCount > 0 ? "heart.fill" : "heart")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("\(favouriteCount)")
+                    .font(.kanitLight(16))
+            }
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(.thinMaterial.opacity(0.5), in: Capsule())
+        }
+        .accessibilityLabel("Favourites, \(favouriteCount) saved")
+    }
+
     var saveButton: some View {
         Button(action: {
             onSaveTapped?()

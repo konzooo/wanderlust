@@ -1,5 +1,5 @@
 //
-//  FestivalCard.swift
+//  FavouritesListView.swift
 //  Wanderlust
 //
 //  Created by Rodrigo Mato on 15/7/25.
@@ -9,58 +9,57 @@ import CoreModels
 import DesignSystem
 import SwiftUI
 
+/// The favourites list, grouped by where each item came from.
+///
+/// The heading carries the context, so the cards no longer repeat it under every
+/// row. Order is derived from the trip (see `Trip.favouriteSections`) rather
+/// than from the `Set` behind `Favorites`, which never had one.
 struct FavouritesListView: View {
-    // Updated to use contextual favorites with removal functionality
-    var favorites: [TripOutputStore.FavoriteWithContext]
-    @Binding var favoritesBinding: Trip.Favorites
+    let sections: [Trip.FavouriteSection]
     var onRemoveFavorite: (UUID) -> Void
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                ForEach(favorites, id: \.id) { favoriteItem in
-                    FavoriteCard(
-                        favoriteItem: favoriteItem,
-                        isFavorited: favoritesBinding.contains(favoriteItem.id),
-                        onRemoveFavorite: onRemoveFavorite
-                    )
+            LazyVStack(alignment: .leading, spacing: .Padding.md, pinnedViews: []) {
+                ForEach(sections) { section in
+                    VStack(alignment: .leading, spacing: .Padding.sm2) {
+                        Text(section.context)
+                            .font(DS.Typography.sectionHeader)
+                            .foregroundStyle(.primary)
+
+                        ForEach(section.items) { item in
+                            FavoriteCard(item: item, onRemoveFavorite: onRemoveFavorite)
+                        }
+                    }
                 }
             }
-            .padding(20)
+            .padding(.Padding.md)
         }
-        .background(Color(.systemGroupedBackground))
     }
 }
 
 struct FavoriteCard: View {
-    let favoriteItem: TripOutputStore.FavoriteWithContext
-    let isFavorited: Bool
+    let item: Trip.FavouriteCandidate
     let onRemoveFavorite: (UUID) -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(favoriteItem.text.linkedText)
-                    .font(.system(size: 15.5, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(favoriteItem.context)
-                    .font(.kanitItalic(14))
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            Spacer(minLength: 8)
+        HStack(alignment: .top, spacing: .Padding.sm2) {
+            // The whole `LocationLinkableText` reaches this view, locations
+            // included, so a place that links in the itinerary still links here.
+            Text(item.text.linkedText)
+                .font(DS.Typography.generatedListItem)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
-                onRemoveFavorite(favoriteItem.id)
+                onRemoveFavorite(item.id)
             } label: {
-                HeartIcon(size: 22, isFavorited: isFavorited)
+                HeartIcon(size: 22, isFavorited: true)
                     .frame(width: 44, height: 44) // Minimum tap target size
             }
             .buttonStyle(PlainButtonStyle())
             .contentShape(Rectangle())
+            .accessibilityLabel("Remove from favourites")
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,29 +77,29 @@ struct FavoriteCard: View {
 
 #Preview {
     FavouritesListView(
-        favorites: [
-            TripOutputStore.FavoriteWithContext(
-                id: UUID(),
-                text: LocationLinkableText(text: "Catch the Sant Joan Festival — beach bonfires, fireworks, and all-night energy in late June."),
-                context: "Evening"
+        sections: [
+            Trip.FavouriteSection(
+                context: "Morning",
+                items: [
+                    .init(
+                        id: UUID(),
+                        text: LocationLinkableText(text: "Grab a coffee at Surf House Barcelona."),
+                        context: "Morning"
+                    )
+                ]
             ),
-            TripOutputStore.FavoriteWithContext(
-                id: UUID(),
-                text: LocationLinkableText(text: "Visit the Picasso Museum."),
-                context: "Afternoon"
-            ),
-            TripOutputStore.FavoriteWithContext(
-                id: UUID(),
-                text: LocationLinkableText(text: "Grab a coffee at Surf House Barcelona."),
-                context: "Morning"
-            ),
-            TripOutputStore.FavoriteWithContext(
-                id: UUID(),
-                text: LocationLinkableText(text: "Try the hot chocolate with churros at La Nena."),
-                context: "Secret Tip"
+            Trip.FavouriteSection(
+                context: "Worth it or skip",
+                items: [
+                    .init(
+                        id: Trip.WorthItItem.mockSet[0].id,
+                        text: Trip.WorthItItem.mockSet[0].favouriteText,
+                        context: "Worth it or skip"
+                    )
+                ]
             )
         ],
-        favoritesBinding: .constant(.init()),
         onRemoveFavorite: { _ in }
     )
+    .gradientBackground()
 }

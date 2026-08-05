@@ -15,36 +15,26 @@ struct ItineraryCard: View {
     @State private var currentPage = 0
     let tripItinerary: AsyncValue<Trip.Itinerary>
     @Binding var favorites: Trip.Favorites
+    /// `nil` where there is nothing to re-request (read-only trips).
+    let onRetry: (() -> Void)?
 
-    init(tripItinerary: AsyncValue<Trip.Itinerary>, favorites: Binding<Trip.Favorites>) {
+    init(
+        tripItinerary: AsyncValue<Trip.Itinerary>,
+        favorites: Binding<Trip.Favorites>,
+        onRetry: (() -> Void)? = nil
+    ) {
         self.tripItinerary = tripItinerary
         self._favorites = favorites
+        self.onRetry = onRetry
     }
 
     var body: some View {
         ZStack {
-            switch tripItinerary {
-            case .initial, .loading:
-                ProgressView()
-                    .padding(.top, 20)
-                    .transition(.opacity)
-                Spacer()
-            case .error(let error):
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 32))
-                        .foregroundColor(.red)
-                    Text("Failed to load itinerary.")
-                        .font(.headline)
-                    if let error = error as? LocalizedError {
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                }
-                .padding(.top, 20)
-            case .loaded(let itinerary):
+            ComponentStateView(
+                value: tripItinerary,
+                subject: "your sample itinerary",
+                onRetry: onRetry
+            ) { itinerary in
                 ZStack(alignment: .top) {
                     PageIndicator(currentPage: currentPage, totalPages: itinerary.segments.count)
                         .padding(.top, .Padding.md)

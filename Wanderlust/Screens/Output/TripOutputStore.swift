@@ -22,6 +22,8 @@ class TripOutputStore: ObservableStore {
     // UI Bindings
     @Published var retryCount: Int = 0
     @Published var presentSaveToast: Bool = false
+    /// Favourites are a full-screen sheet reached from the header, not a tab.
+    @Published var isFavouritesSheetPresented: Bool = false
     @Published var isPublishingShare: Bool = false
     /// Non-nil → present the native share sheet for this URL.
     @Published var shareSheetURL: URL?
@@ -111,6 +113,16 @@ class TripOutputStore: ObservableStore {
             }
             fetchDestinationImage()
 
+        case .retryComponent(let component):
+            // The in-place "Try again" on one tab. Same coordinator path as the
+            // screen-level retry, so it still cancels and supersedes rather than
+            // racing whatever was outstanding.
+            retryCount += 1
+            generate(component, restart: true)
+
+        case .decideWorthIt(let id, let decision):
+            applyWorthIt(decision, to: id)
+
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
 
@@ -118,16 +130,10 @@ class TripOutputStore: ObservableStore {
             shareTrip()
 
 
-        case .removeFavorite(let id, let confirmRemoval):
-            if confirmRemoval {
-                state.favorites.toggle(id)
-                state.alert = nil
-                state.favoriteToRemove = nil
-            } else {
-                state.favoriteToRemove = id
-                state.alert = .removeFavorite
-            }
-            
+        case .removeFavorite(let id):
+            removeFavourite(id)
+
+
         case .navigateBack:
             if state.mode == .sharedTrip {
                 // Unlike `.groupTrip` (no local file, favorite toggles are
@@ -181,7 +187,8 @@ extension TripOutputStore {
         /// than a runtime guard someone can forget.
         var generationRequest: TripGenerationRequest? = nil
         var details: Trip.Details
-        var selectedContentTab: OutputTab = .itinerary
+        var selectedContentTab: OutputTab = .discover
+        var discoverSegment: DiscoverSegment = .suggestions
         var favorites: Trip.Favorites = .init()
         var saved: Bool = false
         let mode: Mode
@@ -194,7 +201,23 @@ extension TripOutputStore {
         var suggestionsResponse: AsyncValue<Trip.Suggestions> = .initial
         var imageUrlResponse: AsyncValue<URL> = .initial
         var didLogResultViewed = false
-        
+
+        /// The Worth-it/Skip cards. `nil` until something generates them — the
+        /// segment isn't offered while it is nil, rather than showing an empty
+        /// one.
+        var worthItItems: [Trip.WorthItItem]? = nil
+
+        /// The traveller's calls on those cards. An id with no entry is
+        /// *undecided*, which is where every card starts and where Undo returns
+        /// it. Always non-`nil` so a save writes what the traveller actually
+        /// decided, including "nothing any more".
+        var worthItDecisions: [UUID: WorthItDecision] = [:]
+
+        /// Interest deep dives already paid for on this trip, carried so a
+        /// re-save cannot drop them and so their items stay heartable.
+        var deepDives: [Trip.Suggestions.Category]? = nil
+
+
         var fullDestinationString: String {
             itineraryResponse.data?.destination ?? details.destination.name
         }
@@ -204,13 +227,6 @@ extension TripOutputStore {
         }
         
         // Dialogs & Sheets
-        var showRemoveFavoriteDialog: Bool = false {
-            didSet {
-                print("showRemoveFavoriteDialog changed from \(oldValue) to \(showRemoveFavoriteDialog)")
-            }
-        }
-        var favoriteToRemove: UUID?
-    
         var alert: AlertType? = nil
     }
 
@@ -218,9 +234,16 @@ extension TripOutputStore {
         case onAppear
         case closeAlert
         case retry
+        /// Retry exactly one component, from that component's own error state.
+        case retryComponent(TripComponent)
+        /// Record (or, with `nil`, undo) a Worth-it/Skip decision.
+        case decideWorthIt(UUID, WorthItDecision?)
         case saveTrip(confirmOverride: Bool = false)
         case shareTrip
-        case removeFavorite(UUID, confirmRemoval: Bool = false)
+        /// Confirmation is the presenter's job — the favourites sheet owns its
+        /// own alert, because one presented by the screen underneath would
+        /// dismiss the sheet in order to appear.
+        case removeFavorite(UUID)
         case navigateBack
         case saveAndNavigateBack
         case discardAndNavigateBack
@@ -238,79 +261,114 @@ extension TripOutputStore {
     }
 }
 
+// MARK: - Shell
+
 extension TripOutputStore {
-    /// Returns a dictionary of favorited UUIDs to their LocationLinkableText, built from the current loaded itinerary and/or suggestions.
-    var favouritesDictionary: [UUID: LocationLinkableText]? {
-        // Try to extract loaded itinerary and suggestions, if available
-        let itinerary: Trip.Itinerary?
-        if case .loaded(let loadedItinerary) = state.itineraryResponse {
-            itinerary = loadedItinerary
-        } else {
-            itinerary = nil
+    /// The tabs this screen offers.
+    ///
+    /// Visibility is a product rule, not a rendering detail: Near You is
+    /// personal and address-grounded, so it is absent from the read-only modes
+    /// entirely and gated behind ``OutputFeatureFlags/nearYouEnabled`` until
+    /// there is real grounding behind it.
+    var visibleTabs: [OutputTab] {
+        var tabs: [OutputTab] = [.discover]
+        if OutputFeatureFlags.nearYouEnabled && !state.mode.isReadOnly {
+            tabs.append(.nearYou)
         }
-
-        let suggestions: Trip.Suggestions?
-        if case .loaded(let loadedSuggestions) = state.suggestionsResponse {
-            suggestions = loadedSuggestions
-        } else {
-            suggestions = nil
+        if OutputFeatureFlags.knowBeforeYouGoEnabled {
+            tabs.append(.knowBeforeYouGo)
         }
-
-        // If neither is loaded, return nil
-        if itinerary == nil && suggestions == nil {
-            return nil
-        }
-
-        var result: [UUID: LocationLinkableText] = [:]
-
-        // Itinerary
-        for segment in itinerary!.segments {
-            for bucket in [segment.description.morning, segment.description.afternoon, segment.description.evening] {
-                bucket?.forEach { result[$0.id] = $0 }
-            }
-            if let tip = segment.secretTip {
-                // Convert SecretTip to LocationLinkableText for consistency
-                result[tip.id] = LocationLinkableText(text: tip.text, id: tip.id)
-            }
-        }
-
-        // Suggestions
-        if let suggestions = suggestions {
-            for cat in suggestions.dynamicSuggestions + suggestions.staticSuggestions {
-                cat.texts.forEach { result[$0.id] = $0 }
-            }
-        }
-
-        // Only return those that are actually favorited
-        return state.favorites.liked.reduce(into: [UUID: LocationLinkableText]()) { dict, id in
-            if let text = result[id] {
-                dict[id] = text
-            }
-        }
+        return tabs
     }
 
-    /// Structure to hold favorite item information with context for display
-    struct FavoriteWithContext {
-        let id: UUID
-        let text: LocationLinkableText
-        let context: String
+    /// The pills inside Discover.
+    ///
+    /// Worth-it/Skip appears only when there are cards, and never on a group
+    /// trip: deciding is personal, and a group trip has no personal layer to
+    /// record the decision in.
+    var discoverSegments: [DiscoverSegment] {
+        var segments: [DiscoverSegment] = [.suggestions]
+        if worthItCards.isEmpty == false { segments.append(.worthIt) }
+        segments.append(.itinerary)
+        return segments
     }
 
-    /// Returns favorited items with their contextual information (Morning/Afternoon/Evening for itinerary, section title for suggestions)
-    var favouritesWithContext: [FavoriteWithContext] {
-        guard case let .loaded(itinerary) = state.itineraryResponse else {
-            return []
-        }
-        
-        let trip = Trip(details: state.details, itinerary: itinerary, suggestions: state.suggestionsResponse.data, favorites: state.favorites)
-        let allCandidatesWithContext = trip.allFavouriteCandidatesWithContext
-        
-        return state.favorites.liked.compactMap { favoriteId in
-            guard let (text, context) = allCandidatesWithContext[favoriteId] else { return nil }
-            
-            // Create LocationLinkableText from the text
-            let locationLinkableText = LocationLinkableText(text: text, id: favoriteId)
-            return FavoriteWithContext(id: favoriteId, text: locationLinkableText, context: context)
+    /// The Worth-it/Skip cards to render, already filtered by mode.
+    var worthItCards: [Trip.WorthItItem] {
+        guard state.mode != .groupTrip else { return [] }
+        return state.worthItItems ?? []
+    }
+
+    func worthItDecision(for id: UUID) -> WorthItDecision? {
+        state.worthItDecisions[id]
+    }
+}
+
+// MARK: - Favourites
+
+extension TripOutputStore {
+    /// The trip as the favourites plumbing sees it. Built from live screen
+    /// state so a favourite made seconds ago resolves, and from **one** walk of
+    /// the content — the screen used to keep its own second copy of that walk,
+    /// which is how the two drifted apart and place links stopped rendering
+    /// in the favourites list.
+    private var favouritesSourceTrip: Trip? {
+        guard case let .loaded(itinerary) = state.itineraryResponse else { return nil }
+        return Trip(
+            details: state.details,
+            itinerary: itinerary,
+            suggestionsState: state.suggestionsResponse.persisted,
+            deepDives: state.deepDives,
+            worthItItems: state.worthItItems,
+            worthItDecisions: state.worthItDecisions,
+            favorites: state.favorites
+        )
+    }
+
+    /// Favourites grouped by their heading, in a deterministic order.
+    var favouriteSections: [Trip.FavouriteSection] {
+        favouritesSourceTrip?.favouriteSections(state.favorites) ?? []
+    }
+
+    var favouriteCount: Int {
+        state.favorites.liked.count
+    }
+
+    /// Removes a favourite **and** clears any decision attached to it.
+    ///
+    /// This is the row of the invariant table that breaks if the two stores are
+    /// touched independently: un-hearting a Worth-it card from the favourites
+    /// screen has to return that card to undecided, or the traveller is left
+    /// with a card showing "kept" that is not in their favourites. Nothing else
+    /// may mutate `favorites` and `worthItDecisions` at separate call sites.
+    func removeFavourite(_ id: UUID) {
+        state.favorites.remove(id)
+        state.worthItDecisions[id] = nil
+    }
+
+    /// Records a Worth-it/Skip decision, or undoes it with `nil`.
+    ///
+    /// | Action | Decision | Favourites |
+    /// |---|---|---|
+    /// | Add to favourites | `.kept` | insert |
+    /// | Undo from `.kept` | undecided | remove |
+    /// | Skip it | `.skipped` | unchanged |
+    /// | Undo from `.skipped` | undecided | unchanged |
+    private func applyWorthIt(_ decision: WorthItDecision?, to id: UUID) {
+        let previous = state.worthItDecisions[id]
+        state.worthItDecisions[id] = decision
+
+        switch (previous, decision) {
+        case (_, .kept):
+            state.favorites.insert(id)
+        case (.kept, _):
+            // Leaving `.kept` — by undo, or by changing one's mind to `.skipped`
+            // — must take the favourite with it. "Kept" and "in favourites" are
+            // the same fact stored twice; they are never allowed to disagree.
+            state.favorites.remove(id)
+        case (.skipped, _), (nil, _):
+            // Skipping, and undoing a skip, deliberately leave favourites alone.
+            break
         }
     }
 
@@ -505,6 +563,13 @@ extension TripOutputStore {
             details: state.details,
             itinerary: itinerary,
             suggestionsState: state.suggestionsResponse.persisted,
+            deepDives: state.deepDives,
+            worthItItems: state.worthItItems,
+            // Always written, never `nil`: the personal layer is a live edit, so
+            // "the traveller undid every decision" has to reach disk as an empty
+            // map rather than as "I don't know", which `merged(over:)` would
+            // resolve back to the stored decisions.
+            worthItDecisions: state.worthItDecisions,
             favorites: state.favorites,
             shareCode: state.shareCode,
             tripKey: state.generationRequest?.tripKey
@@ -746,14 +811,12 @@ extension TripOutputStore {
 extension TripOutputStore.State {
     enum AlertType: Identifiable {
         case override
-        case removeFavorite
         case deleteTrip
         case unsavedTrip
         
         var id: String {
             switch self {
             case .override: return "override"
-            case .removeFavorite: return "removeFavorite"
             case .deleteTrip: return "deleteTrip"
             case .unsavedTrip: return "unsavedTrip"
             }

@@ -20,8 +20,21 @@ Family: **Kanit**. Raw weight helpers (`.kanit()`, `.kanitLight()`, `.kanitMediu
 | `DS.Typography.subtitle` | 18 / Light | Page subtitle, under a Display title |
 | `DS.Typography.fieldCaption` | 18 / Light | Label above a sheet form field — same size as `subtitle` today, kept as a separate token since the two may diverge later |
 | `DS.Typography.fieldLabel` | 16 / Medium | Field / section label on the Next Trip form |
+| `DS.Typography.sectionHeader` | 18 / Medium | Heading above a content section (suggestions carousel, favourites group) |
+| `DS.Typography.segmentTitle` | 19 / Medium | Title of one segment of content (a day in the itinerary) |
+| `DS.Typography.eyebrow` | 15 / Medium Italic | Small label introducing a block of generated prose ("The case", "The catch") |
+| `DS.Typography.contextLabel` | 14 / Italic | Where a favourite came from, shown beside it |
+| `DS.Typography.tabLabel` | 14 / Medium | Tab-bar and pill-selector labels |
 
-**What changed:** "Display" text was 4 different sizes before (34/32/30/28) — one of them (`TripCard`) wasn't even Kanit, it was the system font. All four now share one size; weight alone signals context, and the font-family bug is fixed as part of the same change.
+**Typography is content-type, not hierarchy.** Kanit is the app's voice and renders *chrome* — titles, tab and segment labels, section headings, eyebrows. Anything the **model** generated renders in SF Pro Rounded, so generated prose reads as prose and not as another piece of the app's furniture. A heading written by the model is still model text; it does not get Kanit for being a heading.
+
+| Token | Spec | Role |
+|---|---|---|
+| `DS.Typography.generatedBody` | 15 / SF Pro Rounded | Model-written prose inside a card |
+| `DS.Typography.generatedListItem` | 15.5 / SF Pro Rounded | Model-written prose as a list row (itinerary items, favourites) |
+| `DS.Typography.generatedTitle` | 18 / Semibold / SF Pro Rounded | A place name the model chose, used as a card title |
+
+**What changed:** "Display" text was 4 different sizes before (34/32/30/28) — one of them (`TripCard`) wasn't even Kanit, it was the system font. All four now share one size; weight alone signals context, and the font-family bug is fixed as part of the same change. `DS.ContentTabBar` followed neither rule — it rendered its labels in the plain system font — and now uses `tabLabel`.
 
 **What stayed distinct on purpose:** `subtitle` and `fieldCaption` render identically today (18/Light) but are two separate tokens — a page subtitle and a sheet form-field label are different jobs that happen to look the same right now, not the same thing.
 
@@ -72,7 +85,11 @@ Down from 9 raw values with no names to 6 named tiers. One 2pt radius (the Quest
 
 ## Components
 
-Unchanged from the original audit — `PrimaryButtonStyle`, `SecondaryButtonStyle` (still unused anywhere live), `Chip`, `DS.ContentTabBar`, `DS.InformativeCard`, `DS.Toast`, `TopHeader`, `HeartIcon`. Two small fixes landed alongside the tokens:
+`PrimaryButtonStyle`, `SecondaryButtonStyle`, `Chip`, `DS.ContentTabBar`, `DS.InformativeCard`, `DS.Toast`, `TopHeader`, `HeartIcon`.
+
+`DS.ContentTabBar` takes `init(selection:tabs:)`: tab visibility is per-mode (a group trip has no personal layer; a tab whose content isn't wired up yet is not passed in), so the bar renders what it is given rather than every case of `OutputTab`. It normalizes a selection that isn't in `tabs`, and stacks the icon above the label so a long title shares the same equal-width column as a short one.
+
+Two small fixes landed alongside the tokens:
 - `TopHeader` no longer has a debug `Color.red` sitting behind the hero image.
 - `TripCard`'s destination title and chip labels now use Kanit — they were the only place in the app rendering text in the system font.
 

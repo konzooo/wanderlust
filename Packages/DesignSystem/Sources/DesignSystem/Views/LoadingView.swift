@@ -24,7 +24,10 @@ public struct LoadingView: View {
         rotateIcon: Bool = false
     ) {
         self._progress = State(initialValue: progress)
-        self._currentFactIndex = State(initialValue: showQuestion2 || showAnswer2 ? 1 : 0)
+        let initialFactIndex = showQuestion2 || showAnswer2
+            ? 1
+            : Int.random(in: Self.facts.indices)
+        self._currentFactIndex = State(initialValue: initialFactIndex)
         self._showQuestion = State(initialValue: showQuestion1 || showQuestion2)
         self._showAnswer = State(initialValue: showAnswer1 || showAnswer2)
         self._rotateIcon = State(initialValue: rotateIcon)

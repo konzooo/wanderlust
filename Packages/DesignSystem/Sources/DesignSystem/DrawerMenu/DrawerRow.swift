@@ -27,7 +27,7 @@ public enum DrawerRow: Int, CaseIterable {
         case .groupTrip:
             "Start or join group trip"
         case .savedTrips:
-            "Trips"
+            "My trips"
         case .profiles:
             "Profiles"
         case .feedback:

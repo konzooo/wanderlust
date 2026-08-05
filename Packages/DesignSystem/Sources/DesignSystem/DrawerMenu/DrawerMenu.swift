@@ -86,7 +86,12 @@ struct DrawerMenu: View {
                 Divider().padding(.horizontal, 20)
 
                 VStack(spacing: 4) {
-                    ForEach(DrawerRow.allCases.filter { $0 != .none }, id: \.self) { row in
+                    ForEach(
+                        DrawerRow.allCases.filter {
+                            $0 != .none && $0 != .feedback
+                        },
+                        id: \.self
+                    ) { row in
                         RowView(
                             isSelected: selected == row,
                             icon: row.iconName,
@@ -102,6 +107,24 @@ struct DrawerMenu: View {
                 .padding(.top, 12)
 
                 Spacer()
+
+                Divider()
+                    .padding(.horizontal, 20)
+
+                VStack(spacing: 0) {
+                    RowView(
+                        isSelected: selected == .feedback,
+                        icon: DrawerRow.feedback.iconName,
+                        title: DrawerRow.feedback.title,
+                        row: .feedback
+                    ) {
+                        onSelection(.feedback)
+                        viewModel.closeDrawer(with: $isOpen)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 28)
             }
             .frame(width: totalWidth)
             .frame(maxHeight: .infinity, alignment: .top)

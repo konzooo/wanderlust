@@ -57,6 +57,7 @@ final class SharedTripStore: ObservableObject {
                     ),
                     itinerary: dto.itinerary,
                     suggestionsState: dto.suggestions.map(ComponentState.ready) ?? .absent,
+                    knowBeforeYouGoState: dto.knowBeforeYouGo.map(ComponentState.ready) ?? .absent,
                     // Content arrives; the sender's decisions deliberately do
                     // not (§4), so this local copy starts every card undecided.
                     worthItItems: dto.worthItItems,
@@ -104,6 +105,9 @@ final class SharedTripStore: ObservableObject {
         output.itineraryResponse = .loaded(trip.itinerary)
         if let suggestions = trip.suggestions {
             output.suggestionsResponse = .loaded(suggestions)
+        }
+        if let briefing = trip.knowBeforeYouGo {
+            output.knowBeforeYouGoResponse = .loaded(briefing)
         }
         // Shared content carries over; the personal layer is the recipient's own
         // — theirs if this local copy already has some, undecided if not.

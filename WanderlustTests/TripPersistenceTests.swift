@@ -25,6 +25,7 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertNil(trip.deepDives)
         XCTAssertNil(trip.worthItDecisions)
         XCTAssertNil(trip.accommodation)
+        XCTAssertTrue(trip.knowBeforeYouGoState.isAbsent)
     }
 
     /// A v1 file whose suggestions key was simply never written. "There are

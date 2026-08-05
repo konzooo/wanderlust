@@ -153,7 +153,12 @@ struct TripOutputScreen: View {
                 )
 
             case .knowBeforeYouGo:
-                KnowBeforeYouGoPlaceholder(destination: store.fullDestinationString)
+                KnowBeforeYouGoView(
+                    value: store.state.knowBeforeYouGoResponse,
+                    destination: store.fullDestinationString,
+                    unavailable: store.knowBeforeYouGoIsUnavailable,
+                    onRetry: canRetry ? { store.send(.retryComponent(.knowBeforeYouGo)) } : nil
+                )
             }
         }
         .gradientBackground()
@@ -284,6 +289,48 @@ struct TripOutputScreen: View {
 
     private var backButtonTitle: String {
         store.state.mode == .groupTrip ? "Dashboard" : "Trips"
+    }
+}
+
+/// What the Near You tab says while it is flag-gated.
+///
+/// It lives here rather than in its own file because it is scaffolding with a
+/// known removal date: the grounded Near You (MapKit resolution, real walking
+/// distances, the device-side address boundary) replaces it wholesale. Until
+/// then the tab is not offered at all — this is only reachable by flipping
+/// `OutputFeatureFlags.nearYouEnabled`, and it says plainly what it is.
+private struct NearYouPlaceholder: View {
+    let destination: String
+
+    var body: some View {
+        VStack(spacing: .Spacing.medium) {
+            Image(systemName: "location")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(Color.appTint)
+                .padding(.top, .Padding.lg)
+
+            Text("Near You")
+                .font(DS.Typography.sectionHeader)
+                .foregroundStyle(.primary)
+
+            Text("Once you tell us where you're staying in \(destination), this is what's actually around you — walking distances from the map, not guesses.")
+                .font(.kanit(15))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Text("Not built yet")
+                .font(DS.Typography.eyebrow)
+                .foregroundStyle(Color.appTint)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.appTint.opacity(0.07)))
+                .overlay(Capsule().stroke(Color.appTint.opacity(0.18), lineWidth: 1))
+                .padding(.top, .Padding.sm)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, .Padding.md2)
     }
 }
 
@@ -435,6 +482,7 @@ extension View {
         mode: .newTrip,
         itineraryResponse: .loaded(.mock),
         suggestionsResponse: .loaded(.mock),
+        knowBeforeYouGoResponse: .loaded(.mock),
         imageUrlResponse: .loaded(URL(
             string: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1080&q=80")!
         )

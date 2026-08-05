@@ -1,0 +1,166 @@
+{
+  "id": "bergen-family",
+  "why": "Small Nordic city where scams and bargaining are not topics; family changes the emphasis",
+  "model": "gpt-4o-mini",
+  "ranAt": "2026-08-05T18:55:35.182Z",
+  "usage": {
+    "inputTokens": 2476,
+    "cachedInputTokens": 0,
+    "outputTokens": 944,
+    "reasoningTokens": 0
+  },
+  "durationMs": 12129,
+  "score": {
+    "sectionCount": 9,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 2,
+      "money": 1,
+      "gettingAround": 2,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 8,
+    "verifyRatio": 0.1111111111111111,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.3333333333333333,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 3,
+    "sectionsNamingPlaces": 2,
+    "duplicateSentences": []
+  },
+  "sections": [
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Entry and documents",
+      "body": "Travelers heading to Norway from most countries do not require a visa for stays of up to 90 days. EU and Schengen citizens need only an ID card; everyone else needs a passport valid for three months beyond departure.",
+      "bullets": [],
+      "volatility": "verify",
+      "sourceLead": "Entry rules change — confirm with",
+      "source": "Norwegian Directorate of Immigration",
+      "sourceURL": "https://www.udi.no/",
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "What July is practically like",
+      "body": "July in Bergen is mild and pleasant, with average temperatures around 15-20°C (59-68°F). Expect long daylight hours, with the sun setting as late as 11 PM. It’s a popular month, so pack light layers and plan for occasional rain showers.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "How payments work in Bergen",
+      "body": "In Bergen, card payments are widely accepted, even at smaller shops. ATMs are easily found for cash withdrawals, but having some cash for local street food or markets is a good idea. A family of four can expect to spend around 1500-2500 NOK per day, depending on activities.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Getting from Bergen Airport",
+      "body": "To get into Bergen from the airport, the Flybussen express bus is the best choice. It costs around 120 NOK per person and takes about 30 minutes to reach the city center. Alternatively, taxis are available but can be expensive at around 400 NOK.",
+      "bullets": [
+        "Flybussen costs approx. 120 NOK",
+        "Takes about 30 minutes",
+        "Taxis can cost around 400 NOK"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "Bergen Airport",
+          "placeName": "Bergen Airport, Bergen",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Public transport options in Bergen",
+      "body": "Bergen has a reliable public transport system with buses, light rail, and ferries. You can purchase a Bergen Card for unlimited travel on public transport and discounts on local attractions. The city is also very walkable, which makes exploring easy.",
+      "bullets": [
+        "Bergen Card for unlimited travel",
+        "Good for local attractions",
+        "City is walkable"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Food culture in Bergen",
+      "body": "Families in Bergen typically eat dinner around 5-7 PM. For local food, try the fish market for fresh seafood and street food options. Dinner in a restaurant might cost around 200-400 NOK per person for a nice meal, while casual eateries offer cheaper options.",
+      "bullets": [
+        "Dinner around 5-7 PM",
+        "Fish market for street food",
+        "Nice meal: 200-400 NOK"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "Fish Market",
+          "placeName": "Fish Market, Bergen",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Language basics to know",
+      "body": "Norwegian is the official language, but English is widely spoken. You’ll find that most locals are happy to assist in English, but knowing a few basic phrases in Norwegian can go a long way in creating friendly interactions.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Health and vaccinations advice",
+      "body": "Travelers to Norway should ensure they are up to date with standard vaccinations. No specific vaccinations are required for entry, but tap water is safe to drink throughout Bergen.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Personal safety tips",
+      "body": "Bergen is generally very safe for families, but as with any city, be aware of your surroundings. Keep an eye on personal items in crowded areas, especially at tourist spots.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    }
+  ]
+}

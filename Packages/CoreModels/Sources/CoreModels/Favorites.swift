@@ -82,10 +82,12 @@ extension Trip {
     /// that is `nil` (an older saved trip, a component that failed) simply
     /// contributes nothing.
     ///
-    /// Not everything generated is heartable. The Near You practical layer
-    /// (nearest pharmacy, nearest metro) and the where-to-stay options are
-    /// deliberately excluded — they are reference, not things you'd want a list
-    /// of. Neither exists yet; both get their arm here when they do.
+    /// Not everything generated is heartable. Know Before You Go, the Near You
+    /// practical layer (nearest pharmacy, nearest metro) and the where-to-stay
+    /// options are deliberately excluded — they are reference, not things you'd
+    /// want a list of. "How people pay in Barcelona" is not a favourite; it is
+    /// something you read once. The last two don't exist yet; both get their arm
+    /// here when they do.
     public var favouriteCandidates: [FavouriteCandidate] {
         var result: [FavouriteCandidate] = []
 

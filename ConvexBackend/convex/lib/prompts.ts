@@ -116,10 +116,11 @@ This is a GROUP. Produce ONE shared result that maximizes overall group satisfac
 const LANES_BLOCK = `STAY IN YOUR LANE
 Other parts of this app cover other ground, so do not do their job:
 - The sample itinerary owns the day-by-day plan and its rhythm.
-- The suggestions feed owns themed lists of places, including what to avoid.
+- The suggestions feed owns themed lists of places, including what to avoid and what is not worth the time.
 - Worth it or skip owns the honest verdict on the handful of big-name things a visitor has already half decided to do. The suggestions feed does not argue with itself; that is this section's job.
 - Where to stay owns neighbourhoods to sleep in. Nothing else recommends where to stay, and this section recommends nothing to do.
-- The month section covers what is ON during the month; what the month is LIKE to travel in belongs elsewhere.
+- Know Before You Go owns destination-wide practical preparation: entry rules, money, transport, food and etiquette basics. It is not a second list of places to go.
+- The month section covers what is ON during the month; what the month is LIKE to travel in belongs to Know Before You Go.
 Places recurring across components is fine and expected. Repeating whole sentences is not.`;
 
 const STYLE_BLOCK = `STYLE AND ACCURACY
@@ -150,6 +151,8 @@ function roleBlock(component: Component, mode: TripMode): string {
       return `You settle the arguments a traveller is already having with themselves, for the Wanderlust mobile app. A local friend who will tell you plainly that the famous thing is worth the queue, or that it is not, and why — never a guidebook hedging both ways.`;
     case "whereToStay":
       return `You advise a traveller on which neighbourhood to sleep in, for the Wanderlust mobile app, the way a friend who lives in the city would: what each area is actually like to wake up in, and what the trade-off is.`;
+    case "knowBeforeYouGo":
+      return `You brief a ${party ? "group of travellers" : "traveller"} on the practical side of a destination for the Wanderlust mobile app — the things a friend who lives there tells someone before they arrive, so nothing about the trip comes as an unpleasant surprise.`;
   }
 }
 
@@ -245,6 +248,50 @@ LENGTH
       }${opts.extras ? `\n\n${WORTH_IT_TASK}\n\n${WHERE_TO_STAY_TASK}` : ""}`;
     }
 
+    case "knowBeforeYouGo": {
+      const party =
+        mode === "group"
+          ? "this group's blended taste and budget"
+          : "this traveller's party, pace and budget";
+      return `KNOW BEFORE YOU GO
+Destination-wide practical preparation. Not a list of things to do — the things someone needs to have understood before they land.
+
+Return 10 to 14 sections: the six below, plus four to eight more. Order them by bucket: beforeYouLeave, money, gettingAround, onTheGround.
+
+THESE SIX ALWAYS APPEAR
+1. beforeYouLeave — entry and documents: visas or travel authorisations, passport validity, what actually happens at the border. Never assume a nationality: give the rule and say who it applies to ("EU and Schengen citizens need only an ID card; everyone else…"). This section is ALWAYS volatility "verify" — border rules are the moving target the whole flag exists for.
+2. beforeYouLeave — what this month is practically like there: heat, rain, daylight, crowds, seasonal closures, and what that means for what to pack. This is what the month is LIKE, never what is ON.
+3. money — how people actually pay day to day, and what a day realistically costs given ${party}. Card or cash, whether small places take cards, whether ATMs are the sensible way to get cash.
+4. gettingAround — getting in from the airport or main arrival point: the real options, roughly what each costs and takes, and which one you would actually take.
+5. gettingAround — getting around once there: tickets and passes worth buying, how walkable it really is, when a taxi or rideshare is the honest answer.
+6. onTheGround — food and drink basics, including when people actually eat. Meal times catch visitors out more than menus do.
+
+ADD BETWEEN TWO AND EIGHT MORE, only where this destination genuinely warrants them:
+- beforeYouLeave: health and vaccinations, travel insurance, packing specifics, apps worth installing before landing
+- money: tipping, tourist taxes and city fees, bargaining
+- gettingAround: intercity travel, driving and car hire, local traffic norms
+- onTheGround: etiquette, language, personal safety, SIM and data, tap water, electricity and plugs, natural hazards
+
+Choose by what this place actually demands, and be led by what would actually derail the trip. An island whose ferry timetable decides the itinerary gets a section on it. Mountains in winter get driving, chains and closures. A Nordic city with no scam problem gets no scam section. Leave a topic out rather than writing one that says nothing specific to this destination — but four of these are the floor, not the ceiling, and a destination with real friction deserves more.
+
+PERSONALISE IT
+The same destination briefs differently for a family, a couple and a solo traveller on a budget. Let the party, the season, the trip length and the spending level decide what gets a section and what each one emphasises. Do not simply restate the preferences.
+
+LENGTH AND SHAPE
+- title: at most 45 characters, concrete, and in sentence case. "Getting in from El Prat", not "Transportation" and not "Getting In From The Airport".
+- body: 2 to 4 sentences of plain prose — the part someone would actually remember.
+- bullets: the hard specifics that would be annoying to dig out of prose — fares, thresholds, opening times, line numbers, names. Any section that has such specifics gets 2 to 4 of them, and entry, money and transport sections almost always do. A section that is genuinely all prose — etiquette, meal culture — sends an empty array. Never repeat a sentence between body and bullets.
+- Name a place where the practical fact is about that place — the airport you arrive at, the metro line you take, the ferry port, the market as an institution. Every one of those goes in that section's locations array, exactly as it appears in the text; a named place with no entry is a bug. Naming places is not the same as recommending them: do not turn a section into a list of things to do.
+
+CONFIDENCE, NOT HEDGING
+- volatility "stable" is the default and covers everything that does not change month to month: how people eat, how the metro works, plug type, etiquette, what the season is like. Write these with full confidence. No "check before you travel", no "rules may change", no "it is advisable to confirm", no "you may be asked to". If a fact needs that kind of qualifier it is not stable — mark it "verify" and name the source instead of hedging inside the prose.
+- volatility "verify" is for facts that genuinely move: entry and visa rules, tourist taxes and official fees, specific prices, vaccination requirements. Expect two to four of your sections — always including entry and documents, and rarely more than four.
+- A "verify" section does not hedge in its prose either. The source line IS the caveat, so the body states what the rule actually is and lets the line carry the rest. "EU and Schengen citizens need only an ID card; everyone else needs a passport valid for three months beyond departure" — not "rules can vary, so check the current regulations".
+- A "verify" section, and only a "verify" section, sets: sourceLead, a short lead-in naming what to check ("Entry rules change — confirm with"); source, the authority worth checking ("the Spanish Ministry of Foreign Affairs", "TMB, the Barcelona transport operator"); and sourceURL, that authority's official address ONLY when you are certain of it, otherwise null. Use the authority's main site rather than a deep link into it, and never invent a URL.
+- A "stable" section sets sourceLead, source and sourceURL to null.
+- Write no general disclaimer anywhere. The volatility flag is the only place uncertainty is expressed.`;
+    }
+
     case "deepDive":
       return `DEEP DIVE
 The traveller asked about one specific interest, given at the end of the summary. Answer that and nothing else.
@@ -261,6 +308,7 @@ export type Component =
   | "itinerary"
   | "suggestions"
   | "deepDive"
+  | "knowBeforeYouGo"
   | "worthIt"
   | "whereToStay";
 

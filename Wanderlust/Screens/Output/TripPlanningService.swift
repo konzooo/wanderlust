@@ -109,6 +109,11 @@ protocol WhereToStayGenerating {
     func generate(_ request: TripGenerationRequest) async throws -> [Trip.StayArea]
 }
 
+/// Produces the Know Before You Go briefing from this trip's generation request.
+protocol KnowBeforeYouGoGenerating {
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.KnowBeforeYouGo
+}
+
 // MARK: - Live services
 
 /// Every live service is thin: everything that used to make these interesting
@@ -165,6 +170,14 @@ struct BackendWhereToStayService: WhereToStayGenerating {
     }
 }
 
+struct BackendKnowBeforeYouGoService: KnowBeforeYouGoGenerating {
+    var service: TripGenerationService = .shared
+
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.KnowBeforeYouGo {
+        try await service.generate(.knowBeforeYouGo, for: request)
+    }
+}
+
 enum TripPlanningServices {
     static func itinerary() -> any ItineraryGenerating {
         DebugSettings.useMockTripData ? MockItineraryService() : BackendItineraryService()
@@ -180,6 +193,12 @@ enum TripPlanningServices {
 
     static func whereToStay() -> any WhereToStayGenerating {
         DebugSettings.useMockTripData ? MockWhereToStayService() : BackendWhereToStayService()
+    }
+
+    static func knowBeforeYouGo() -> any KnowBeforeYouGoGenerating {
+        DebugSettings.useMockTripData
+            ? MockKnowBeforeYouGoService()
+            : BackendKnowBeforeYouGoService()
     }
 }
 
@@ -272,6 +291,16 @@ struct MockWhereToStayService: WhereToStayGenerating {
     func generate(_ request: TripGenerationRequest) async throws -> [Trip.StayArea] {
         try? await Task.sleep(nanoseconds: delayNanoseconds)
         return Trip.StayArea.mockSet
+    }
+}
+
+/// Returns a bundled mock briefing after a short delay. Never calls the network.
+struct MockKnowBeforeYouGoService: KnowBeforeYouGoGenerating {
+    var delayNanoseconds: UInt64 = 1_000_000_000
+
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.KnowBeforeYouGo {
+        try? await Task.sleep(nanoseconds: delayNanoseconds)
+        return .mock
     }
 }
 

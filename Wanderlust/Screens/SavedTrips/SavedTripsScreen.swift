@@ -320,7 +320,8 @@ struct SavedTripsScreen: View {
             mode: .savedTrip,
             shareCode: trip.shareCode,
             itineraryResponse: .loaded(trip.itinerary),
-            suggestionsResponse: suggestions
+            suggestionsResponse: suggestions,
+            knowBeforeYouGoResponse: trip.knowBeforeYouGo.map { .loaded($0) } ?? .initial
         )
         // The traveller's own trip: their decisions and their paid-for deep
         // dives come back with it. Anything missing on an older file is simply
@@ -358,7 +359,8 @@ struct SavedTripsScreen: View {
             mode: .sharedTrip,
             shareCode: trip.shareCode,
             itineraryResponse: .loaded(trip.itinerary),
-            suggestionsResponse: suggestions
+            suggestionsResponse: suggestions,
+            knowBeforeYouGoResponse: trip.knowBeforeYouGo.map { .loaded($0) } ?? .initial
         )
         // A received trip is the recipient's own local file, so these are the
         // recipient's decisions, restored. The *sender's* never arrive: the

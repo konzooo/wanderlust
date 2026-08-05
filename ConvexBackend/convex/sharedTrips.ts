@@ -22,6 +22,7 @@ export const publishTrip = mutation({
     groupType: v.string(),
     itinerary: v.any(),
     suggestions: v.optional(v.any()),
+    knowBeforeYouGo: v.optional(v.any()),
     favorites: v.optional(v.any()),
     /**
      * Worth-it/Skip **content** travels; the sender's **decisions** never do
@@ -69,6 +70,7 @@ export const publishTrip = mutation({
       groupType: args.groupType,
       itinerary: args.itinerary,
       suggestions: args.suggestions,
+      knowBeforeYouGo: args.knowBeforeYouGo,
       favorites: args.favorites,
       worthItItems: args.worthItItems,
       whereToStay: args.whereToStay,

@@ -1,0 +1,214 @@
+{
+  "id": "sri-lanka-group",
+  "why": "Multi-region country with real entry rules, health topics and transport friction",
+  "model": "gpt-4o-mini",
+  "ranAt": "2026-08-05T18:56:06.047Z",
+  "usage": {
+    "inputTokens": 2475,
+    "cachedInputTokens": 0,
+    "outputTokens": 1354,
+    "reasoningTokens": 0
+  },
+  "durationMs": 16279,
+  "score": {
+    "sectionCount": 11,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 1,
+      "gettingAround": 3,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 2,
+    "stableCount": 9,
+    "verifyRatio": 0.18181818181818182,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [
+      "Eating and drinking in Sri Lanka"
+    ],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 1,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 11,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": []
+  },
+  "sections": [
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Entry rules to Sri Lanka",
+      "body": "Most travelers need an Electronic Travel Authorization (ETA) to visit Sri Lanka, which can be applied for online. Passports should be valid for at least six months beyond your date of entry. Make sure to keep this in mind when planning your travel.",
+      "bullets": [
+        "Electronic Travel Authorization (ETA) required for most travelers",
+        "Passport must be valid for a minimum of six months after entry",
+        "Visa can be obtained online prior to arrival"
+      ],
+      "volatility": "verify",
+      "sourceLead": "Entry rules change — confirm with",
+      "source": "Department of Immigration and Emigration, Sri Lanka",
+      "sourceURL": "http://www.immigration.gov.lk/",
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "What February is like in Sri Lanka",
+      "body": "February is one of the best months to visit Sri Lanka, with warm temperatures and relatively low rainfall in most parts. Expect daytime temperatures around 28-32°C (82-90°F) and cooler evenings. Pack lightweight clothing and sunscreen.",
+      "bullets": [
+        "Average temperatures range from 28-32°C (82-90°F)",
+        "Low rainfall makes it great for outdoor activities",
+        "Pack light clothing and sunscreen"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "How to handle money in Sri Lanka",
+      "body": "In Sri Lanka, cash is still king. Many small shops and street vendors only accept cash, so it’s wise to carry some local currency (Sri Lankan Rupee). ATMs are widely available in cities, and credit cards are accepted at larger establishments.",
+      "bullets": [
+        "Use Sri Lankan Rupees for most transactions",
+        "ATMs are common in urban areas",
+        "Credit cards accepted in larger hotels and restaurants"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Airport transfer options in Sri Lanka",
+      "body": "For getting from Bandaranaike International Airport to Colombo, taxis or rideshare services are reliable options. Expect the journey to take about 30-45 minutes and cost around 3,000-4,500 LKR depending on traffic. Airport buses are available but are less comfortable.",
+      "bullets": [
+        "Taxis cost around 3,000-4,500 LKR to Colombo",
+        "Journey takes about 30-45 minutes",
+        "Airport buses are an option but less comfortable"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "Bandaranaike International Airport",
+          "placeName": "Bandaranaike International Airport, Colombo",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Navigating cities in Sri Lanka",
+      "body": "Transportation within cities is quite manageable. Tuk-tuks are a popular choice for short distances, and though ride-hailing apps are available, they may fluctuate in availability. Public buses are cheap but can be overcrowded; plan accordingly.",
+      "bullets": [
+        "Tuk-tuks are widely available for short trips",
+        "Ride-hailing apps like PickMe and Uber function in major cities",
+        "Public buses are inexpensive but often crowded"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Eating and drinking in Sri Lanka",
+      "body": "Sri Lankans generally eat rice and curry for lunch, while dinner can range from lighter meals to more elaborate dishes. Street food is popular; don't miss trying kottu roti and hoppers. Always check the cleanliness of food stalls before eating.",
+      "bullets": [
+        "Lunch usually consists of rice and curry",
+        "Street food like kottu roti is a must-try",
+        "Check food stall hygiene before eating"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Cultural norms in Sri Lanka",
+      "body": "Respect for local customs is important. When visiting temples, dress modestly and remove shoes. It's common to greet with a slight bow and a smile, and public displays of affection are generally frowned upon.",
+      "bullets": [
+        "Dress modestly for temple visits",
+        "Always remove shoes before entering temples",
+        "Public displays of affection may be frowned upon"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Health recommendations for Sri Lanka",
+      "body": "Check with your healthcare provider about vaccinations such as Typhoid and Hepatitis A before traveling. Bring a basic first-aid kit and any personal medications. Mosquito repellent is also advised due to dengue fever risks.",
+      "bullets": [
+        "Vaccinations for Typhoid and Hepatitis A recommended",
+        "Bring a first-aid kit and personal medications",
+        "Mosquito repellent is useful for avoiding dengue fever"
+      ],
+      "volatility": "verify",
+      "sourceLead": "Health recommendations may change — check with",
+      "source": "Your healthcare provider",
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Intercity travel tips in Sri Lanka",
+      "body": "Travel between cities is best done via train for scenic views or by bus for cost-effectiveness. Buses are straightforward, but trains can be crowded during peak hours. Booking train tickets in advance is advisable.",
+      "bullets": [
+        "Train travel offers scenic views",
+        "Buses are cheaper and more direct",
+        "Book train tickets in advance during peak times"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "SIM cards and connectivity in Sri Lanka",
+      "body": "Buying a local SIM card at the airport or in shops in Colombo is convenient. Dialog and Mobitel offer good coverage and data plans. Internet access is generally reliable in urban areas.",
+      "bullets": [
+        "Local SIM cards available at the airport",
+        "Dialog and Mobitel offer good services",
+        "Reliable internet access in cities"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Electrical plugs and voltages in Sri Lanka",
+      "body": "Sri Lanka uses type D and G plugs with a standard voltage of 230V. Ensure your devices are compatible or bring an adapter. Most hotels provide adapters, but it's good to check in advance.",
+      "bullets": [
+        "Type D and G plugs used",
+        "Standard voltage is 230V",
+        "Confirm availability of adapters at hotels"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    }
+  ]
+}

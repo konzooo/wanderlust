@@ -130,6 +130,9 @@ class NavigationRouter: ObservableObject {
         if let suggestions = group.suggestions {
             state.suggestionsResponse = .loaded(suggestions)
         }
+        if let briefing = group.knowBeforeYouGo {
+            state.knowBeforeYouGoResponse = .loaded(briefing)
+        }
         if let imageUrl = group.imageUrl, let url = URL(string: imageUrl) {
             state.imageUrlResponse = .loaded(url)
         }

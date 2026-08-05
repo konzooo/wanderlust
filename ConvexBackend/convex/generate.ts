@@ -181,12 +181,17 @@ export const commitComponent = internalMutation({
     const group = await ctx.db.get(args.groupId);
     if (!group || group.generationVersion !== args.generationVersion) return;
 
-    const states = { ...currentStates(group), [args.component]: { state: "ready" as const } };
+    // A component a group never generates (a deep dive is solo-only) has no
+    // column to write to, so there is nothing to commit.
+    const field = PAYLOAD_FIELD[args.component as GroupComponent];
+    if (!field) return;
+
     await ctx.db.patch(args.groupId, {
-      componentStates: states,
-      ...(args.component === "itinerary"
-        ? { itinerary: args.data }
-        : { suggestions: args.data }),
+      componentStates: {
+        ...currentStates(group),
+        [args.component]: { state: "ready" as const },
+      },
+      [field]: args.data,
     });
   },
 });
@@ -364,23 +369,43 @@ export const run = internalAction({
 });
 
 /** The components a group trip generates. Deep dives are solo-only (§10). */
-export const GROUP_COMPONENTS = ["itinerary", "suggestions"] as const;
+export const GROUP_COMPONENTS = [
+  "itinerary",
+  "suggestions",
+  "knowBeforeYouGo",
+] as const;
 export type GroupComponent = (typeof GROUP_COMPONENTS)[number];
 
+/** Where each group component's payload is stored on the document. */
+const PAYLOAD_FIELD: Record<GroupComponent, "itinerary" | "suggestions" | "knowBeforeYouGo"> = {
+  itinerary: "itinerary",
+  suggestions: "suggestions",
+  knowBeforeYouGo: "knowBeforeYouGo",
+};
+
 type ComponentStates = Doc<"groups">["componentStates"] & {};
+type ResolvedStates = Required<ComponentStates>;
 
 /**
- * A group generated before per-component state existed has none stored. Its
- * payloads still say what happened, so reconstruct from those rather than
- * claiming everything is absent.
+ * What actually happened to each component, for any generation of any age.
+ *
+ * Two kinds of gap are filled here, both from the payloads: a group generated
+ * before per-component state existed has no `componentStates` at all, and a
+ * group generated before a component existed has the object but not that key.
+ * In both cases the payload is the honest record — present means it ran, absent
+ * means it never did — so neither is reported as a failure.
  */
-export function currentStates(group: Doc<"groups">): ComponentStates {
-  return (
-    group.componentStates ?? {
-      itinerary: group.itinerary === undefined ? { state: "absent" } : { state: "ready" },
-      suggestions: group.suggestions === undefined ? { state: "absent" } : { state: "ready" },
-    }
-  );
+export function currentStates(group: Doc<"groups">): ResolvedStates {
+  const stored = group.componentStates;
+  return {
+    itinerary: stored?.itinerary ?? derivedState(group.itinerary),
+    suggestions: stored?.suggestions ?? derivedState(group.suggestions),
+    knowBeforeYouGo: stored?.knowBeforeYouGo ?? derivedState(group.knowBeforeYouGo),
+  };
+}
+
+function derivedState(payload: unknown): ResolvedStates["itinerary"] {
+  return payload === undefined ? { state: "absent" } : { state: "ready" };
 }
 
 /** The components worth re-running: anything that failed or never happened. */

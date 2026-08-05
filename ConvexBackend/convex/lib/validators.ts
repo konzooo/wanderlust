@@ -141,11 +141,18 @@ export const componentState = v.union(
 
 /**
  * Per-component state for a group's generated output. The payloads themselves
- * stay in `groups.itinerary` / `groups.suggestions`; this records what actually
- * happened to each. Absent entirely on groups generated before it existed —
- * `deriveComponentStates` reconstructs those from the payloads.
+ * stay in `groups.itinerary` / `groups.suggestions` / `groups.knowBeforeYouGo`;
+ * this records what actually happened to each. Absent entirely on groups
+ * generated before it existed — `currentStates` reconstructs those from the
+ * payloads.
+ *
+ * Every entry is optional for the same reason the whole object is: a group
+ * generated before a component existed has no key for it, and a required key
+ * would make those documents fail schema validation rather than simply read as
+ * "this one never ran".
  */
 export const groupComponentStates = v.object({
-  itinerary: componentState,
-  suggestions: componentState,
+  itinerary: v.optional(componentState),
+  suggestions: v.optional(componentState),
+  knowBeforeYouGo: v.optional(componentState),
 });

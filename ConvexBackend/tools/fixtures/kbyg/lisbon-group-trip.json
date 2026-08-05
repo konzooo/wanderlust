@@ -1,0 +1,193 @@
+{
+  "id": "lisbon-group-trip",
+  "why": "The group path: one shared briefing assembled from several members",
+  "model": "gpt-4o-mini",
+  "ranAt": "2026-08-05T18:56:37.362Z",
+  "usage": {
+    "inputTokens": 2606,
+    "cachedInputTokens": 0,
+    "outputTokens": 1184,
+    "reasoningTokens": 0
+  },
+  "durationMs": 17431,
+  "score": {
+    "sectionCount": 11,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 2,
+      "gettingAround": 3,
+      "onTheGround": 3
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 10,
+    "verifyRatio": 0.09090909090909091,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.45454545454545453,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 5,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": []
+  },
+  "sections": [
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Entry and documents",
+      "body": "EU and Schengen citizens need only an ID card; everyone else needs a passport valid for three months beyond departure. Be prepared to present proof of accommodation and return flight upon entry.",
+      "bullets": [],
+      "volatility": "verify",
+      "sourceLead": "Entry rules change — confirm with",
+      "source": "the Portuguese Embassy",
+      "sourceURL": "https://www.portaldiplomatico.mne.gov.pt/en/foreigners-in-portugal/visa-information/visa-requirements-for-foreigners-in-portugal",
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "What October is practically like",
+      "body": "In October, Lisbon enjoys mild weather, averaging around 20°C (68°F) during the day and dropping to about 15°C (59°F) at night. You can expect occasional rain showers, so a light rain jacket and layers are recommended.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "How to pay and daily expenses",
+      "body": "In Lisbon, credit and debit cards are widely accepted, but small cafés and local markets may prefer cash. A budget of around €50-70 per person per day should cover meals, transportation, and some attractions.",
+      "bullets": [
+        "Average meal cost: €10-20",
+        "Public transportation: €1.50 per ride",
+        "Budget restaurants: €5-10 per meal",
+        "Daily coffee: around €1.20"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Getting in from the airport",
+      "body": "Lisbon Airport is well connected to the city center. The metro takes about 30 minutes and costs €1.50. Taxis are also available, roughly costing €15-20 depending on your destination.",
+      "bullets": [
+        "Metro: Line Red to downtown",
+        "Taxi fare: approx. €15-20",
+        "Airport bus: Aerobus to city center, €4",
+        "Duration: metro 30 mins, taxi 20 mins"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "Lisbon Airport",
+          "placeName": "Lisbon Airport",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Navigating the city",
+      "body": "Lisbon is quite walkable, especially the central neighborhoods. The metro is efficient for covering longer distances, and tickets are best purchased in rechargeable cards. Rideshare services are also available for convenience.",
+      "bullets": [
+        "Metro tickets: €1.50",
+        "Rechargeable Viva Viagem card: €0.50",
+        "Walkable neighborhoods: Alfama, Bairro Alto",
+        "Rideshare options: Uber and Bolt"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Food and drink basics",
+      "body": "Lunch is generally served between 12:30 PM and 3 PM, while dinner typically starts around 8 PM. Local seafood is a must-try, and you can often find excellent street food like bifana (pork sandwich) and pastéis de nata (custard tarts).",
+      "bullets": [
+        "Lunch: 12:30 PM - 3 PM",
+        "Dinner: 8 PM onwards",
+        "Street food: €3-5 for snacks",
+        "Common dish: bacalhau à brás (cod)"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Local etiquette",
+      "body": "Portuguese people are friendly and appreciate politeness. Simple greetings like 'Bom dia' (Good morning) or 'Obrigado/a' (Thank you) go a long way. It's also common to greet shopkeepers upon entering or leaving a store.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Health and vaccinations",
+      "body": "No specific vaccinations are required for entry into Portugal. However, it's good to have travel insurance that covers health needs during your stay. Be aware of any health advisories before departure.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "Tipping customs",
+      "body": "Tipping is appreciated but not mandatory. Generally, rounding up the bill or leaving a small tip (around 5-10%) is common in restaurants. For taxi drivers, you can simply round up the fare.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "SIM cards and mobile data",
+      "body": "You can purchase a local SIM card at the airport or various shops in the city. Prices vary, but you should expect to pay around €15 for a prepaid plan with data options.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Public transportation options",
+      "body": "Lisbon’s public transport includes buses, trams, and metro lines. Consider getting a 24-hour public transport pass for €6.40 which covers all options—the best way to explore without breaking the bank.",
+      "bullets": [
+        "24-hour pass: €6.40",
+        "Includes bus, tram, and metro",
+        "Best for unlimited travel",
+        "Purchase at ticket machines"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    }
+  ]
+}

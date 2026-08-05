@@ -1,0 +1,163 @@
+[
+  {
+    "id": "barcelona-couple",
+    "sectionCount": 11,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 1,
+      "gettingAround": 3,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 2,
+    "stableCount": 9,
+    "verifyRatio": 0.18181818181818182,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.2727272727272727,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 3,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": [],
+    "outputTokens": 1146
+  },
+  {
+    "id": "bergen-family",
+    "sectionCount": 9,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 2,
+      "money": 1,
+      "gettingAround": 2,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 8,
+    "verifyRatio": 0.1111111111111111,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.3333333333333333,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 3,
+    "sectionsNamingPlaces": 2,
+    "duplicateSentences": [],
+    "outputTokens": 944
+  },
+  {
+    "id": "naxos-solo",
+    "sectionCount": 12,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 2,
+      "gettingAround": 3,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 11,
+    "verifyRatio": 0.08333333333333333,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [
+      "Getting in from Naxos Airport",
+      "Public transport options"
+    ],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.25,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 3,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": [],
+    "outputTokens": 1267
+  },
+  {
+    "id": "sri-lanka-group",
+    "sectionCount": 11,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 1,
+      "gettingAround": 3,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 2,
+    "stableCount": 9,
+    "verifyRatio": 0.18181818181818182,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [
+      "Eating and drinking in Sri Lanka"
+    ],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 1,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 11,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": [],
+    "outputTokens": 1354
+  },
+  {
+    "id": "dolomites-couple",
+    "sectionCount": 10,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 4,
+      "money": 1,
+      "gettingAround": 2,
+      "onTheGround": 3
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 9,
+    "verifyRatio": 0.1,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.9,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 9,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": [],
+    "outputTokens": 1117
+  },
+  {
+    "id": "lisbon-group-trip",
+    "sectionCount": 11,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 2,
+      "gettingAround": 3,
+      "onTheGround": 3
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 10,
+    "verifyRatio": 0.09090909090909091,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.45454545454545453,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 5,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": [],
+    "outputTokens": 1184
+  }
+]

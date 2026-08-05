@@ -1,0 +1,195 @@
+{
+  "id": "naxos-solo",
+  "why": "Island: ferries and timetables decide the trip; sparse practical infrastructure",
+  "model": "gpt-4o-mini",
+  "ranAt": "2026-08-05T18:55:49.766Z",
+  "usage": {
+    "inputTokens": 2478,
+    "cachedInputTokens": 0,
+    "outputTokens": 1267,
+    "reasoningTokens": 0
+  },
+  "durationMs": 14583,
+  "score": {
+    "sectionCount": 12,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 2,
+      "gettingAround": 3,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 11,
+    "verifyRatio": 0.08333333333333333,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [
+      "Getting in from Naxos Airport",
+      "Public transport options"
+    ],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.25,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 3,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": []
+  },
+  "sections": [
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Entry and documents",
+      "body": "To enter Greece, most nationalities will require a passport, typically valid for at least three months beyond your departure date. Check specific requirements based on your citizenship; for instance, EU citizens only need an ID card. Don't forget to have any necessary travel insurance in case of emergencies.",
+      "bullets": [],
+      "volatility": "verify",
+      "sourceLead": "Entry rules change — confirm with",
+      "source": "the Greek Ministry of Foreign Affairs",
+      "sourceURL": "https://www.mfa.gr/en/.",
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "What September is practically like",
+      "body": "September in Naxos is delightful, with warm weather and fewer crowds compared to the peak summer months. Expect temperatures around 25-30°C (77-86°F) and mostly sunny days. Since the sea is still warm, it's perfect for swimming, but pack a light jacket for cooler evenings.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "How to handle your cash",
+      "body": "On Naxos, cash is still king. While you can use cards at larger restaurants and shops, many small local places and markets prefer cash. ATMs are available in towns, and it’s a good idea to carry euros for day-to-day expenses, especially in more rural areas.",
+      "bullets": [
+        "Most restaurants and shops accept credit cards, but cash is safer.",
+        "Average daily cost for budget travel: €40-€60.",
+        "ATMs are widely available in Naxos Town.",
+        "Small cafes often only take cash."
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Getting in from Naxos Airport",
+      "body": "The best way to get from Naxos Airport to the main town is by taxi, which costs around €10-€15 and takes about 15 minutes. Alternatively, local buses are available, but they may have limited schedules, so check beforehand if you prefer this option.",
+      "bullets": [
+        "Taxi cost: €10-€15.",
+        "Travel time: approximately 15 minutes.",
+        "Local buses available but check the timetable."
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "Naxos Airport",
+          "placeName": "Naxos Airport",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Moving around Naxos",
+      "body": "The island is quite walkable, especially in Naxos Town, where you'll find many attractions within a short distance. For exploring beyond the town, consider renting a scooter or a car. Public buses can connect you to beaches and villages, but schedules may vary, so check on the routes you plan to utilize.",
+      "bullets": [
+        "Naxos Town is very walkable.",
+        "Buses connect major beaches and villages with sporadic schedules.",
+        "Scooter rentals are popular for getting around."
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Food and drink basics",
+      "body": "In Naxos, lunch usually starts around 1 PM, and dinner around 8 PM. Embrace the local cuisine with street food like souvlaki and moussaka, which can be found at casual eateries. Try to dine at local tavernas for authentic Greek meals, especially fresh seafood.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Local dining culture",
+      "body": "Dining in Naxos is a relaxed affair, often accompanied by wine or ouzo. Don’t hesitate to linger at your table if you’re enjoying the ambiance; meals are seen as communal and leisurely. Tipping is appreciated but not mandatory, rounding up the bill or leaving a small tip is common.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Health and vaccinations",
+      "body": "No specific vaccinations are required to enter Greece, but make sure routine vaccinations are up-to-date. It's wise to carry any personal medications you might need, as some may not be available locally.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Safety tips",
+      "body": "Naxos is generally safe for solo travelers. However, it's always wise to keep an eye on personal belongings, especially in crowded areas or during night outings. The locals are friendly, and asking for directions or recommendations is often welcomed.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Public transport options",
+      "body": "Buses on Naxos connect the main towns with local beaches and a few major sites, but they can be infrequent. Consider downloading local transport apps or check the current schedules when you arrive to make your travel smoother.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "Tipping practices",
+      "body": "Tipping in Naxos is customary but not obligatory. If you enjoyed the service, leaving around 10% is appreciated, especially in restaurants. Additionally, rounding up the bill at cafes and bars is common etiquette.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Finding connectivity",
+      "body": "SIM cards are available at the airport and in local shops. They’re relatively inexpensive if you need data for navigation or staying connected during your trip. Check if your phone is unlocked before purchasing a local sim.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    }
+  ]
+}

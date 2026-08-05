@@ -5,7 +5,8 @@
   "description": "Convex backend for Wanderlust Group Trips",
   "scripts": {
     "dev": "convex dev",
-    "deploy": "convex deploy"
+    "deploy": "convex deploy",
+    "eval:kbyg": "esbuild tools/kbyg-eval.ts --bundle --platform=node --format=esm --outfile=tools/.build/kbyg-eval.mjs && node tools/.build/kbyg-eval.mjs"
   },
   "dependencies": {
     "convex": "^1.17.0"

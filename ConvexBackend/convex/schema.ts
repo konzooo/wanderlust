@@ -49,6 +49,8 @@ export default defineSchema({
      */
     itinerary: v.optional(v.any()),
     suggestions: v.optional(v.any()),
+    /** Mirrors CoreModels `Trip.KnowBeforeYouGo`. Absent on older groups. */
+    knowBeforeYouGo: v.optional(v.any()),
     /**
      * What happened to each component, alongside the payloads above. Absent on
      * groups generated before per-component state existed; `dto.ts` derives
@@ -105,6 +107,12 @@ export default defineSchema({
      */
     itinerary: v.any(),
     suggestions: v.optional(v.any()),
+    /**
+     * Know Before You Go travels with a share: it is destination-wide content
+     * about the trip, not part of the sender's personal layer (§4). Absent on
+     * trips published before it existed, and on any trip whose KBYG call failed.
+     */
+    knowBeforeYouGo: v.optional(v.any()),
     /** `Trip.Favorites` — shown read-only-but-editable on the recipient's local copy. */
     favorites: v.optional(v.any()),
     /**

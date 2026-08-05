@@ -8,6 +8,7 @@ import Foundation
 enum TripComponent: String, CaseIterable, Sendable {
     case itinerary
     case suggestions
+    case knowBeforeYouGo
     case deepDive
     case worthIt
     case whereToStay
@@ -19,17 +20,19 @@ enum TripComponent: String, CaseIterable, Sendable {
 
     /// The components a trip screen generates on its own when it opens.
     ///
-    /// A deep dive is deliberately absent: one is only ever generated because
-    /// the traveller tapped a chip. The rest depends on which arm of the D15
-    /// experiment is running — under ``SuggestionsVariant/combined`` the
+    /// Know Before You Go is eager (D14), with the same lifecycle as the other
+    /// automatic components. A deep dive is deliberately absent: one is only
+    /// ever generated because the traveller tapped a chip. The rest depends on
+    /// which arm of the D15 experiment is running — under
+    /// ``SuggestionsVariant/combined`` the
     /// Worth-it cards and the where-to-stay guide ride on the suggestions call
     /// rather than being requested separately.
     static func automatic(
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) -> [TripComponent] {
         switch variant {
-        case .combined: [.itinerary, .suggestions]
-        case .split: [.itinerary, .suggestions, .worthIt, .whereToStay]
+        case .combined: [.itinerary, .suggestions, .knowBeforeYouGo]
+        case .split: [.itinerary, .suggestions, .knowBeforeYouGo, .worthIt, .whereToStay]
         }
     }
 }

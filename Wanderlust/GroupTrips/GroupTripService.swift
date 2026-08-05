@@ -183,6 +183,7 @@ struct GroupDTO: Decodable, Equatable {
     let members: [MemberDTO]
     let itinerary: Trip.Itinerary?
     let suggestions: Trip.Suggestions?
+    let knowBeforeYouGo: Trip.KnowBeforeYouGo?
     /// What happened to each component, keyed by component name. A `nil`
     /// payload alone could not distinguish "not generated" from "failed", so
     /// there was nothing to offer a retry on.
@@ -204,7 +205,7 @@ struct GroupDTO: Decodable, Equatable {
     enum CodingKeys: String, CodingKey {
         case groupId, code, name, destination, startMonth, status
         case viewerIsAdmin, canAutoGenerate, members, itinerary, suggestions
-        case componentStates, canRetry, imageUrl, errorCode
+        case knowBeforeYouGo, componentStates, canRetry, imageUrl, errorCode
         case completedCountRaw = "completedCount"
         case memberCountRaw = "memberCount"
     }
@@ -222,6 +223,9 @@ struct GroupDTO: Decodable, Equatable {
         members = try container.decode([MemberDTO].self, forKey: .members)
         itinerary = try? container.decodeIfPresent(Trip.Itinerary.self, forKey: .itinerary)
         suggestions = try? container.decodeIfPresent(Trip.Suggestions.self, forKey: .suggestions)
+        knowBeforeYouGo = try? container.decodeIfPresent(
+            Trip.KnowBeforeYouGo.self, forKey: .knowBeforeYouGo
+        )
         // Tolerated rather than required: a client running against a backend
         // that predates per-component state should still show the trip.
         componentStates = (try? container.decodeIfPresent(

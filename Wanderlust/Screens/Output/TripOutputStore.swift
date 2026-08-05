@@ -36,6 +36,7 @@ class TripOutputStore: ObservableStore {
     private let suggestionsService: any SuggestionsGenerating
     private let worthItService: any WorthItGenerating
     private let whereToStayService: any WhereToStayGenerating
+    private let knowBeforeYouGoService: any KnowBeforeYouGoGenerating
 
     private let imageService: ImageService
 
@@ -55,6 +56,7 @@ class TripOutputStore: ObservableStore {
         suggestionsService: (any SuggestionsGenerating)? = nil,
         worthItService: (any WorthItGenerating)? = nil,
         whereToStayService: (any WhereToStayGenerating)? = nil,
+        knowBeforeYouGoService: (any KnowBeforeYouGoGenerating)? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
         state = initialState
@@ -64,6 +66,7 @@ class TripOutputStore: ObservableStore {
         self.suggestionsService = suggestionsService ?? TripPlanningServices.suggestions()
         self.worthItService = worthItService ?? TripPlanningServices.worthIt()
         self.whereToStayService = whereToStayService ?? TripPlanningServices.whereToStay()
+        self.knowBeforeYouGoService = knowBeforeYouGoService ?? TripPlanningServices.knowBeforeYouGo()
     }
 
     func setRouter(_ router: NavigationRouter) {
@@ -197,6 +200,7 @@ extension TripOutputStore {
 
         var itineraryResponse: AsyncValue<Trip.Itinerary> = .initial
         var suggestionsResponse: AsyncValue<Trip.Suggestions> = .initial
+        var knowBeforeYouGoResponse: AsyncValue<Trip.KnowBeforeYouGo> = .initial
         var imageUrlResponse: AsyncValue<URL> = .initial
         var didLogResultViewed = false
 
@@ -364,6 +368,18 @@ extension TripOutputStore {
             .filter { !$0.isEmpty }
             .joined(separator: "-")
     }
+
+    /// Whether this trip can never show a briefing.
+    ///
+    /// A trip generated before Know Before You Go existed has none stored, and
+    /// a saved, group or received trip has no `generationRequest` to ask for one
+    /// with — deliberately, since §4's rule is that reopening a trip never
+    /// silently spends the traveller's quota. Without this the tab would sit on
+    /// its loading state forever, because "never started" and "still running"
+    /// are the same `AsyncValue`.
+    var knowBeforeYouGoIsUnavailable: Bool {
+        state.generationRequest == nil && response(for: .knowBeforeYouGo).isUnstarted
+    }
 }
 
 // MARK: - Favourites
@@ -380,6 +396,7 @@ extension TripOutputStore {
             details: state.details,
             itinerary: itinerary,
             suggestionsState: state.suggestionsResponse.persisted,
+            knowBeforeYouGoState: state.knowBeforeYouGoResponse.persisted,
             deepDives: state.deepDives,
             worthItItems: state.worthItResponse.persistedContent,
             worthItDecisions: state.worthItDecisions,
@@ -489,6 +506,11 @@ extension TripOutputStore {
                     guard coordinator.isCurrent(component, attempt: attempt) else { return }
                     state.whereToStayResponse = .loaded(areas)
 
+                case .knowBeforeYouGo:
+                    let briefing = try await knowBeforeYouGoService.generate(request)
+                    guard coordinator.isCurrent(component, attempt: attempt) else { return }
+                    state.knowBeforeYouGoResponse = .loaded(briefing)
+
                 case .deepDive:
                     // Interest deep dives have no client entry point yet; the
                     // server already enforces their per-trip cap.
@@ -563,6 +585,7 @@ extension TripOutputStore {
         switch component {
         case .itinerary: ComponentResponse(state.itineraryResponse)
         case .suggestions: ComponentResponse(state.suggestionsResponse)
+        case .knowBeforeYouGo: ComponentResponse(state.knowBeforeYouGoResponse)
         case .worthIt: ComponentResponse(state.worthItResponse)
         case .whereToStay: ComponentResponse(state.whereToStayResponse)
         case .deepDive: ComponentResponse(AsyncValue<Trip.Suggestions>.initial)
@@ -612,6 +635,7 @@ extension TripOutputStore {
             }
         case .worthIt: state.worthItResponse = .loading
         case .whereToStay: state.whereToStayResponse = .loading
+        case .knowBeforeYouGo: state.knowBeforeYouGoResponse = .loading
         case .deepDive: break
         }
     }
@@ -627,6 +651,7 @@ extension TripOutputStore {
             }
         case .worthIt: state.worthItResponse = .error(error)
         case .whereToStay: state.whereToStayResponse = .error(error)
+        case .knowBeforeYouGo: state.knowBeforeYouGoResponse = .error(error)
         case .deepDive: break
         }
     }
@@ -710,6 +735,7 @@ extension TripOutputStore {
             details: state.details,
             itinerary: itinerary,
             suggestionsState: state.suggestionsResponse.persisted,
+            knowBeforeYouGoState: state.knowBeforeYouGoResponse.persisted,
             deepDives: state.deepDives,
             worthItItems: state.worthItResponse.persistedContent,
             // Always written, never `nil`: the personal layer is a live edit, so
@@ -854,6 +880,9 @@ extension TripOutputStore {
                     groupType: state.details.members.groupType.rawValue,
                     itinerary: itinerary,
                     suggestions: state.suggestionsResponse.data,
+                    // Destination-wide content, so it travels with the share —
+                    // unlike the personal layer, which deliberately does not.
+                    knowBeforeYouGo: state.knowBeforeYouGoResponse.data,
                     favorites: state.favorites,
                     // Content travels; decisions do not (§4). The recipient
                     // gets the four cards undecided, because deciding is the

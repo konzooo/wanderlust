@@ -159,6 +159,53 @@ final class TripGenerationCoordinatorTests: XCTestCase {
         XCTAssertTrue(store.state.suggestionsResponse.isLoaded)
     }
 
+    /// Know Before You Go is eager (D14) — a third parallel component with the
+    /// same lifecycle as the other two, not a lazy load on first tab open.
+    func testTheBriefingIsGeneratedEagerlyAndOnlyOnce() async {
+        let itinerary = CountingItineraryService()
+        let suggestions = CountingSuggestionsService()
+        let briefing = CountingKnowBeforeYouGoService()
+        let store = makeStore(itinerary: itinerary, suggestions: suggestions, briefing: briefing)
+
+        store.send(.onAppear)
+        store.send(.onAppear)
+        await itinerary.release()
+        await suggestions.release()
+        await briefing.release()
+        await settle()
+
+        XCTAssertEqual(briefing.callCount, 1)
+        XCTAssertTrue(store.state.knowBeforeYouGoResponse.isLoaded)
+    }
+
+    /// One component failing must not take the others with it, and the failed
+    /// one must be recoverable on its own.
+    func testAFailedBriefingLeavesTheRestOfTheTripAloneAndRetriesOnItsOwn() async {
+        let itinerary = CountingItineraryService()
+        let suggestions = CountingSuggestionsService()
+        let briefing = CountingKnowBeforeYouGoService(failing: true)
+        let store = makeStore(itinerary: itinerary, suggestions: suggestions, briefing: briefing)
+
+        store.send(.onAppear)
+        await itinerary.release()
+        await suggestions.release()
+        await briefing.release()
+        await settle()
+
+        XCTAssertTrue(store.state.itineraryResponse.isLoaded)
+        XCTAssertTrue(store.state.suggestionsResponse.isLoaded)
+        XCTAssertNotNil(store.state.knowBeforeYouGoResponse.error)
+
+        briefing.failing = false
+        store.send(.retryComponent(.knowBeforeYouGo))
+        await briefing.release()
+        await settle()
+
+        XCTAssertEqual(itinerary.callCount, 1, "A succeeded component must not be re-run")
+        XCTAssertEqual(briefing.callCount, 2)
+        XCTAssertTrue(store.state.knowBeforeYouGoResponse.isLoaded)
+    }
+
     /// A failed component stays failed until the traveller asks for a retry —
     /// re-generating it on every re-appear would quietly spend their quota.
     func testAFailedComponentIsNotRetriedAutomaticallyOnReappear() async {
@@ -180,7 +227,8 @@ final class TripGenerationCoordinatorTests: XCTestCase {
 
     private func makeStore(
         itinerary: any ItineraryGenerating,
-        suggestions: any SuggestionsGenerating
+        suggestions: any SuggestionsGenerating,
+        briefing: any KnowBeforeYouGoGenerating = MockKnowBeforeYouGoService(delayNanoseconds: 0)
     ) -> TripOutputStore {
         TripOutputStore(
             initialState: .init(
@@ -195,7 +243,11 @@ final class TripGenerationCoordinatorTests: XCTestCase {
             // they must be injected: an omitted service here would fall
             // through to the live backend and put a unit test on the network.
             worthItService: MockWorthItService(),
-            whereToStayService: MockWhereToStayService()
+            whereToStayService: MockWhereToStayService(),
+            // Every component `onAppear` starts must be a double here, or the
+            // store falls back to the live backend service and these tests
+            // quietly make network calls.
+            knowBeforeYouGoService: briefing
         )
     }
 
@@ -256,6 +308,24 @@ private final class CountingSuggestionsService: SuggestionsGenerating {
         await gate.wait()
         if failing { throw TripGenerationError.transport }
         return SuggestionsPayload(suggestions: .mock)
+    }
+
+    func release() async { await gate.open() }
+}
+
+@MainActor
+private final class CountingKnowBeforeYouGoService: KnowBeforeYouGoGenerating {
+    private(set) var callCount = 0
+    var failing: Bool
+    private let gate = Gate()
+
+    init(failing: Bool = false) { self.failing = failing }
+
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.KnowBeforeYouGo {
+        callCount += 1
+        await gate.wait()
+        if failing { throw TripGenerationError.transport }
+        return .mock
     }
 
     func release() async { await gate.open() }

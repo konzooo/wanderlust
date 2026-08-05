@@ -1,0 +1,187 @@
+{
+  "id": "barcelona-couple",
+  "why": "Large European city, the baseline everything was designed against",
+  "model": "gpt-4o-mini",
+  "ranAt": "2026-08-05T18:55:23.052Z",
+  "usage": {
+    "inputTokens": 2476,
+    "cachedInputTokens": 0,
+    "outputTokens": 1146,
+    "reasoningTokens": 0
+  },
+  "durationMs": 13000,
+  "score": {
+    "sectionCount": 11,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 3,
+      "money": 1,
+      "gettingAround": 3,
+      "onTheGround": 4
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 2,
+    "stableCount": 9,
+    "verifyRatio": 0.18181818181818182,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.2727272727272727,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 3,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": []
+  },
+  "sections": [
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Entry requirements for Spain",
+      "body": "EU and Schengen citizens need only an ID card; everyone else needs a passport valid for three months beyond departure. Be prepared for possible additional checks depending on your nationality.",
+      "bullets": [],
+      "volatility": "verify",
+      "sourceLead": "Entry rules change — confirm with",
+      "source": "the Spanish Ministry of Foreign Affairs",
+      "sourceURL": "http://www.exteriores.gob.es/Portal/en/Paginas/inicio.aspx",
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "May weather in Barcelona",
+      "body": "May brings warm temperatures averaging 20-25°C (68-77°F) with little rain, making it ideal for enjoying outdoor activities. Days are long, with daylight lasting until around 9 PM, so pack light clothing and a light jacket for cooler evenings.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "How to pay and daily costs",
+      "body": "Cash is accepted but cards are widely used in most places, especially in tourist areas. Expect to spend around €60-€100 a day for two people, including meals and transport. Small local eateries may only accept cash, so having some on hand is advisable.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Getting from the airport to the city",
+      "body": "The most convenient way from El Prat Airport to the city is via the Aerobus, costing around €5.90 per person and taking about 35 minutes to reach Plaça de Catalunya. Taxis are available but more expensive, around €30-€35.",
+      "bullets": [
+        "Aerobus: €5.90, 35 minutes",
+        "Taxi: €30-€35, 25-30 minutes",
+        "Train to city center: €4.60, 25 minutes"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "El Prat Airport",
+          "placeName": "El Prat Airport, Barcelona",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        },
+        {
+          "linkSubstring": "Plaça de Catalunya",
+          "placeName": "Plaça de Catalunya, Barcelona",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Navigating Barcelona easily",
+      "body": "Barcelona is quite walkable, especially in neighborhoods like the Gothic Quarter and Eixample. Consider a T10 card for the metro and bus system which allows for 10 rides for about €11.35, ideal for couples.",
+      "bullets": [
+        "T10 Card: €11.35 for 10 rides",
+        "Metro operates from 5 AM to midnight",
+        "Buses run 24/7"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Dining culture and meal times",
+      "body": "Lunch is typically served from 1 PM to 4 PM, and dinner from 8 PM onwards. Local street food, like tapas, is popular and can be found throughout the city. Don’t miss trying patatas bravas or jamón ibérico at local tapas bars.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Some local etiquette tips",
+      "body": "It's customary to greet with a friendly 'Hola' and thank people with 'Gracias'. Don't be surprised if shops close in the afternoon for a siesta, usually between 2 PM and 5 PM.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Health considerations and vaccinations",
+      "body": "It's advisable to have regular vaccinations up to date. Check for any required vaccinations, though none are mandatory for travel to Spain. Travel insurance is highly recommended for peace of mind.",
+      "bullets": [],
+      "volatility": "verify",
+      "sourceLead": "Health advice changes — verify with",
+      "source": "the CDC or your country's health department",
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Emergency numbers and personal safety",
+      "body": "In case of emergencies, dial 112 for police, fire, or ambulance services. Barcelona is generally safe, but be mindful of your belongings in crowded areas to avoid pickpockets.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Intercity travel options",
+      "body": "For day trips outside Barcelona, Renfe trains are your best bet, with regular services to places like Montserrat and Sitges. Tickets can be purchased online or at the station.",
+      "bullets": [
+        "Train to Montserrat: €11.20",
+        "Train to Sitges: around €4.10",
+        "Frequent departures throughout the day"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Mobile data and SIM cards",
+      "body": "Purchasing a local SIM card is easy, with options available at the airport or stores in the city. Companies like Vodafone and Orange offer affordable data plans for travelers, and Wi-Fi is common in cafes and public spaces.",
+      "bullets": [],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    }
+  ]
+}

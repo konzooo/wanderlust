@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import {
   DEEP_DIVE_SCHEMA,
   ITINERARY_SCHEMA,
+  KNOW_BEFORE_YOU_GO_SCHEMA,
   WHERE_TO_STAY_SCHEMA,
   WORTH_IT_SCHEMA,
   suggestionsSchema,
@@ -31,6 +32,7 @@ export const generationComponent = v.union(
   v.literal("itinerary"),
   v.literal("suggestions"),
   v.literal("deepDive"),
+  v.literal("knowBeforeYouGo"),
   v.literal("worthIt"),
   v.literal("whereToStay"),
 );
@@ -72,8 +74,14 @@ export function automaticComponents(
   variant: SuggestionsVariant = SUGGESTIONS_VARIANT,
 ): Component[] {
   return variant === "combined"
-    ? ["itinerary", "suggestions"]
-    : ["itinerary", "suggestions", "worthIt", "whereToStay"];
+    ? ["itinerary", "suggestions", "knowBeforeYouGo"]
+    : [
+        "itinerary",
+        "suggestions",
+        "knowBeforeYouGo",
+        "worthIt",
+        "whereToStay",
+      ];
 }
 
 /**
@@ -130,6 +138,19 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
     schema: suggestionsSchema({ extras: false, interestPrompts: true }),
     schemaName: "travel_suggestions_schema",
     maxOutputTokens: SUGGESTIONS_MAX_OUTPUT_TOKENS_SPLIT,
+    required: false,
+    perTripCap: null,
+  },
+  knowBeforeYouGo: {
+    schema: KNOW_BEFORE_YOU_GO_SCHEMA,
+    schemaName: "know_before_you_go_schema",
+    // Measured, not estimated: the six §13 evaluation cases (see
+    // `tools/kbyg-eval.ts` and the fixtures beside it) produce 9–12 sections at
+    // 944–1,522 output tokens. The ceiling sits well above that on purpose —
+    // truncation is not a short answer here, it is a hard strict-decode failure
+    // — and a cap costs nothing when it is not reached. Re-derive it from the
+    // `incomplete_` rate in real telemetry, never from arithmetic.
+    maxOutputTokens: 6_144,
     required: false,
     perTripCap: null,
   },
@@ -237,6 +258,10 @@ function validate(
       return validateSuggestions(data, report);
     case "deepDive":
       return validateDeepDive(data, report);
+    case "knowBeforeYouGo":
+      // KBYG's conditional stable/verify rule is resolved by CoreModels after
+      // decode; the strict schema already owns its backend shape.
+      return data;
     case "worthIt":
       return validateWorthItResponse(data, report);
     case "whereToStay":

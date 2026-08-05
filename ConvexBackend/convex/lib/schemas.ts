@@ -159,6 +159,60 @@ export function suggestionsSchema(opts: {
 }
 
 /**
+ * Know Before You Go v1 (§12 of the plan).
+ *
+ * Four buckets, 8–14 sections, six of them always present. The bucket is part
+ * of the contract rather than something the app infers from the title: it is
+ * what lets the sections be grouped under stable headings and what makes
+ * "did the model cover all four" a checkable property.
+ *
+ * `volatility` is the whole confidence mechanism. There is no global
+ * disclaimer and no per-section badge: a `stable` section reads with full
+ * confidence, and a `verify` section carries one line naming the authority to
+ * check. The conditional rule that follows from that — a `verify` section MUST
+ * name a source — cannot be expressed in strict JSON Schema (§3), so it is
+ * validated after decode in `Trip.KnowBeforeYouGo.Section`, which downgrades an
+ * unsourced `verify` to `stable` rather than rendering "check with (nobody)".
+ *
+ * `sourceURL` is nullable and the prompt says never to guess one: a fabricated
+ * official URL is worse than a named authority with no link, because the link
+ * is the part a traveller would trust.
+ */
+const KBYG_BUCKETS = ["beforeYouLeave", "money", "gettingAround", "onTheGround"];
+
+export const KNOW_BEFORE_YOU_GO_SCHEMA = obj(
+  {
+    sections: arr(
+      obj(
+        {
+          bucket: strEnum(KBYG_BUCKETS),
+          title: str,
+          body: str,
+          bullets: arr(str),
+          volatility: strEnum(["stable", "verify"]),
+          sourceLead: nullableStr,
+          source: nullableStr,
+          sourceURL: nullableStr,
+          locations: arr(LOCATION),
+        },
+        [
+          "bucket",
+          "title",
+          "body",
+          "bullets",
+          "volatility",
+          "sourceLead",
+          "source",
+          "sourceURL",
+          "locations",
+        ],
+      ),
+    ),
+  },
+  ["sections"],
+);
+
+/**
  * An interest deep dive is one extra category appended to the feed. It carries
  * no `ID`: its provenance is "the traveller asked for this", not one of the
  * fixed sections, and the app renders it with its own icon. `Trip.Suggestions.

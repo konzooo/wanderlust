@@ -152,7 +152,8 @@ final class WorthItDecisionTests: XCTestCase {
             itineraryService: MockItineraryService(),
             suggestionsService: MockSuggestionsService(),
             worthItService: MockWorthItService(),
-            whereToStayService: MockWhereToStayService()
+            whereToStayService: MockWhereToStayService(),
+            knowBeforeYouGoService: MockKnowBeforeYouGoService()
         )
     }
 }

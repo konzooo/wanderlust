@@ -24,13 +24,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// - 2: components carry explicit ``ComponentState``; adds `tripKey`,
     ///   `deepDives`, `worthItDecisions` and `accommodation`.
     /// - 3: the rest of the generated content — `whereToStay` and
-    ///   `interestPrompts` here, `knowBeforeYouGo` on the S9 branch.
-    ///
-    /// **On rebasing S5–S7 onto S9:** both branches bump to 3 and both add
-    /// optional, `decodeIfPresent` fields. Resolve by merging the two field
-    /// lists under a single v3 rather than by inventing a v4 — the version
-    /// number documents what a file may contain, and neither shape has shipped,
-    /// so no reader exists that can tell them apart.
+    ///   `interestPrompts` and `knowBeforeYouGoState`.
     public static let currentSchemaVersion = 3
 
     public let id = UUID()
@@ -45,6 +39,14 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// value that was indistinguishable from a genuine empty result. It could
     /// never be retried and never be explained.
     public var suggestionsState: ComponentState<Suggestions>
+
+    /// Know Before You Go, as an explicit state for the same reason suggestions
+    /// is one: a trip saved while the call was still running must record "not
+    /// yet", not an empty briefing that can never be retried or explained.
+    ///
+    /// Shared content — it travels in a share and a group trip has one — and it
+    /// is never regenerated on reopen.
+    public var knowBeforeYouGoState: ComponentState<KnowBeforeYouGo>
 
     /// Interest deep dives, kept apart from `suggestions.dynamicSuggestions` so
     /// they can be counted against the per-trip cap, shown with their own
@@ -96,11 +98,16 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// reach for ``suggestionsState`` when absent-vs-failed matters.
     public var suggestions: Suggestions? { suggestionsState.value }
 
+    /// The generated briefing, if there is one. Same read-path convention as
+    /// ``suggestions``.
+    public var knowBeforeYouGo: KnowBeforeYouGo? { knowBeforeYouGoState.value }
+
     /// Designated initializer.
     public init(
         details: Details,
         itinerary: Itinerary,
         suggestionsState: ComponentState<Suggestions>,
+        knowBeforeYouGoState: ComponentState<KnowBeforeYouGo> = .absent,
         deepDives: [Suggestions.Category]? = nil,
         worthItItems: [WorthItItem]? = nil,
         worthItDecisions: [UUID: WorthItDecision]? = nil,
@@ -116,6 +123,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.details = details
         self.itinerary = itinerary
         self.suggestionsState = suggestionsState
+        self.knowBeforeYouGoState = knowBeforeYouGoState
         self.deepDives = deepDives
         self.worthItItems = worthItItems
         self.worthItDecisions = worthItDecisions
@@ -134,6 +142,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         details: Details,
         itinerary: Itinerary,
         suggestions: Suggestions?,
+        knowBeforeYouGo: KnowBeforeYouGo? = nil,
         favorites: Favorites = .init(),
         shareCode: String? = nil,
         tripKey: String? = nil
@@ -142,6 +151,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
             details: details,
             itinerary: itinerary,
             suggestionsState: suggestions.map(ComponentState.ready) ?? .absent,
+            knowBeforeYouGoState: knowBeforeYouGo.map(ComponentState.ready) ?? .absent,
             favorites: favorites,
             shareCode: shareCode,
             tripKey: tripKey
@@ -162,6 +172,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         case suggestions
         /// v2 shape: an explicit `ComponentState`.
         case suggestionsState
+        case knowBeforeYouGoState
         case deepDives
         case worthItItems
         case worthItDecisions
@@ -193,6 +204,12 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
             suggestionsState = .absent
         }
 
+        // Absent on every trip saved before v3, which is exactly `.absent`:
+        // nothing was requested and nothing was lost.
+        knowBeforeYouGoState = try container.decodeIfPresent(
+            ComponentState<KnowBeforeYouGo>.self, forKey: .knowBeforeYouGoState
+        ) ?? .absent
+
         deepDives = try container.decodeIfPresent([Suggestions.Category].self, forKey: .deepDives)
         worthItItems = try container.decodeIfPresent([WorthItItem].self, forKey: .worthItItems)
         worthItDecisions = try container.decodeIfPresent(
@@ -214,6 +231,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         try container.encode(details, forKey: .details)
         try container.encode(itinerary, forKey: .itinerary)
         try container.encode(suggestionsState, forKey: .suggestionsState)
+        try container.encode(knowBeforeYouGoState, forKey: .knowBeforeYouGoState)
         try container.encodeIfPresent(deepDives, forKey: .deepDives)
         try container.encodeIfPresent(worthItItems, forKey: .worthItItems)
         try container.encodeIfPresent(worthItDecisions, forKey: .worthItDecisions)
@@ -245,6 +263,7 @@ public extension Trip {
             details: details,
             itinerary: itinerary,
             suggestionsState: suggestionsState.merged(over: stored.suggestionsState),
+            knowBeforeYouGoState: knowBeforeYouGoState.merged(over: stored.knowBeforeYouGoState),
             deepDives: deepDives ?? stored.deepDives,
             worthItItems: worthItItems ?? stored.worthItItems,
             worthItDecisions: worthItDecisions ?? stored.worthItDecisions,

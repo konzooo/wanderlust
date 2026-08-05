@@ -78,11 +78,11 @@ final class DiscoverContentTests: XCTestCase {
     func testTheSplitVariantRequestsEachSectionSeparately() {
         XCTAssertEqual(
             TripComponent.automatic(variant: .split),
-            [.itinerary, .suggestions, .worthIt, .whereToStay]
+            [.itinerary, .suggestions, .knowBeforeYouGo, .worthIt, .whereToStay]
         )
         XCTAssertEqual(
             TripComponent.automatic(variant: .combined),
-            [.itinerary, .suggestions]
+            [.itinerary, .suggestions, .knowBeforeYouGo]
         )
     }
 

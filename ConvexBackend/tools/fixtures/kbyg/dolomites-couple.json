@@ -1,0 +1,193 @@
+{
+  "id": "dolomites-couple",
+  "why": "Rural/mountain: driving, seasonal closures and natural hazards are the real content",
+  "model": "gpt-4o-mini",
+  "ranAt": "2026-08-05T18:56:19.929Z",
+  "usage": {
+    "inputTokens": 2482,
+    "cachedInputTokens": 0,
+    "outputTokens": 1117,
+    "reasoningTokens": 0
+  },
+  "durationMs": 13881,
+  "score": {
+    "sectionCount": 10,
+    "inRange": true,
+    "byBucket": {
+      "beforeYouLeave": 4,
+      "money": 1,
+      "gettingAround": 2,
+      "onTheGround": 3
+    },
+    "allFourBucketsCovered": true,
+    "verifyCount": 1,
+    "stableCount": 9,
+    "verifyRatio": 0.1,
+    "verifyWithoutSource": [],
+    "verifyWithSourceURL": 1,
+    "stableWithSourceFields": [],
+    "hedgedStableSections": [],
+    "hedgedVerifySections": [],
+    "bulletCoverage": 0.9,
+    "titlesOverLimit": [],
+    "sectionsWithBullets": 9,
+    "sectionsNamingPlaces": 1,
+    "duplicateSentences": []
+  },
+  "sections": [
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Entry and documents",
+      "body": "EU citizens need only an ID card; everyone else needs a valid passport. Check if you require any specific travel insurance that covers skiing. Note that border checks may be in place, especially during peak seasons.",
+      "bullets": [],
+      "volatility": "verify",
+      "sourceLead": "Entry rules change — confirm with",
+      "source": "Italian Ministry of Foreign Affairs",
+      "sourceURL": "https://www.esteri.it/mae/en/",
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "What January is like in Val Gardena",
+      "body": "January is prime ski season in Val Gardena, with numerous thick snowfalls making for excellent skiing conditions. Expect cold temperatures, often ranging from -5°C to 5°C. The days are short, with daylight lasting about 8 to 9 hours, so layers and warm clothing are essential.",
+      "bullets": [
+        "Average temperature: -5°C to 5°C",
+        "Days are approximately 8-9 hours long",
+        "Expect considerable snow cover"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "money",
+      "title": "How to pay in Val Gardena",
+      "body": "Cash is widely accepted, but many restaurants and shops also take credit cards. ATMs are plentiful in the area, so withdrawing cash for smaller vendors is wise. Plan for daily expenses of around €70-150 per person, especially if enjoying meals with wine.",
+      "bullets": [
+        "Average daily cost: €70-150 per person",
+        "Most small places prefer cash",
+        "ATMs available throughout Val Gardena"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Getting in from the airport",
+      "body": "The nearest major airport is Bolzano, about an hour's drive away. You can take a ski shuttle or rent a car. Buses also service the area from larger hubs, like Innsbruck or Verona, with transfers available to Val Gardena.",
+      "bullets": [
+        "Bolzano Airport: 1 hour drive",
+        "Ski shuttle options available",
+        "Check bus services from Innsbruck or Verona"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": [
+        {
+          "linkSubstring": "Bolzano Airport",
+          "placeName": "Bolzano Airport, Bolzano, Italy",
+          "latitude": null,
+          "longitude": null,
+          "placeID": null
+        }
+      ]
+    },
+    {
+      "bucket": "gettingAround",
+      "title": "Getting around Val Gardena",
+      "body": "Val Gardena is walkable, but buses and ski shuttles can take you between towns and ski lifts. Consider a Dolomiti Superski pass for unlimited access to several ski areas. Local buses run frequently, especially during the ski season.",
+      "bullets": [
+        "Dolomiti Superski pass recommended",
+        "Buses run frequently between towns",
+        "Walking is a viable option for local travel"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Food and drink basics",
+      "body": "Dinner typically starts around 7 PM, with many restaurants serving hearty local options like speck and polenta. Lunch on the slopes sees a mixture of traditional food outlets and quick bites. Don't miss the chance to try local wines after your meal.",
+      "bullets": [
+        "Dinner at 7 PM",
+        "Lunch options on slope vary",
+        "Look for speck and polenta dishes"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Personal safety while skiing",
+      "body": "Always wear a helmet when skiing and follow local safety guidelines on the slopes. Insurance that covers skiing and any potential mountain rescue is highly recommended. Be cautious of avalanche conditions and check reports daily.",
+      "bullets": [
+        "Wear a helmet while skiing",
+        "Insurance that covers skiing is essential",
+        "Check avalanche conditions regularly"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "onTheGround",
+      "title": "Tipping culture in restaurants",
+      "body": "Tipping is customary in Italy, usually around 10% if service is good. Check the bill for service charge as it might already be included. Leaving small change is seen as polite.",
+      "bullets": [
+        "Tip around 10% for good service",
+        "Check for service charges included",
+        "Round up to the next euro is common"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Packing specifics for skiing",
+      "body": "Pack warm layers, waterproof jackets, and essential skiing gear. Don't forget goggles and gloves. If you plan to rent gear, check local rental shops for advance bookings, especially during the busy season.",
+      "bullets": [
+        "Warm layers essential",
+        "Waterproof jackets required",
+        "Goggles and gloves are a must"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    },
+    {
+      "bucket": "beforeYouLeave",
+      "title": "Apps worth installing before landing",
+      "body": "Consider downloading local transport apps for bus schedules and ski area maps. Additionally, apps for weather forecasts can help you plan ski days effectively.",
+      "bullets": [
+        "Download local transport apps",
+        "Get ski area maps",
+        "Weather forecast apps help planning"
+      ],
+      "volatility": "stable",
+      "sourceLead": null,
+      "source": null,
+      "sourceURL": null,
+      "locations": []
+    }
+  ]
+}

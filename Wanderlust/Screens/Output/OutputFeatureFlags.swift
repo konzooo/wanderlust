@@ -21,9 +21,11 @@ enum OutputFeatureFlags {
     /// than no Near You.
     static let nearYouEnabled = false
 
-    /// Know Before You Go ships as a visible placeholder on purpose: the tab is
-    /// part of the shell being reviewed, and it says plainly that its content is
-    /// still coming rather than pretending to be empty.
+    /// Know Before You Go now has real content behind it — its own component,
+    /// prompt, schema, persistence and retry — so the tab is live rather than a
+    /// placeholder. The flag stays as the off switch: v1's taxonomy is
+    /// explicitly provisional and expected to be reworked, and a tab that can be
+    /// closed is easier to rework than one that cannot.
     static let knowBeforeYouGoEnabled = true
 
     /// The interest chips are generated and persisted, but tapping one starts a

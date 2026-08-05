@@ -43,6 +43,7 @@ export type GroupDTO = {
   members: MemberDTO[];
   itinerary: unknown | null;
   suggestions: unknown | null;
+  knowBeforeYouGo: unknown | null;
   /** Per-component state, keyed by component name. */
   componentStates: Record<string, ComponentStateDTO>;
   /** Whether anything is worth retrying — drives the admin's retry affordance. */
@@ -74,6 +75,7 @@ export type SharedTripDTO = {
   groupType: string;
   itinerary: unknown;
   suggestions: unknown | null;
+  knowBeforeYouGo: unknown | null;
   favorites: unknown | null;
   /** Content only — see the `sharedTrips` schema on why decisions are absent. */
   worthItItems: unknown | null;
@@ -93,6 +95,7 @@ export function toSharedTripDTO(doc: Doc<"sharedTrips">): SharedTripDTO {
     groupType: doc.groupType,
     itinerary: doc.itinerary,
     suggestions: doc.suggestions ?? null,
+    knowBeforeYouGo: doc.knowBeforeYouGo ?? null,
     favorites: doc.favorites ?? null,
     worthItItems: doc.worthItItems ?? null,
     whereToStay: doc.whereToStay ?? null,
@@ -131,6 +134,7 @@ export function toGroupDTO(
     members: members.map((m) => toMemberDTO(m, viewerMemberId)),
     itinerary: group.itinerary ?? null,
     suggestions: group.suggestions ?? null,
+    knowBeforeYouGo: group.knowBeforeYouGo ?? null,
     componentStates: currentStates(group),
     canRetry:
       group.status !== "collecting" &&

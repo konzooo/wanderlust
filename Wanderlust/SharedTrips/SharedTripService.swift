@@ -37,6 +37,7 @@ final class SharedTripService {
         groupType: String,
         itinerary: Trip.Itinerary,
         suggestions: Trip.Suggestions?,
+        knowBeforeYouGo: Trip.KnowBeforeYouGo?,
         favorites: Trip.Favorites,
         worthItItems: [Trip.WorthItItem]?,
         whereToStay: [Trip.StayArea]?,
@@ -70,6 +71,9 @@ final class SharedTripService {
         }
         if !interestPrompts.isEmpty {
             args["interestPrompts"] = interestPrompts as [(any ConvexEncodable)?]
+        }
+        if let knowBeforeYouGo {
+            args["knowBeforeYouGo"] = knowBeforeYouGo
         }
         let result: PublishedTrip = try await client.mutation("sharedTrips:publishTrip", with: args)
         return result.code
@@ -113,6 +117,7 @@ struct SharedTripDTO: Decodable, Equatable {
     let groupType: String
     let itinerary: Trip.Itinerary
     let suggestions: Trip.Suggestions?
+    let knowBeforeYouGo: Trip.KnowBeforeYouGo?
     let favorites: Trip.Favorites?
     /// Shared content. The sender's `worthItDecisions` are never published, so
     /// there is nothing here to receive them into — the recipient decides.
@@ -129,7 +134,7 @@ struct SharedTripDTO: Decodable, Equatable {
     /// here — and a negative is only testable against an enumerable list.
     enum CodingKeys: String, CodingKey, CaseIterable {
         case code, title, destination, startMonth, groupType, itinerary, suggestions, favorites
-        case worthItItems, whereToStay, interestPrompts, imageUrl
+        case knowBeforeYouGo, worthItItems, whereToStay, interestPrompts, imageUrl
         case durationDaysRaw = "durationDays"
     }
 
@@ -144,6 +149,9 @@ struct SharedTripDTO: Decodable, Equatable {
         durationDaysRaw = try container.decode(Double.self, forKey: .durationDaysRaw)
         imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
         suggestions = try? container.decodeIfPresent(Trip.Suggestions.self, forKey: .suggestions)
+        knowBeforeYouGo = try? container.decodeIfPresent(
+            Trip.KnowBeforeYouGo.self, forKey: .knowBeforeYouGo
+        )
         favorites = try? container.decodeIfPresent(Trip.Favorites.self, forKey: .favorites)
         // Same degrade-don't-throw rule as the two above: a section this build
         // doesn't recognise must cost the recipient that section, never the
@@ -160,6 +168,7 @@ struct SharedTripDTO: Decodable, Equatable {
 // these are safe from the Int-vs-Double wire gotcha without extra handling.
 extension Trip.Itinerary: @retroactive ConvexEncodable {}
 extension Trip.Suggestions: @retroactive ConvexEncodable {}
+extension Trip.KnowBeforeYouGo: @retroactive ConvexEncodable {}
 extension Trip.Favorites: @retroactive ConvexEncodable {}
 extension Trip.WorthItItem: @retroactive ConvexEncodable {}
 extension Trip.StayArea: @retroactive ConvexEncodable {}

@@ -5,6 +5,7 @@ The app parses both group invites and shared solo trips in
 
 - **Production group invite:** `https://wanderlust.get-catalyst.app/join/<code>`
 - **Production shared trip:** `https://wanderlust.get-catalyst.app/t/<code>`
+- **Privacy policy:** `https://wanderlust.get-catalyst.app/privacy`
 - **Legacy:** Existing `https://www.get-catalyst.app/...` links stay supported.
 - **Dev/testing:** `wanderlust://join/<code>` and `wanderlust://t/<code>`
 

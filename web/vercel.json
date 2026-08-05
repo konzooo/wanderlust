@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
       "source": "/join/:code",
       "destination": "https://affable-pika-176.convex.site/join?code=:code"
     },

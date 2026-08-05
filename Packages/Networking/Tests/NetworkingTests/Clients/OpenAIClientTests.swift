@@ -44,7 +44,7 @@ final class OpenAIClientTests: XCTestCase {
         let stubData  = try JSONEncoder().encode(payload)
         let mock      = MockNetworkClient(stub: .success(stubData))
 
-        let client = OpenAIClient(network: mock, apiKey: apiKey)
+        let client = OpenAIClient(network: mock, keyProvider: { self.apiKey })
 
         // Act
         let result: DummyResponse = try await client.send(endpoint)   // the no-body overload
@@ -67,7 +67,7 @@ final class OpenAIClientTests: XCTestCase {
         let stubData  = try JSONEncoder().encode(payload)
         let mock      = MockNetworkClient(stub: .success(stubData))
 
-        let client = OpenAIClient(network: mock, apiKey: apiKey)
+        let client = OpenAIClient(network: mock, keyProvider: { self.apiKey })
         let body   = DummyBody()
 
         // Act
@@ -91,7 +91,7 @@ final class OpenAIClientTests: XCTestCase {
     func test_send_InvalidJSON_ThrowsDecodingError() async {
         // Arrange – return *malformed* JSON
         let mock = MockNetworkClient(stub: .success(Data("💣".utf8)))
-        let client = OpenAIClient(network: mock, apiKey: apiKey)
+        let client = OpenAIClient(network: mock, keyProvider: { self.apiKey })
 
         // Act / Assert
         do {

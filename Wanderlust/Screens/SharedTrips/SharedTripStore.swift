@@ -1,3 +1,4 @@
+import CoreArchitecture
 import CoreModels
 import Foundation
 
@@ -9,6 +10,7 @@ import Foundation
 ///
 /// Deliberately not a live subscription: once a shared trip lands locally, it
 /// is never fetched again (see `ReceivedSharedTripStorage`).
+@MainActor
 final class SharedTripStore: ObservableObject {
     @Published var state: State
 
@@ -24,15 +26,26 @@ final class SharedTripStore: ObservableObject {
                 let ownedAll = try TripStorage().fetchAll()
                 if let owned = ownedAll.first(where: { $0.shareCode == code }) {
                     state.resolved = .loaded(Self.outputState(for: owned, mode: .savedTrip))
+                    logOpened(trip: owned, outcome: "owned_cache")
                     return
                 }
                 let receivedAll = try ReceivedSharedTripStorage.received().fetchAll()
                 if let received = receivedAll.first(where: { $0.shareCode == code }) {
                     state.resolved = .loaded(Self.outputState(for: received, mode: .sharedTrip))
+                    logOpened(trip: received, outcome: "received_cache")
                     return
                 }
                 guard let dto = try await SharedTripService.shared.fetchOnce(code: code) else {
                     state.resolved = .failed
+                    AnalyticsTracker.shared.log(
+                        .init(.sharedTripOpened, properties: [
+                            "source": .string("deep_link"),
+                            "outcome": .string("failure"),
+                            "error_category": .string(
+                                AnalyticsErrorCategory.notFound.rawValue
+                            )
+                        ])
+                    )
                     return
                 }
                 let trip = Trip(
@@ -49,10 +62,30 @@ final class SharedTripStore: ObservableObject {
                 )
                 try ReceivedSharedTripStorage.received().save(trip)
                 state.resolved = .loaded(Self.outputState(for: trip, mode: .sharedTrip))
+                logOpened(trip: trip, outcome: "network")
             } catch {
                 state.resolved = .failed
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .sharedTripOpened,
+                        outcome: "failure",
+                        error: error,
+                        properties: ["source": .string("deep_link")]
+                    )
+                )
             }
         }
+    }
+
+    private func logOpened(trip: Trip, outcome: String) {
+        var properties: [String: AnalyticsValue] = [
+            "source": .string("deep_link"),
+            "outcome": .string(outcome)
+        ]
+        if let destination = AnalyticsSanitizer.destination(trip.destination) {
+            properties["destination"] = .string(destination)
+        }
+        AnalyticsTracker.shared.log(.init(.sharedTripOpened, properties: properties))
     }
 
     private static func outputState(for trip: Trip, mode: TripOutputStore.State.Mode) -> TripOutputStore.State {

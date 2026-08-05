@@ -133,8 +133,8 @@ extension HomeScreen {
 
     var ctaButton: some View {
         Button("Get Started") {
-            //            store.send(.ctaTapped)
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            AnalyticsTracker.shared.log(.tripPlanningStarted(entryPoint: "home"))
             router.goToBasicInfo()
         }
         .buttonStyle(PrimaryButtonStyle(fullWidth: false))

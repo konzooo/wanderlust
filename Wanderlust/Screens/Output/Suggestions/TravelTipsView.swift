@@ -128,9 +128,9 @@ extension TravelTipsView {
 
     private struct SuggestionCard: View {
         // Fixed so the carousel keeps its uniform rhythm; sized to fit the 150-character
-        // ceiling the prompt sets (about five lines) with the last line clear of the heart.
+        // ceiling the prompt sets (about four lines) with the last line clear of the heart.
         private static let cardWidth: CGFloat = 270
-        private static let cardHeight: CGFloat = 138
+        private static let cardHeight: CGFloat = 120
 
         let card: TextCard
         @Binding var favorites: Trip.Favorites

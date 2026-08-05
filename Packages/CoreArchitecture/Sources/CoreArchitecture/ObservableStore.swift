@@ -7,6 +7,7 @@ import Foundation
 
 /// Representation of a store combining an observable state with a single entry point
 /// to dispatch actions representing business logic.
+@MainActor
 public protocol ObservableStore: ObservableObject {
     /// Store's state representation. Conforming types must ensure `State` is `Equatable`
     associatedtype State: Equatable

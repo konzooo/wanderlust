@@ -5,11 +5,13 @@ import Foundation
 /// Drives the live group dashboard. Subscribes to Convex `getGroup` so the
 /// roster/status update in real time as members finish, and issues the admin
 /// controls (add / remove / generate / retry).
+@MainActor
 final class GroupDashboardStore: ObservableStore {
     @Published var state: State
     private let service: GroupTripService
     private let credentials: GroupTripCredentials?
     private var cancellable: AnyCancellable?
+    private var previousGroupStatus: GroupStatus?
 
     init(groupId: String, service: GroupTripService = .shared) {
         self.service = service
@@ -33,6 +35,7 @@ final class GroupDashboardStore: ObservableStore {
                     }
                 },
                 receiveValue: { [weak self] dto in
+                    self?.logStatusChange(dto)
                     self?.state.group = .loaded(dto)
                 }
             )
@@ -42,8 +45,10 @@ final class GroupDashboardStore: ObservableStore {
         guard let credentials, let adminToken = credentials.adminToken else { return }
         switch action {
         case .generate:
+            logGenerationRequested(action: "generate")
             runAdmin { try await self.service.forceGenerate(groupId: credentials.groupId, adminToken: adminToken) }
         case .retry:
+            logGenerationRequested(action: "retry")
             runAdmin { try await self.service.retryGeneration(groupId: credentials.groupId, adminToken: adminToken) }
         case let .removeMember(memberId):
             runAdmin { try await self.service.removeMember(groupId: credentials.groupId, adminToken: adminToken, memberId: memberId) }
@@ -64,6 +69,50 @@ final class GroupDashboardStore: ObservableStore {
             }
         }
     }
+
+    private func logGenerationRequested(action: String) {
+        var properties: [String: AnalyticsValue] = [
+            "action": .string(action)
+        ]
+        if case let .loaded(group) = state.group {
+            properties["roster_count"] = .integer(group.memberCount)
+            properties["completed_count"] = .integer(group.completedCount)
+            if let destination = AnalyticsSanitizer.destination(group.destination) {
+                properties["destination"] = .string(destination)
+            }
+        }
+        AnalyticsTracker.shared.log(
+            .init(.groupGenerationRequested, properties: properties)
+        )
+    }
+
+    private func logStatusChange(_ group: GroupDTO) {
+        guard previousGroupStatus != group.status else { return }
+        var properties: [String: AnalyticsValue] = [
+            "previous_state": .string(previousGroupStatus?.rawValue ?? "unknown"),
+            "state": .string(group.status.rawValue),
+            "roster_count": .integer(group.memberCount),
+            "completed_count": .integer(group.completedCount)
+        ]
+        if let destination = AnalyticsSanitizer.destination(group.destination) {
+            properties["destination"] = .string(destination)
+        }
+        if let errorCode = group.errorCode {
+            properties["error_category"] = .string(
+                AnalyticsSanitizer.errorCategory(
+                    GroupAnalyticsError(code: errorCode)
+                ).rawValue
+            )
+        }
+        previousGroupStatus = group.status
+        AnalyticsTracker.shared.log(
+            .init(.groupGenerationStateChanged, properties: properties)
+        )
+    }
+}
+
+private struct GroupAnalyticsError: Error {
+    let code: String
 }
 
 extension GroupDashboardStore {

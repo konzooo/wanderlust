@@ -1,3 +1,4 @@
+import CoreArchitecture
 import CoreModels
 import DesignSystem
 import Foundation
@@ -58,6 +59,7 @@ final class TravellerProfileLibrary: ObservableObject {
     func save(_ profile: TravellerProfile) throws {
         let cleaned = try normalized(profile)
         let isFirst = profiles.isEmpty
+        let wasExisting = profiles.contains(where: { $0.id == cleaned.id })
         if let index = profiles.firstIndex(where: { $0.id == cleaned.id }) {
             profiles[index] = cleaned
         } else {
@@ -68,9 +70,16 @@ final class TravellerProfileLibrary: ObservableObject {
             attachByDefault = true
         }
         try persist()
+        var properties = cleaned.analyticsProperties
+        properties["operation"] = .string(wasExisting ? "updated" : "created")
+        properties["profile_count"] = .integer(profiles.count)
+        AnalyticsTracker.shared.log(
+            .init(.travellerProfileSaved, properties: properties)
+        )
     }
 
     func delete(_ id: UUID) {
+        let deleted = profiles.first(where: { $0.id == id })
         profiles.removeAll(where: { $0.id == id })
         if mainProfileID == id {
             mainProfileID = profiles.first?.id
@@ -79,6 +88,13 @@ final class TravellerProfileLibrary: ObservableObject {
             attachByDefault = false
         }
         try? persist()
+        if let deleted {
+            var properties = deleted.analyticsProperties
+            properties["profile_count"] = .integer(profiles.count)
+            AnalyticsTracker.shared.log(
+                .init(.travellerProfileDeleted, properties: properties)
+            )
+        }
     }
 
     func makeMain(_ id: UUID) {
@@ -461,6 +477,12 @@ struct ProfileSelectionButton: View {
                     isSelected: selection == nil
                 ) {
                     selection = nil
+                    AnalyticsTracker.shared.log(
+                        .init(.travellerProfileSelected, properties: [
+                            "selection": .string("none"),
+                            "profile_count": .integer(library.profiles.count)
+                        ])
+                    )
                     pickerPresented = false
                 }
 
@@ -474,6 +496,12 @@ struct ProfileSelectionButton: View {
                             isSelected: selection == profile.id
                         ) {
                             selection = profile.id
+                            var properties = profile.analyticsProperties
+                            properties["selection"] = .string("profile")
+                            properties["profile_count"] = .integer(library.profiles.count)
+                            AnalyticsTracker.shared.log(
+                                .init(.travellerProfileSelected, properties: properties)
+                            )
                             pickerPresented = false
                         }
                     }
@@ -695,6 +723,7 @@ struct ProfilesScreen: View {
             }
         }
         .onAppear {
+            AnalyticsTracker.shared.log(.screenViewed(.profiles))
             guard !didHandleInitialAction else { return }
             didHandleInitialAction = true
             if library.profiles.isEmpty, !onboardingDismissed {
@@ -917,6 +946,25 @@ struct ProfilesScreen: View {
         }
         .padding(12)
         .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private extension TravellerProfile {
+    var analyticsProperties: [String: AnalyticsValue] {
+        var properties: [String: AnalyticsValue] = [
+            "skip_count": .integer(usuallySkip.count),
+            "must_have_count": .integer(mustHaves.count),
+            "has_notes": .boolean(
+                !(additionalNotes?
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            )
+        ]
+        for dimension in TravellerDNADimension.allCases {
+            if let score = score(for: dimension) {
+                properties["dna_\(dimension.rawValue)"] = .integer(score)
+            }
+        }
+        return properties
     }
 }
 

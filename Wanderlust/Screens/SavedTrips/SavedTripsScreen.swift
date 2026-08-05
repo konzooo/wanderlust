@@ -12,6 +12,7 @@ struct SavedTripsScreen: View {
     @State private var segment: Segment = .myTrips
     @State private var groupSummaries: [GroupTripSummary] = []
     @State private var sharedTrips: [Trip] = []
+    @State private var didLogView = false
 
     // Shortened labels so all three fit the segmented control on small
     // devices and at larger Dynamic Type sizes ("My Group Trips" / "Shared
@@ -23,8 +24,9 @@ struct SavedTripsScreen: View {
         case shared = "Shared"
     }
 
-    init(store: SavedTripsStore = .init()) {
-        self._store = StateObject(wrappedValue: store)
+    @MainActor
+    init(store: SavedTripsStore? = nil) {
+        self._store = StateObject(wrappedValue: store ?? SavedTripsStore())
     }
 
     var body: some View {
@@ -60,6 +62,7 @@ struct SavedTripsScreen: View {
 
         // onAppear is only called the first time this screen is shown (not when returning via pop)
         .onAppear {
+            AnalyticsTracker.shared.log(.screenViewed(.savedTrips))
             store.send(.loadSavedTrips)
             groupSummaries = GroupTripCredentialsStore.summaries
             sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
@@ -74,6 +77,17 @@ struct SavedTripsScreen: View {
                 sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
             }
         }
+        .onChange(of: store.state.savedTrips) { _, value in
+            guard !didLogView, case let .loaded(trips) = value else { return }
+            didLogView = true
+            AnalyticsTracker.shared.log(
+                .init(.savedTripsViewed, properties: [
+                    "personal_count": .integer(trips.count),
+                    "group_count": .integer(groupSummaries.count),
+                    "received_count": .integer(sharedTrips.count)
+                ])
+            )
+        }
     }
 
     var groupTripsList: some View {
@@ -84,6 +98,15 @@ struct SavedTripsScreen: View {
                 } else {
                     ForEach(groupSummaries) { summary in
                         Button {
+                            var properties: [String: AnalyticsValue] = [
+                                "trip_type": .string("group")
+                            ]
+                            if let destination = AnalyticsSanitizer.destination(summary.destination) {
+                                properties["destination"] = .string(destination)
+                            }
+                            AnalyticsTracker.shared.log(
+                                .init(.savedTripOpened, properties: properties)
+                            )
                             router.goToGroupDashboard(summary.groupId)
                         } label: {
                             groupSummaryCard(summary)
@@ -139,7 +162,7 @@ struct SavedTripsScreen: View {
 
     var titleSubtitle: some View {
         VStack(spacing: 2) {
-            Text("Trips")
+            Text("My trips")
                 .font(.kanit(34))
 
             if case let .loaded(trips) = store.state.savedTrips, !trips.isEmpty {
@@ -281,6 +304,11 @@ struct SavedTripsScreen: View {
 
     // should be part of a Store Action
     func navigateToTripDetails(_ trip: Trip) {
+        var properties: [String: AnalyticsValue] = ["trip_type": .string("personal")]
+        if let destination = AnalyticsSanitizer.destination(trip.destination) {
+            properties["destination"] = .string(destination)
+        }
+        AnalyticsTracker.shared.log(.init(.savedTripOpened, properties: properties))
         let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
             .loaded(trip.suggestions!) : .initial
 
@@ -302,6 +330,14 @@ struct SavedTripsScreen: View {
     /// A trip in "Shared" is already a durable local copy
     /// (`ReceivedSharedTripStorage`) — opens instantly, no network.
     func navigateToSharedTripDetails(_ trip: Trip) {
+        var properties: [String: AnalyticsValue] = [
+            "source": .string("saved_trips"),
+            "outcome": .string("success")
+        ]
+        if let destination = AnalyticsSanitizer.destination(trip.destination) {
+            properties["destination"] = .string(destination)
+        }
+        AnalyticsTracker.shared.log(.init(.sharedTripOpened, properties: properties))
         let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
             .loaded(trip.suggestions!) : .initial
 

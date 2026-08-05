@@ -15,6 +15,7 @@ import UIKit
 /// Manages the state and business logic for the itinerary result screen.
 /// Handles parallel fetching of itinerary data and destination images.
 @dynamicMemberLookup
+@MainActor
 class TripOutputStore: ObservableStore {
     @Published var state: State
 
@@ -96,9 +97,9 @@ class TripOutputStore: ObservableStore {
             fetchDestinationImage()
             
         case .retry:
+            retryCount += 1
             generateItinerary()
             fetchDestinationImage()
-            retryCount+=1
             
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
@@ -177,6 +178,7 @@ extension TripOutputStore {
         var itineraryResponse: AsyncValue<Trip.Itinerary> = .initial
         var suggestionsResponse: AsyncValue<Trip.Suggestions> = .initial
         var imageUrlResponse: AsyncValue<URL> = .initial
+        var didLogResultViewed = false
         
         var fullDestinationString: String {
             itineraryResponse.data?.destination ?? details.destination.name
@@ -301,6 +303,9 @@ extension TripOutputStore {
     /// Updates state independently on the main thread.
     func generateItinerary() {
         state.itineraryResponse = .loading
+        let startedAt = Date()
+        let attempt = retryCount + 1
+        logGeneration(.tripGenerationStarted, component: "itinerary", attempt: attempt)
         Task {
             do {
                 // Fetch and process the itinerary data
@@ -312,11 +317,25 @@ extension TripOutputStore {
                 // Save itinerary response
                 await MainActor.run {
                     state.itineraryResponse = .loaded(response)
+                    logGeneration(
+                        .tripGenerationSucceeded,
+                        component: "itinerary",
+                        attempt: attempt,
+                        duration: startedAt
+                    )
+                    logResultViewedIfNeeded()
                 }
             } catch {
                 // Handle any errors during the process
                 await MainActor.run {
                     state.itineraryResponse = .error(error)
+                    logGeneration(
+                        .tripGenerationFailed,
+                        component: "itinerary",
+                        attempt: attempt,
+                        duration: startedAt,
+                        error: error
+                    )
                 }
             }
         }
@@ -324,17 +343,33 @@ extension TripOutputStore {
 
     func generateSuggestions() {
         state.suggestionsResponse = .loading
+        let startedAt = Date()
+        let attempt = retryCount + 1
+        logGeneration(.tripGenerationStarted, component: "suggestions", attempt: attempt)
         Task {
             do {
                 // Fetch and process the itinerary data
                 let response = try await suggestionsService.generate(userMessage: state.tripSummary)
                 await MainActor.run {
                     state.suggestionsResponse = .loaded(response)
+                    logGeneration(
+                        .tripGenerationSucceeded,
+                        component: "suggestions",
+                        attempt: attempt,
+                        duration: startedAt
+                    )
                 }
             } catch {
                 // Handle any errors during the process
                 await MainActor.run {
                     state.suggestionsResponse = .error(error)
+                    logGeneration(
+                        .tripGenerationFailed,
+                        component: "suggestions",
+                        attempt: attempt,
+                        duration: startedAt,
+                        error: error
+                    )
                 }
             }
         }
@@ -347,6 +382,9 @@ extension TripOutputStore {
     /// intentionally call it a second time once generation normalizes the
     /// destination name.)
     func fetchDestinationImage() {
+        let startedAt = Date()
+        let attempt = retryCount + 1
+        logGeneration(.tripGenerationStarted, component: "image", attempt: attempt)
         Task {
             do {
                 // Get destination name and fetch corresponding image. The
@@ -357,11 +395,24 @@ extension TripOutputStore {
                 let response = try await imageService.fetchImageURL(for: destinationName)
                 await MainActor.run {
                     state.imageUrlResponse = .loaded(response)
+                    logGeneration(
+                        .tripGenerationSucceeded,
+                        component: "image",
+                        attempt: attempt,
+                        duration: startedAt
+                    )
                 }
             } catch {
                 // Handle any errors during the image fetch
                 await MainActor.run {
                     state.imageUrlResponse = .error(error)
+                    logGeneration(
+                        .tripGenerationFailed,
+                        component: "image",
+                        attempt: attempt,
+                        duration: startedAt,
+                        error: error
+                    )
                 }
             }
         }
@@ -433,8 +484,25 @@ extension TripOutputStore {
                     }
                     
                     state.alert = nil
+                    AnalyticsTracker.shared.log(
+                        .outcome(
+                            .tripSaved,
+                            outcome: "success",
+                            properties: analyticsTripProperties
+                        )
+                    )
                 }
             } catch {
+                await MainActor.run {
+                    AnalyticsTracker.shared.log(
+                        .outcome(
+                            .tripSaved,
+                            outcome: "failure",
+                            error: error,
+                            properties: analyticsTripProperties
+                        )
+                    )
+                }
                 // Handle error (could add error state)
                 print("Failed to save trip: \(error)")
             }
@@ -458,19 +526,46 @@ extension TripOutputStore {
                 try storage.delete(trip)
                 await MainActor.run {
                     state.alert = nil
+                    AnalyticsTracker.shared.log(
+                        .outcome(
+                            .tripDeleted,
+                            outcome: "success",
+                            properties: analyticsTripProperties
+                        )
+                    )
                     router?.pop()
                 }
             } catch {
+                await MainActor.run {
+                    AnalyticsTracker.shared.log(
+                        .outcome(
+                            .tripDeleted,
+                            outcome: "failure",
+                            error: error,
+                            properties: analyticsTripProperties
+                        )
+                    )
+                }
                 print("Failed to delete trip: \(error)")
             }
         }
     }
 
     private func shareTrip() {
+        AnalyticsTracker.shared.log(
+            .init(.tripShareRequested, properties: analyticsTripProperties)
+        )
         // Already published: content is immutable once generated, so
         // re-sharing is a pure client-side reopen — no network, no new code.
         if let code = state.shareCode {
             shareSheetURL = SharedTripLink.url(for: code)
+            AnalyticsTracker.shared.log(
+                .outcome(
+                    .tripShareSucceeded,
+                    outcome: "reopened",
+                    properties: analyticsTripProperties
+                )
+            )
             return
         }
 
@@ -500,10 +595,78 @@ extension TripOutputStore {
                     reSaveTrip()
                 }
                 shareSheetURL = SharedTripLink.url(for: code)
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .tripShareSucceeded,
+                        outcome: "published",
+                        properties: analyticsTripProperties
+                    )
+                )
             } catch {
                 shareErrorMessage = "Couldn't create a share link. Check your connection and try again."
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .tripShareFailed,
+                        outcome: "failure",
+                        error: error,
+                        properties: analyticsTripProperties
+                    )
+                )
             }
         }
+    }
+
+    func logResultViewedIfNeeded() {
+        guard !state.didLogResultViewed, state.itineraryResponse.isLoaded else { return }
+        state.didLogResultViewed = true
+        let name: AnalyticsEventName = state.mode == .groupTrip
+            ? .groupResultViewed
+            : .tripResultViewed
+        AnalyticsTracker.shared.log(.init(name, properties: analyticsTripProperties))
+    }
+
+    func logFavoriteChange(action: String) {
+        var properties = analyticsTripProperties
+        properties["action"] = .string(action)
+        properties["favorite_count"] = .integer(state.favorites.liked.count)
+        AnalyticsTracker.shared.log(.init(.favoriteChanged, properties: properties))
+    }
+
+    private var analyticsTripProperties: [String: AnalyticsValue] {
+        var properties: [String: AnalyticsValue] = [
+            "trip_type": .string(state.mode.analyticsName),
+            "duration_days": .integer(state.details.duration)
+        ]
+        if let destination = AnalyticsSanitizer.destination(state.fullDestinationString) {
+            properties["destination"] = .string(destination)
+        }
+        return properties
+    }
+
+    private func logGeneration(
+        _ name: AnalyticsEventName,
+        component: String,
+        attempt: Int,
+        duration startedAt: Date? = nil,
+        error: Error? = nil
+    ) {
+        var properties = analyticsTripProperties
+        properties["component"] = .string(component)
+        properties["attempt"] = .integer(attempt)
+        properties["trip_mode"] = .string(
+            state.mode == .groupTrip ? "group" : "solo"
+        )
+        if let startedAt {
+            properties["duration_ms"] = .integer(
+                Int(Date().timeIntervalSince(startedAt) * 1_000)
+            )
+        }
+        if let error {
+            properties["error_category"] = .string(
+                AnalyticsSanitizer.errorCategory(error).rawValue
+            )
+        }
+        AnalyticsTracker.shared.log(.init(name, properties: properties))
     }
 
     /// Saves the recipient's current favorite selections back onto their local
@@ -571,5 +734,13 @@ extension TripOutputStore.State.Mode {
     var isReadOnly: Bool {
         self == .groupTrip || self == .sharedTrip
     }
-}
 
+    var analyticsName: String {
+        switch self {
+        case .newTrip: "new"
+        case .savedTrip: "saved"
+        case .groupTrip: "group"
+        case .sharedTrip: "received"
+        }
+    }
+}

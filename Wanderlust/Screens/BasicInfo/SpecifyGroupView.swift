@@ -62,7 +62,6 @@ struct SpecifyGroupView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        AnalyticsTracker.shared.log(.buttonTapped("specify_group_save", screen: .basicInfo))
                         onSave(
                             .init(
                                 averageAge: Int(averageAgeText),

@@ -1,6 +1,7 @@
 import CoreArchitecture
 import Foundation
 
+@MainActor
 class GroupTripMembersStore: ObservableStore {
     @Published var state: State
     private let service: GroupTripService
@@ -56,9 +57,30 @@ class GroupTripMembersStore: ObservableStore {
                 state.members.append(GroupTripMemberRow(memberId: result.memberId, name: name, isAdmin: true))
                 state.newMemberName = ""
                 state.isAddingMember = false
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupMemberAdded,
+                        outcome: "success",
+                        properties: [
+                            "role": .string("admin"),
+                            "roster_count": .integer(state.members.count)
+                        ]
+                    )
+                )
             } catch {
                 state.isAddingMember = false
                 state.errorMessage = "Couldn't add your name. Check your connection and try again."
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupMemberAdded,
+                        outcome: "failure",
+                        error: error,
+                        properties: [
+                            "role": .string("admin"),
+                            "roster_count": .integer(state.members.count)
+                        ]
+                    )
+                )
             }
         }
     }
@@ -74,9 +96,30 @@ class GroupTripMembersStore: ObservableStore {
                 state.members.append(GroupTripMemberRow(memberId: seeded.memberId, name: name, isAdmin: false))
                 state.newMemberName = ""
                 state.isAddingMember = false
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupMemberAdded,
+                        outcome: "success",
+                        properties: [
+                            "role": .string("member"),
+                            "roster_count": .integer(state.members.count)
+                        ]
+                    )
+                )
             } catch {
                 state.isAddingMember = false
                 state.errorMessage = "Couldn't add \(name). Check your connection and try again."
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupMemberAdded,
+                        outcome: "failure",
+                        error: error,
+                        properties: [
+                            "role": .string("member"),
+                            "roster_count": .integer(state.members.count)
+                        ]
+                    )
+                )
             }
         }
     }

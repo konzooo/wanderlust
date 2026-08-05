@@ -42,7 +42,6 @@ struct FeedbackScreen: View {
         // 4️⃣ Action button stays visible
         .safeAreaInset(edge: .bottom) {
             Button("Submit") {
-                AnalyticsTracker.shared.log(.buttonTapped("submit_feedback", screen: .feedback))
                 store.send(.submit)
                 dismiss()
             }

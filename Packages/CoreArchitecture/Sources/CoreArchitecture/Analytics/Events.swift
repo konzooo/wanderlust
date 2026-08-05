@@ -7,46 +7,56 @@
 
 
 public extension AnalyticsEvent {
-    public enum Key: String {
-        case screenName = "screen_name"
-        case buttonName = "button_name"
-        case destination
-    }
-
-    public enum Screen: String {
+    enum Screen: String, Sendable {
         case home = "home"
         case basicInfo = "basic_info"
-        case questionaire = "questionaire"
-        case itineraryResult = "itinerary_result"
+        case questionnaire = "questionnaire"
+        case tripOutput = "trip_output"
         case feedback = "feedback"
+        case savedTrips = "saved_trips"
+        case profiles = "profiles"
+        case groupCreate = "group_create"
+        case groupMembers = "group_members"
+        case groupJoin = "group_join"
+        case groupQuestionnaire = "group_questionnaire"
+        case groupDashboard = "group_dashboard"
+        case sharedTrip = "shared_trip"
     }
 
+    static func screenViewed(_ screen: Screen, entryPoint: String? = nil) -> Self {
+        var properties: [String: AnalyticsValue] = [
+            "screen_name": .string(screen.rawValue)
+        ]
+        if let entryPoint {
+            properties["entry_point"] = .string(entryPoint)
+        }
+        return .init(.screenViewed, properties: properties)
+    }
 
-    public static func screenViewed(_ screen: Screen) -> Self {
-        .init("screen_viewed", parameters: [
-            Key.screenName.rawValue: screen.rawValue
+    static func tripPlanningStarted(entryPoint: String) -> Self {
+        .init(.tripPlanningStarted, properties: [
+            "entry_point": .string(entryPoint)
         ])
     }
 
-    public static func buttonTapped(_ buttonName: String, screen: Screen) -> Self {
-        .init("button_tapped", parameters: [
-            Key.buttonName.rawValue: buttonName,
-            Key.screenName.rawValue: screen.rawValue
-        ])
+    static func outcome(
+        _ name: AnalyticsEventName,
+        outcome: String,
+        error: Error? = nil,
+        properties: [String: AnalyticsValue] = [:]
+    ) -> Self {
+        var values = properties
+        values["outcome"] = .string(outcome)
+        if let error {
+            values["error_category"] = .string(
+                AnalyticsSanitizer.errorCategory(error).rawValue
+            )
+        }
+        return .init(name, properties: values)
     }
 
-    public static func confirmBasicInfo(properties: [String: String]) -> Self {
-        .init("confired_basic_info", parameters: [
-            Key.screenName.rawValue: Screen.basicInfo,
-            "basic_info": properties
-        ])
-    }
-
-    public static func questionnaireFinished(properties: [String: String]) -> Self {
-        .init("questionnaire_finished", parameters: [
-            Key.screenName.rawValue: Screen.questionaire,
-            "questionnaire_responses": properties
-        ])
+    static func destinationProperty(_ rawValue: String) -> [String: AnalyticsValue] {
+        guard let destination = AnalyticsSanitizer.destination(rawValue) else { return [:] }
+        return ["destination": .string(destination)]
     }
 }
-

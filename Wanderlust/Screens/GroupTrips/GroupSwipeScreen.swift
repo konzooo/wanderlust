@@ -1,3 +1,4 @@
+import CoreArchitecture
 import CoreModels
 import DesignSystem
 import SwiftUI
@@ -136,6 +137,13 @@ struct GroupSwipeScreen: View {
                 )
                 GroupQuestionnaireDraftStore.clear(memberID: credentials.memberId)
                 isSubmitting = false
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupPreferencesSubmitted,
+                        outcome: "success",
+                        properties: analyticsProperties(for: preferences)
+                    )
+                )
                 router.goToGroupDashboard(groupId, resetStack: true)
             } catch {
                 isSubmitting = false
@@ -148,8 +156,46 @@ struct GroupSwipeScreen: View {
                     return
                 }
                 submitError = "We couldn't upload your preferences. Your choices are saved — check your connection and try again."
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupPreferencesSubmitted,
+                        outcome: "failure",
+                        error: error,
+                        properties: analyticsProperties(for: preferences)
+                    )
+                )
             }
         }
+    }
+
+    private func analyticsProperties(
+        for preferences: MemberPreferences
+    ) -> [String: AnalyticsValue] {
+        var properties: [String: AnalyticsValue] = [
+            "questionnaire_version": .integer(preferences.questionnaireVersion),
+            "question_count": .integer(preferences.answers.count),
+            "has_profile": .boolean(preferences.profile != nil)
+        ]
+        for answer in preferences.answers {
+            let paddedID = answer.questionID.count == 1
+                ? "0\(answer.questionID)"
+                : answer.questionID
+            properties["q\(paddedID)_choice"] = .string(answer.choice.rawValue)
+        }
+        if let profile = preferences.profile {
+            for dimension in TravellerDNADimension.allCases {
+                if let score = profile.score(for: dimension) {
+                    properties["dna_\(dimension.rawValue)"] = .integer(score)
+                }
+            }
+            properties["profile_skip_count"] = .integer(profile.usuallySkip.count)
+            properties["profile_must_have_count"] = .integer(profile.mustHaves.count)
+            properties["profile_has_notes"] = .boolean(
+                !(profile.additionalNotes?
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            )
+        }
+        return properties
     }
 
     private var submittingOverlay: some View {

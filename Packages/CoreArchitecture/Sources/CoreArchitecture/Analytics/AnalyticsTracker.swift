@@ -5,52 +5,56 @@
 //  Created by Rodrigo Mato Castellano on 6/2/25.
 //
 
+import Foundation
+
 /// Use this singleton throughout the app rather than referencing a concrete backend.
 @MainActor
-public final class AnalyticsTracker {
+public final class AnalyticsTracker: AnalyticsTracking {
 
     public static let shared = AnalyticsTracker()
-    private var service: AnalyticsService
+    private var service: AnalyticsService = NoOpAnalyticsService()
+    private var testingClient: AnalyticsTracking?
+    private var distributionChannel = "debug"
+    private var configured = false
 
-    public func initialize() {
+    public func initialize(configuration: AnalyticsConfiguration = .appDefault()) {
+        guard !configured else { return }
+        configured = true
+        distributionChannel = configuration.distributionChannel
+        service = configuration.networkEnabled
+            ? AmplitudeAnalyticsService(configuration: configuration)
+            : NoOpAnalyticsService()
         service.configure()
-
-//        service.setDefaultParameters([])
-
-        service.setUserID(KeychainDeviceIDProvider().deviceID()) // TODO: use as dependency
     }
-
-    /// Swap in an alternative backend 
-    func use(_ newService: AnalyticsService) {
-        service = newService
-        service.configure()
-    }
-
-    // MARK: Delegated API
 
     public func log(_ event: AnalyticsEvent) {
-        service.log(event)
+        guard event.isContractValid else {
+            assertionFailure(
+                "Analytics event \(event.name.rawValue) is missing required properties"
+            )
+            return
+        }
+        var properties = event.properties
+        properties["schema_version"] = .integer(AnalyticsEvent.schemaVersion)
+        properties["distribution_channel"] = .string(distributionChannel)
+        let enrichedEvent = AnalyticsEvent(event.name, properties: properties)
+        if let testingClient {
+            testingClient.log(enrichedEvent)
+        } else {
+            service.log(enrichedEvent)
+        }
     }
 
-    public func setUserProperty(_ value: String?, for key: String) {
-        service.setUserProperty(value, for: key)
+    /// Installs an in-memory or custom client for deterministic app/store tests.
+    /// Passing `nil` restores the normal provider selection path.
+    public func useForTesting(_ client: AnalyticsTracking?) {
+        testingClient = client
+        distributionChannel = client == nil ? "debug" : "test"
+        if client == nil {
+            configured = false
+            service = NoOpAnalyticsService()
+        }
     }
 
-    public func setUserID(_ id: String?) {
-        service.setUserID(id)
-    }
-
-//    public func record(error: Error, additionalInfo: [String: Any]? = nil) {
-//        service.record(error: error, additionalInfo: additionalInfo)
-//    }
-
-    // MARK: - Private
-
-    private init(service: AnalyticsService = FirebaseAnalytics()) {
-        self.service = service
-    }
-
-    func setDefaultParameters(_ parameters: [String: Any]) {
-        service.setDefaultParameters(parameters)
-    }
+    private init() {}
 }

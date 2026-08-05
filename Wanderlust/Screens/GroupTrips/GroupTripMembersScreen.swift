@@ -48,6 +48,9 @@ struct GroupTripMembersScreen: View {
         .simultaneousGesture(
             TapGesture().onEnded { _ in hideKeyboard() }
         )
+        .onAppear {
+            AnalyticsTracker.shared.log(.screenViewed(.groupMembers))
+        }
     }
 }
 
@@ -80,6 +83,12 @@ extension GroupTripMembersScreen {
 
                     Button {
                         UIPasteboard.general.string = store.state.shareLink
+                        AnalyticsTracker.shared.log(
+                            .init(.groupInviteShared, properties: [
+                                "method": .string("copy_link"),
+                                "roster_count": .integer(store.state.members.count)
+                            ])
+                        )
                         withAnimation { didCopyLink = true }
                         Task {
                             try? await Task.sleep(nanoseconds: 1_500_000_000)

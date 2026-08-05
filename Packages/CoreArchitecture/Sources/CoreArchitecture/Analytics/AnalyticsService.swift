@@ -5,16 +5,34 @@
 //  Created by Rodrigo Mato Castellano on 6/2/25.
 //
 
-/// Thin protocol every analytics backend must conform to.
-protocol AnalyticsService {
+/// Internal provider boundary. Product code depends on ``AnalyticsTracking``.
+protocol AnalyticsService: AnyObject {
     func configure()
     func log(_ event: AnalyticsEvent)
-    func setUserProperty(_ value: String?, for key: String)
-    func setUserID(_ id: String?)
-//    func record(error: Error, additionalInfo: [String: Any]?)
-    func setDefaultParameters(_ parameters: [String: Any])
 }
 
-extension AnalyticsService {
-    func record(error: Error, additionalInfo: [String: Any]? = nil) { /* no‑op by default */ }
+/// Small injectable surface used by screens and stores.
+@MainActor
+public protocol AnalyticsTracking: AnyObject {
+    func log(_ event: AnalyticsEvent)
+}
+
+final class NoOpAnalyticsService: AnalyticsService {
+    func configure() {}
+    func log(_ event: AnalyticsEvent) {}
+}
+
+/// In-memory provider used by unit tests and local schema verification.
+public final class RecordingAnalyticsService: AnalyticsTracking {
+    public private(set) var events: [AnalyticsEvent] = []
+
+    public init() {}
+
+    public func log(_ event: AnalyticsEvent) {
+        events.append(event)
+    }
+
+    public func reset() {
+        events.removeAll()
+    }
 }

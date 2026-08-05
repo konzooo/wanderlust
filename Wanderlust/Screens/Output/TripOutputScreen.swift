@@ -17,6 +17,7 @@ struct TripOutputScreen: View {
     @State private var isDrawerOpen = false
     @State private var showRemoveFavoriteAlert = false // Local state for alert
     @State private var hasDismissedOutputOnThisVisit = false
+    @State private var previousFavoriteCount = 0
     @AppStorage(OnboardingPreferenceKey.newTripOutputPermanentlyDismissed) private var hasPermanentlyDismissedOutputOnboarding = false
     
     init(initialState: TripOutputStore.State) {
@@ -100,9 +101,16 @@ struct TripOutputScreen: View {
 
         // On appear trigger Itinerary generation
         .onAppear {
-            AnalyticsTracker.shared.log(.screenViewed(.itineraryResult))
+            AnalyticsTracker.shared.log(.screenViewed(.tripOutput))
             store.setRouter(router)
             store.send(.onAppear)
+            store.logResultViewedIfNeeded()
+            previousFavoriteCount = store.state.favorites.liked.count
+        }
+        .onChange(of: store.state.favorites.liked.count) { oldCount, newCount in
+            guard newCount != previousFavoriteCount else { return }
+            store.logFavoriteChange(action: newCount > oldCount ? "added" : "removed")
+            previousFavoriteCount = newCount
         }
     }
     

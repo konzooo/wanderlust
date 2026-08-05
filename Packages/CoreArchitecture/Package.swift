@@ -4,7 +4,8 @@ import PackageDescription
 let package = Package(
     name: "CoreArchitecture",
     platforms: [
-        .iOS(.v17)
+        .iOS(.v17),
+        .macOS(.v14)
     ],
     products: [
         .library(
@@ -14,15 +15,15 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/firebase/firebase-ios-sdk.git",
-            .upToNextMajor(from: "10.4.0")
+            url: "https://github.com/amplitude/Amplitude-Swift.git",
+            .upToNextMajor(from: "1.18.6")
         ),
     ],
     targets: [
         .target(
             name: "CoreArchitecture",
             dependencies: [
-                .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk"),
+                .product(name: "AmplitudeSwift", package: "Amplitude-Swift"),
             ]
         ),
         .testTarget(

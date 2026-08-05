@@ -51,7 +51,19 @@ extension FeedbackStore {
 
 extension FeedbackStore {
     private func sendFeedback() {
-        Task {
+        let likesLength = state.likesDislikes.count
+        let suggestionsLength = state.suggestions.count
+        let eventProperties: [String: AnalyticsValue] = [
+            "has_likes_dislikes": .boolean(likesLength > 0),
+            "has_suggestions": .boolean(suggestionsLength > 0),
+            "likes_dislikes_length_bucket": .string(
+                AnalyticsSanitizer.textLengthBucket(likesLength)
+            ),
+            "suggestions_length_bucket": .string(
+                AnalyticsSanitizer.textLengthBucket(suggestionsLength)
+            )
+        ]
+        Task { @MainActor in
             do {
                 let feedback = FeedbackRequest(
                     userID: KeychainDeviceIDProvider().deviceID(), // TODO: add as Dependency
@@ -60,8 +72,23 @@ extension FeedbackStore {
                 )
                 _ = try await feedbackService.sendFeedback(feedback)
                 submissionResult = .success
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .feedbackSubmitted,
+                        outcome: "success",
+                        properties: eventProperties
+                    )
+                )
             } catch {
                 submissionResult = .error
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .feedbackSubmitted,
+                        outcome: "failure",
+                        error: error,
+                        properties: eventProperties
+                    )
+                )
                 print("Failed to send feedback: \(error)")
             }
         }

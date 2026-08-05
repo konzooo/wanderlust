@@ -1,3 +1,4 @@
+import CoreArchitecture
 import CoreModels
 import Foundation
 
@@ -151,36 +152,33 @@ extension Array where Element == QuestionaireStep {
 // MARK: - Analytics Event
 
 extension TripOrganizer {
-    var basicInfoEventProperties: [String: String] {
-        var properties = [
-            "duration": "\(tripDetails.duration)",
-            "month": "\(tripDetails.month.rawValue)",
-            "destination": tripDetails.destination.name,
-            "group_type": "\(tripDetails.members.groupType.rawValue)"
+    var basicInfoEventProperties: [String: AnalyticsValue] {
+        var properties: [String: AnalyticsValue] = [
+            "duration_days": .integer(tripDetails.duration),
+            "start_month": .string(tripDetails.month.rawValue.lowercased()),
+            "party_type": .string(tripDetails.members.groupType.rawValue),
+            "party_age_bucket": .string(
+                AnalyticsSanitizer.ageBucket(tripDetails.members.avgAge)
+            ),
+            "party_gender": .string(tripDetails.members.gender?.rawValue ?? "unknown"),
+            "has_custom_notes": .boolean(
+                !(tripDetails.members.customizations?
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            ),
+            "profile_usage": .string(selectedProfileID == nil ? "none" : "selected")
         ]
 
-        tripDetails.members.avgAge.map {
-            properties["members_avg_age"] = "\($0)"
+        if let destination = AnalyticsSanitizer.destination(tripDetails.destination.name) {
+            properties["destination"] = .string(destination)
         }
-
-        tripDetails.members.gender.map {
-            properties["members_gender"] = "\($0)"
-        }
-
-        tripDetails.members.customizations.map {
-            properties["customizations"] = "\($0)"
-        }
-
         return properties
     }
 
-    var questionnaireEventProperties: [String: String] {
-        var properties: [String: String] = [:]
-        for step in questionaireList {
-            if let response = step.response {
-                properties["question_\(step.id)"] = response.rawValue
-            }
+    var questionnaireEventProperties: [String: AnalyticsValue] {
+        questionaireList.reduce(into: [:]) { properties, step in
+            guard let response = step.response else { return }
+            let paddedID = step.id.count == 1 ? "0\(step.id)" : step.id
+            properties["q\(paddedID)_choice"] = .string(response.rawValue)
         }
-        return properties
     }
 }

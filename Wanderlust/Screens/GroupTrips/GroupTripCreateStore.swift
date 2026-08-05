@@ -2,6 +2,7 @@ import CoreArchitecture
 import CoreModels
 import Foundation
 
+@MainActor
 class GroupTripCreateStore: ObservableStore {
     @Published var state: State = State()
     private let service: GroupTripService
@@ -16,6 +17,17 @@ class GroupTripCreateStore: ObservableStore {
             guard state.readyToCreate, !state.isCreating else { return }
             state.isCreating = true
             state.errorMessage = nil
+            var properties: [String: AnalyticsValue] = [
+                "duration_days": .integer(Int(state.duration)),
+                "start_month": .string(state.month.rawValue.lowercased()),
+                "has_profile": .boolean(state.selectedProfileID != nil)
+            ]
+            if let destination = AnalyticsSanitizer.destination(state.destination) {
+                properties["destination"] = .string(destination)
+            }
+            AnalyticsTracker.shared.log(
+                .init(.groupTripCreationStarted, properties: properties)
+            )
 
             Task { @MainActor in
                 do {
@@ -29,9 +41,24 @@ class GroupTripCreateStore: ObservableStore {
                     )
                     state.isCreating = false
                     state.createdGroup = created
+                    AnalyticsTracker.shared.log(
+                        .outcome(
+                            .groupTripCreated,
+                            outcome: "success",
+                            properties: properties
+                        )
+                    )
                 } catch {
                     state.isCreating = false
                     state.errorMessage = "Couldn't create the group. Check your connection and try again."
+                    AnalyticsTracker.shared.log(
+                        .outcome(
+                            .groupTripCreationFailed,
+                            outcome: "failure",
+                            error: error,
+                            properties: properties
+                        )
+                    )
                 }
             }
         }

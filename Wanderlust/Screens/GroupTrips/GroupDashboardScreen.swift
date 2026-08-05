@@ -36,6 +36,9 @@ struct GroupDashboardScreen: View {
             ToolbarItem(placement: .navigationBarLeading) { backButton }
         }
         .simultaneousGesture(TapGesture().onEnded { _ in hideKeyboard() })
+        .onAppear {
+            AnalyticsTracker.shared.log(.screenViewed(.groupDashboard))
+        }
     }
 
     // MARK: - Loaded content
@@ -107,6 +110,12 @@ struct GroupDashboardScreen: View {
                     Spacer()
                     Button {
                         UIPasteboard.general.string = shareLink(for: group.code)
+                        AnalyticsTracker.shared.log(
+                            .init(.groupInviteShared, properties: [
+                                "method": .string("copy_link"),
+                                "roster_count": .integer(group.memberCount)
+                            ])
+                        )
                         withAnimation { didCopyLink = true }
                         Task { try? await Task.sleep(nanoseconds: 1_500_000_000); withAnimation { didCopyLink = false } }
                     } label: {

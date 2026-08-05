@@ -30,6 +30,10 @@ struct GroupJoinScreen: View {
         .navigationBarBackButtonHidden(true)
         .toolbar { ToolbarItem(placement: .navigationBarLeading) { backButton } }
         .simultaneousGesture(TapGesture().onEnded { _ in hideKeyboard() })
+        .onAppear {
+            store.setAnalyticsSource(router.groupJoinAnalyticsSource)
+            AnalyticsTracker.shared.log(.screenViewed(.groupJoin))
+        }
         .onChange(of: store.state.joinedGroupId) { _, groupId in
             if let groupId { router.goToGroupSwipe(groupId, resetStack: true) }
         }

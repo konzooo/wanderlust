@@ -78,6 +78,7 @@ struct GroupTripCreateScreen: View {
             )
         }
         .onAppear {
+            AnalyticsTracker.shared.log(.screenViewed(.groupCreate))
             guard !didInitializeProfileSelection else { return }
             didInitializeProfileSelection = true
             store.state.selectedProfileID = TravellerProfileLibrary.shared.defaultSelectionID

@@ -5,15 +5,21 @@ import Foundation
 /// Drives the join screen: resolves an invite code to its roster (live), lets
 /// the joiner claim an existing name or add themselves, then binds their new
 /// capability token and hands off to the swipe flow.
+@MainActor
 final class GroupJoinStore: ObservableStore {
     @Published var state: State
     private let service: GroupTripService
     private var cancellable: AnyCancellable?
+    private var analyticsSource = "manual_code"
 
     init(code: String, service: GroupTripService = .shared) {
         self.service = service
         self.state = State(code: code)
         subscribe(code: code)
+    }
+
+    func setAnalyticsSource(_ source: String) {
+        analyticsSource = source == "deep_link" ? "deep_link" : "manual_code"
     }
 
     private func subscribe(code: String) {
@@ -52,6 +58,13 @@ final class GroupJoinStore: ObservableStore {
         guard case let .loaded(dto) = state.resolved, !state.isJoining else { return }
         state.isJoining = true
         state.errorMessage = nil
+        let method = state.selection.analyticsName
+        AnalyticsTracker.shared.log(
+            .init(.groupJoinStarted, properties: [
+                "source": .string(analyticsSource),
+                "method": .string(method)
+            ])
+        )
 
         Task { @MainActor in
             do {
@@ -87,9 +100,30 @@ final class GroupJoinStore: ObservableStore {
                 )
                 state.isJoining = false
                 state.joinedGroupId = dto.groupId
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupJoinSucceeded,
+                        outcome: "success",
+                        properties: [
+                            "source": .string(analyticsSource),
+                            "method": .string(method)
+                        ]
+                    )
+                )
             } catch {
                 state.isJoining = false
                 state.errorMessage = friendlyMessage(for: error)
+                AnalyticsTracker.shared.log(
+                    .outcome(
+                        .groupJoinFailed,
+                        outcome: "failure",
+                        error: error,
+                        properties: [
+                            "source": .string(analyticsSource),
+                            "method": .string(method)
+                        ]
+                    )
+                )
             }
         }
     }
@@ -134,6 +168,14 @@ extension GroupJoinStore {
         case none
         case existing(String)
         case new
+
+        var analyticsName: String {
+            switch self {
+            case .existing: "existing_slot"
+            case .new: "new_member"
+            case .none: "none"
+            }
+        }
     }
 
     enum Action: Equatable {

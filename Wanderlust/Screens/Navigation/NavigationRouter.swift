@@ -6,6 +6,7 @@ import DesignSystem
 class NavigationRouter: ObservableObject {
     /// The navigation path for the app. Only mutate via router methods.
     @Published var path: [Destination] = []
+    private(set) var groupJoinAnalyticsSource = "manual_code"
 
     /// Navigate to the home screen (root).
     func goToHome() {
@@ -134,7 +135,12 @@ class NavigationRouter: ObservableObject {
     }
 
     /// Navigate to the join-a-group-trip screen for an invite code.
-    func goToGroupJoin(code: String, resetStack: Bool = false) {
+    func goToGroupJoin(
+        code: String,
+        resetStack: Bool = false,
+        analyticsSource: String = "manual_code"
+    ) {
+        groupJoinAnalyticsSource = analyticsSource
         if resetStack {
             path.removeAll()
         }
@@ -199,7 +205,11 @@ class NavigationRouter: ObservableObject {
         if let joinIndex = segments.firstIndex(of: "join"), joinIndex + 1 < segments.count {
             let code = segments[joinIndex + 1].filter(\.isNumber)
             if !code.isEmpty {
-                goToGroupJoin(code: code, resetStack: true)
+                goToGroupJoin(
+                    code: code,
+                    resetStack: true,
+                    analyticsSource: "deep_link"
+                )
                 return
             }
         }

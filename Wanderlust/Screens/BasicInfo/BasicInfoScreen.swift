@@ -19,8 +19,9 @@ struct BasicInfoScreen: View {
 
     @EnvironmentObject var router: NavigationRouter
 
-    init(store: BasicInfoStore = BasicInfoStore()) {
-        self.store = store
+    @MainActor
+    init(store: BasicInfoStore? = nil) {
+        self.store = store ?? BasicInfoStore()
     }
 
     var body: some View {
@@ -165,7 +166,6 @@ extension BasicInfoScreen {
 
     var specifyButton: some View {
         Button(action: {
-            AnalyticsTracker.shared.log(.buttonTapped("specify_group", screen: .basicInfo))
             store.state.presentSpecifySheet.toggle()
         }) {
             HStack(spacing: 4) {
@@ -240,7 +240,8 @@ extension BasicInfoScreen {
             store.send(.continue)
             router.goToQuestionnaire()
             AnalyticsTracker.shared.log(
-                .confirmBasicInfo(
+                .init(
+                    .tripDetailsSubmitted,
                     properties: TripOrganizer.shared.basicInfoEventProperties
                 )
             )

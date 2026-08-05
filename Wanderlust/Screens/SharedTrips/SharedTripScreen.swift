@@ -15,17 +15,22 @@ struct SharedTripScreen: View {
     }
 
     var body: some View {
-        switch store.state.resolved {
-        case .loading:
-            ZStack {
-                AuroraBackground()
-                ProgressView().tint(Color.appTint)
+        Group {
+            switch store.state.resolved {
+            case .loading:
+                ZStack {
+                    AuroraBackground()
+                    ProgressView().tint(Color.appTint)
+                }
+                .cleanTopInsets()
+            case .failed:
+                unavailableState
+            case let .loaded(outputState):
+                TripOutputScreen(initialState: outputState)
             }
-            .cleanTopInsets()
-        case .failed:
-            unavailableState
-        case let .loaded(outputState):
-            TripOutputScreen(initialState: outputState)
+        }
+        .onAppear {
+            AnalyticsTracker.shared.log(.screenViewed(.sharedTrip))
         }
     }
 

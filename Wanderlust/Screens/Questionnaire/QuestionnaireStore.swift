@@ -11,6 +11,7 @@ import DesignSystem
 import Foundation
 import SwiftUI
 
+@MainActor
 class QuestionnaireStore: ObservableStore {
     @Published var state: State
     let mode: Mode
@@ -25,11 +26,26 @@ class QuestionnaireStore: ObservableStore {
     func send(_ action: Action) {
         switch action {
         case .start:
+            guard state.startedAt == nil else { return }
+            state.startedAt = Date()
+            AnalyticsTracker.shared.log(
+                .init(.questionnaireStarted, properties: [
+                    "trip_mode": .string(mode.analyticsName),
+                    "questionnaire_version": .integer(mode.questionnaireVersion),
+                    "question_count": .integer(state.cards.count)
+                ])
+            )
             // The daily-itineraries limit only applies to solo trips — a group
             // member swiping for someone else's trip never consumes it.
             guard case .solo = mode else { return }
             if metricsTracker.thresholdReached(for: .dailyItineraries) {
                 state.presentDailyLimitSheet = true
+                AnalyticsTracker.shared.log(
+                    .init(.questionnaireLimitReached, properties: [
+                        "trip_mode": .string(mode.analyticsName),
+                        "questionnaire_version": .integer(mode.questionnaireVersion)
+                    ])
+                )
             }
 
         case let .cardSwipped(card, direction):
@@ -60,6 +76,7 @@ class QuestionnaireStore: ObservableStore {
             }
 
         case .undo:
+            state.undoCount += 1
             switch mode {
             case .solo:
                 TripOrganizer.shared.undoLastStep()
@@ -81,6 +98,50 @@ class QuestionnaireStore: ObservableStore {
         preferences.profile = profile
         return preferences
     }
+
+    func completionEvent(profile: TravellerProfileSnapshot?) -> AnalyticsEvent? {
+        guard !state.didLogCompletion else { return nil }
+        state.didLogCompletion = true
+
+        var properties: [String: AnalyticsValue] = [
+            "trip_mode": .string(mode.analyticsName),
+            "questionnaire_version": .integer(mode.questionnaireVersion),
+            "question_count": .integer(state.cards.count),
+            "duration_ms": .integer(
+                Int(Date().timeIntervalSince(state.startedAt ?? Date()) * 1_000)
+            ),
+            "undo_count": .integer(state.undoCount)
+        ]
+
+        let answers: [(String, String)]
+        switch mode {
+        case .solo:
+            answers = TripOrganizer.shared.questionaireList.compactMap { step in
+                step.response.map { (step.id, $0.rawValue) }
+            }
+        case .group:
+            answers = session.answers.map { ($0.key, $0.value.rawValue) }
+        }
+        for (id, choice) in answers {
+            let paddedID = id.count == 1 ? "0\(id)" : id
+            properties["q\(paddedID)_choice"] = .string(choice)
+        }
+
+        if let profile {
+            for dimension in TravellerDNADimension.allCases {
+                if let score = profile.score(for: dimension) {
+                    properties["dna_\(dimension.rawValue)"] = .integer(score)
+                }
+            }
+            properties["profile_skip_count"] = .integer(profile.usuallySkip.count)
+            properties["profile_must_have_count"] = .integer(profile.mustHaves.count)
+            properties["profile_has_notes"] = .boolean(
+                !(profile.additionalNotes?
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            )
+        }
+        return .init(.questionnaireCompleted, properties: properties)
+    }
 }
 
 extension QuestionnaireStore {
@@ -91,12 +152,29 @@ extension QuestionnaireStore {
     enum Mode: Equatable {
         case solo
         case group(groupID: String, memberID: String, questionnaireVersion: Int = 1)
+
+        var analyticsName: String {
+            switch self {
+            case .solo: "solo"
+            case .group: "group"
+            }
+        }
+
+        var questionnaireVersion: Int {
+            switch self {
+            case .solo: 1
+            case let .group(_, _, version): version
+            }
+        }
     }
 
     struct State: Hashable, Equatable, KeyPathMutable {
         var cards: [Card]
         var presentDailyLimitSheet: Bool = false
         var cardsCompleted: Int = 0  // Track how many cards have been swiped
+        var startedAt: Date?
+        var undoCount = 0
+        var didLogCompletion = false
 
         init(mode: Mode = .solo) {
             switch mode {

@@ -86,7 +86,13 @@ struct QuestionnaireScreen: View {
         }
         .onAppear {
             store.send(.start)
-            AnalyticsTracker.shared.log(.screenViewed(.questionaire))
+            AnalyticsTracker.shared.log(
+                .screenViewed(
+                    store.mode.analyticsName == "group"
+                        ? .groupQuestionnaire
+                        : .questionnaire
+                )
+            )
         }
         .sheet(isPresented: $store.state.presentDailyLimitSheet) {
             UsageThresholdOverlayView(
@@ -159,18 +165,16 @@ struct QuestionnaireScreen: View {
             },
             onEmptyStack: {
                 store.send(.finished)
+                let snapshot = TravellerProfileLibrary.shared
+                    .profile(id: profileSelection.wrappedValue)?
+                    .snapshot
+                if let event = store.completionEvent(profile: snapshot) {
+                    AnalyticsTracker.shared.log(event)
+                }
                 switch store.mode {
                 case .solo:
                     generateItinerary()
-                    AnalyticsTracker.shared.log(
-                        .questionnaireFinished(
-                            properties: TripOrganizer.shared.questionnaireEventProperties
-                        )
-                    )
                 case .group:
-                    let snapshot = TravellerProfileLibrary.shared
-                        .profile(id: profileSelection.wrappedValue)?
-                        .snapshot
                     if let preferences = store.groupPreferences(profile: snapshot) {
                         onGroupCompletion?(preferences)
                     }

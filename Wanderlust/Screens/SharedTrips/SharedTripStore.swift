@@ -90,7 +90,6 @@ final class SharedTripStore: ObservableObject {
 
     private static func outputState(for trip: Trip, mode: TripOutputStore.State.Mode) -> TripOutputStore.State {
         var output = TripOutputStore.State(
-            tripSummary: trip.destination,
             details: trip.details,
             favorites: trip.favorites,
             saved: mode == .savedTrip,

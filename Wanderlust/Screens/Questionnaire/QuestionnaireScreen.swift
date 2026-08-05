@@ -259,8 +259,13 @@ struct QuestionnaireScreen: View {
         let profile = TravellerProfileLibrary.shared
             .profile(id: profileSelection.wrappedValue)?
             .snapshot
+        // `tripKey` is minted once, here, and travels with the trip from now on:
+        // it is what scopes the backend's per-trip generation caps, so it must
+        // not be re-minted on every screen open.
         let state = TripOutputStore.State(
-            tripSummary: TripOrganizer.shared.generateTripSummary(profile: profile),
+            generationRequest: TripGenerationRequest(
+                input: TripOrganizer.shared.generationInput(profile: profile)
+            ),
             details    : TripOrganizer.shared.tripDetails,
             mode: .newTrip
         )

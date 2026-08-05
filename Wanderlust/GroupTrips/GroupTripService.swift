@@ -183,6 +183,12 @@ struct GroupDTO: Decodable, Equatable {
     let members: [MemberDTO]
     let itinerary: Trip.Itinerary?
     let suggestions: Trip.Suggestions?
+    /// What happened to each component, keyed by component name. A `nil`
+    /// payload alone could not distinguish "not generated" from "failed", so
+    /// there was nothing to offer a retry on.
+    let componentStates: [String: GroupComponentStateDTO]
+    /// Whether the server has anything left worth re-running.
+    let canRetry: Bool
     let imageUrl: String?
     let errorCode: String?
 
@@ -191,13 +197,57 @@ struct GroupDTO: Decodable, Equatable {
     var completedCount: Int { Int(completedCountRaw) }
     var memberCount: Int { Int(memberCountRaw) }
 
+    func state(of component: TripComponent) -> GroupComponentStateDTO {
+        componentStates[component.rawValue] ?? .init(state: .absent, code: nil)
+    }
+
     enum CodingKeys: String, CodingKey {
         case groupId, code, name, destination, startMonth, status
         case viewerIsAdmin, canAutoGenerate, members, itinerary, suggestions
-        case imageUrl, errorCode
+        case componentStates, canRetry, imageUrl, errorCode
         case completedCountRaw = "completedCount"
         case memberCountRaw = "memberCount"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        groupId = try container.decode(String.self, forKey: .groupId)
+        code = try container.decode(String.self, forKey: .code)
+        name = try container.decode(String.self, forKey: .name)
+        destination = try container.decode(String.self, forKey: .destination)
+        startMonth = try container.decode(String.self, forKey: .startMonth)
+        status = try container.decode(GroupStatus.self, forKey: .status)
+        viewerIsAdmin = try container.decode(Bool.self, forKey: .viewerIsAdmin)
+        canAutoGenerate = try container.decode(Bool.self, forKey: .canAutoGenerate)
+        members = try container.decode([MemberDTO].self, forKey: .members)
+        itinerary = try? container.decodeIfPresent(Trip.Itinerary.self, forKey: .itinerary)
+        suggestions = try? container.decodeIfPresent(Trip.Suggestions.self, forKey: .suggestions)
+        // Tolerated rather than required: a client running against a backend
+        // that predates per-component state should still show the trip.
+        componentStates = (try? container.decodeIfPresent(
+            [String: GroupComponentStateDTO].self, forKey: .componentStates
+        )) ?? [:]
+        canRetry = (try? container.decodeIfPresent(Bool.self, forKey: .canRetry)) ?? false
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        errorCode = try container.decodeIfPresent(String.self, forKey: .errorCode)
+        completedCountRaw = try container.decode(Double.self, forKey: .completedCountRaw)
+        memberCountRaw = try container.decode(Double.self, forKey: .memberCountRaw)
+    }
+}
+
+/// Mirrors `ComponentStateDTO` in `ConvexBackend/convex/lib/dto.ts`.
+struct GroupComponentStateDTO: Decodable, Equatable {
+    enum Kind: String, Decodable {
+        case absent, generating, failed, ready
+    }
+
+    let state: Kind
+    /// Present only on `failed`.
+    let code: String?
+
+    var isReady: Bool { state == .ready }
+    var isGenerating: Bool { state == .generating }
+    var needsRetry: Bool { state == .failed || state == .absent }
 }
 
 enum GroupStatus: String, Decodable, Equatable {

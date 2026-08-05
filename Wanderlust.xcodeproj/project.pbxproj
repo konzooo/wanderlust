@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000020000000000000002 /* AnalyticsStoreTests.swift */; };
+		AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3000020000000000000002 /* TripPersistenceTests.swift */; };
+		AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */; };
 		D1A000000000000000000001 /* TravellerProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000000000000000000002 /* TravellerProfiles.swift */; };
 		09BF7BFE463967564DA59F92 /* GroupTripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5022352E6B4CC55BC3492D /* GroupTripService.swift */; };
 		0F415E840931ACCB739FA5E1 /* DebugMenuScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */; };
@@ -95,7 +97,6 @@
 		61BEB3522E19F56500811242 /* QuestionaireStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BEB3512E19F56500811242 /* QuestionaireStep.swift */; };
 		61BEB3532E19F7E500811242 /* BasicInfoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D37CABB2D2C3DA000E5C85E /* BasicInfoStore.swift */; };
 		61CA97072E16C64D00791288 /* NavigationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CA97062E16C64D00791288 /* NavigationRouter.swift */; };
-		61EB1CB02E5F921D00ADD209 /* oa.enc in Resources */ = {isa = PBXBuildFile; fileRef = 61EB1CAF2E5F921D00ADD209 /* oa.enc */; };
 		6CBF23EF31A359DC65018AB7 /* QuestionnaireSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4DD8613F5E5F3E9DCBE8E6C /* QuestionnaireSession.swift */; };
 		6E41836EC6ABFF23AF5EB483 /* GroupTripCreateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40F3E23C31A0190A2B7E9778 /* GroupTripCreateStore.swift */; };
 		74BC7BBBAED664DD8DBF265E /* GroupJoinScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA041251E74B9209F2AAE9E4 /* GroupJoinScreen.swift */; };
@@ -114,6 +115,8 @@
 		F16301D3AAB415962565DB9E /* GroupTripMembersStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C1A45E246D034167EB10D5 /* GroupTripMembersStore.swift */; };
 		F69681D32D326ECF00E76538 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F65888532CB087B100E421A1 /* Assets.xcassets */; };
 		FA57A0012D2C3DD700E5C85E /* TripPlanningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */; };
+		AA2000010000000000000001 /* TripGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000020000000000000002 /* TripGenerationService.swift */; };
+		AA4000010000000000000001 /* TripGenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4000020000000000000002 /* TripGenerationCoordinator.swift */; };
 		FC4C10E9339B46B94A8E7A32 /* GroupJoinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13F57FD9CCC66F2D6859F87 /* GroupJoinStore.swift */; };
 /* End PBXBuildFile section */
 
@@ -136,6 +139,8 @@
 
 /* Begin PBXFileReference section */
 		AA1000020000000000000002 /* AnalyticsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsStoreTests.swift; sourceTree = "<group>"; };
+		AA3000020000000000000002 /* TripPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPersistenceTests.swift; sourceTree = "<group>"; };
+		AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationCoordinatorTests.swift; sourceTree = "<group>"; };
 		D1A000000000000000000002 /* TravellerProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravellerProfiles.swift; sourceTree = "<group>"; };
 		03C1A45E246D034167EB10D5 /* GroupTripMembersStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripMembersStore.swift; sourceTree = "<group>"; };
 		1899E73E07BC2D97B8B362BA /* GroupTripCredentialsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripCredentialsStore.swift; sourceTree = "<group>"; };
@@ -222,7 +227,6 @@
 		61BEB3472E17F56D00811242 /* TripCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripCard.swift; sourceTree = "<group>"; };
 		61BEB3512E19F56500811242 /* QuestionaireStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionaireStep.swift; sourceTree = "<group>"; };
 		61CA97062E16C64D00791288 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
-		61EB1CAF2E5F921D00ADD209 /* oa.enc */ = {isa = PBXFileReference; lastKnownFileType = file; name = oa.enc; path = Wanderlust/Resources/oa.enc; sourceTree = "<group>"; };
 		6A5022352E6B4CC55BC3492D /* GroupTripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripService.swift; sourceTree = "<group>"; };
 		8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignPlayground.swift; sourceTree = "<group>"; };
 		8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripCreateScreen.swift; sourceTree = "<group>"; };
@@ -242,6 +246,8 @@
 		3FA7FF4BB5A6E8C86D5D7282 /* SharedTripScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTripScreen.swift; sourceTree = "<group>"; };
 		F65888532CB087B100E421A1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPlanningService.swift; sourceTree = "<group>"; };
+		AA2000020000000000000002 /* TripGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationService.swift; sourceTree = "<group>"; };
+		AA4000020000000000000002 /* TripGenerationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -402,6 +408,8 @@
 				5DF66D842DDB814600904309 /* Components */,
 				5D37CABF2D2C3DD700E5C85E /* TripOutputStore.swift */,
 				FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */,
+				AA2000020000000000000002 /* TripGenerationService.swift */,
+				AA4000020000000000000002 /* TripGenerationCoordinator.swift */,
 				5D37CABD2D2C3DC800E5C85E /* TripOutputScreen.swift */,
 			);
 			path = Output;
@@ -418,7 +426,6 @@
 		5D4EFFA72CB05B0E007E3FF2 = {
 			isa = PBXGroup;
 			children = (
-				61EB1CAF2E5F921D00ADD209 /* oa.enc */,
 				5D4EFFB22CB05B0E007E3FF2 /* Wanderlust */,
 				5D4EFFC42CB05B0F007E3FF2 /* WanderlustTests */,
 				5D4EFFCE2CB05B0F007E3FF2 /* WanderlustUITests */,
@@ -459,6 +466,8 @@
 			isa = PBXGroup;
 			children = (
 				AA1000020000000000000002 /* AnalyticsStoreTests.swift */,
+				AA3000020000000000000002 /* TripPersistenceTests.swift */,
+				AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */,
 				5D4EFFC52CB05B0F007E3FF2 /* WanderlustTests.swift */,
 			);
 			path = WanderlustTests;
@@ -792,7 +801,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				61EB1CB02E5F921D00ADD209 /* oa.enc in Resources */,
 				F69681D32D326ECF00E76538 /* Assets.xcassets in Resources */,
 				5DB3AF582D9C7B80004D22E2 /* 1024.png in Resources */,
 				5DB3AF592D9C7B80004D22E2 /* 60.png in Resources */,
@@ -879,6 +887,8 @@
 				5DEA96332DB3E953003D2483 /* SpecifyGroupView.swift in Sources */,
 				5D37CAC02D2C3DDC00E5C85E /* TripOutputStore.swift in Sources */,
 				FA57A0012D2C3DD700E5C85E /* TripPlanningService.swift in Sources */,
+				AA2000010000000000000001 /* TripGenerationService.swift in Sources */,
+				AA4000010000000000000001 /* TripGenerationCoordinator.swift in Sources */,
 				619B3D392E2704B500B33648 /* FavouritesListView.swift in Sources */,
 				5D8E4D1E2D6BB915004579EE /* URLRequest+OpenAI.swift in Sources */,
 				5DF66D9A2DDB969800904309 /* FontsOLD.swift in Sources */,
@@ -924,6 +934,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */,
+				AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */,
+				AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */,
 				5D4EFFC62CB05B0F007E3FF2 /* WanderlustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

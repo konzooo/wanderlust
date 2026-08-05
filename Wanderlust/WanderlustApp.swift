@@ -25,11 +25,10 @@ struct WanderlustApp: App {
         }
 #endif
 
-        do {
-            try OAKeyManager.installIfNeeded()
-        } catch {
-            print("OpenAI key installation failed: \(error.localizedDescription)")
-        }
+        // Mint the install token now rather than on the first generation, so a
+        // Keychain hiccup shows up at launch instead of mid-flow. There is no
+        // API key to install any more — model calls happen behind the backend.
+        _ = InstallIdentity.token()
     }
     
     var body: some Scene {

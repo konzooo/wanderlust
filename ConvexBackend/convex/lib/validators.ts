@@ -50,6 +50,37 @@ export const memberPreferences = v.object({
   profile: v.optional(travellerProfileSnapshot),
 });
 
+/**
+ * A solo traveller's structured trip inputs — the exact contract the app sends
+ * to `trips:generateComponent`. The app no longer formats a prose trip summary:
+ * the backend owns prompt assembly end to end (see lib/prompts.ts), so what
+ * crosses the wire is data, not a partially-written prompt.
+ *
+ * The nullable unions are not decoration. The Swift `ConvexEncodable`
+ * dictionary sends an absent `Optional` as JSON `null` rather than omitting the
+ * key, so a plain `v.optional(v.string())` would hard-fail for any traveller
+ * who left the age or notes field empty.
+ */
+export const soloTripInput = v.object({
+  destination: v.string(),
+  /** `Trip.Details.GroupType` rawValue. */
+  groupType: v.string(),
+  durationDays: v.number(),
+  /** `Month` rawValue — MIXED CASE ("June", "january"). */
+  startMonth: v.string(),
+  avgAge: v.optional(v.union(v.number(), v.null())),
+  gender: v.optional(v.union(v.string(), v.null())),
+  customizations: v.optional(v.union(v.string(), v.null())),
+  answers: v.array(preferenceAnswer),
+  profile: v.optional(v.union(travellerProfileSnapshot, v.null())),
+});
+
+/** Input size ceilings. Free text reaches a paid model, so it is bounded here. */
+export const MAX_DESTINATION_INPUT_LENGTH = 160;
+export const MAX_CUSTOMIZATIONS_LENGTH = 2_000;
+export const MAX_INTEREST_LENGTH = 80;
+export const MAX_ALREADY_RECOMMENDED_ITEMS = 200;
+
 export const TRAVELLER_DNA_VERSIONS: Record<number, readonly string[]> = {
   1: [
     "advice_detail",
@@ -91,3 +122,30 @@ export const QUESTIONNAIRE_VERSIONS: Record<number, readonly string[]> = {
 
 /** Minimum members before a group can auto-generate (prevents a 1-person trip). */
 export const MIN_MEMBERS_TO_GENERATE = 2;
+
+/**
+ * The state of one generated component, stored per component on a group.
+ *
+ * A bare optional payload could only say "there is nothing here", which the
+ * client cannot act on: never generated, currently generating and failed all
+ * looked identical, so there was nothing to retry and nothing honest to show.
+ * Mirrors `ComponentState` in CoreModels, plus a `generating` case the device
+ * doesn't need (it tracks its own in-flight work, the group's is server-side).
+ */
+export const componentState = v.union(
+  v.object({ state: v.literal("absent") }),
+  v.object({ state: v.literal("generating") }),
+  v.object({ state: v.literal("failed"), code: v.string() }),
+  v.object({ state: v.literal("ready") }),
+);
+
+/**
+ * Per-component state for a group's generated output. The payloads themselves
+ * stay in `groups.itinerary` / `groups.suggestions`; this records what actually
+ * happened to each. Absent entirely on groups generated before it existed —
+ * `deriveComponentStates` reconstructs those from the payloads.
+ */
+export const groupComponentStates = v.object({
+  itinerary: componentState,
+  suggestions: componentState,
+});

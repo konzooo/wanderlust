@@ -145,10 +145,46 @@ struct GroupDashboardScreen: View {
         case .generating:
             generatingBanner
         case .ready:
-            Button { router.goToGroupOutput(group) } label: {
-                infoBanner(icon: "checkmark.circle.fill", tint: .green, title: "Your group trip is ready", body: "Tap to view your itinerary and suggestions.", chevron: true)
+            // A ready trip can still be missing a best-effort component: the
+            // itinerary is required, everything else ships when it works and
+            // says so when it doesn't, rather than failing the whole trip.
+            let suggestions = group.state(of: .suggestions)
+            VStack(spacing: 12) {
+                Button { router.goToGroupOutput(group) } label: {
+                    infoBanner(
+                        icon: "checkmark.circle.fill",
+                        tint: .green,
+                        title: "Your group trip is ready",
+                        body: suggestions.isReady
+                            ? "Tap to view your itinerary and suggestions."
+                            : "Tap to view your itinerary.",
+                        chevron: true
+                    )
+                }
+                .buttonStyle(.plain)
+
+                if suggestions.isGenerating {
+                    infoBanner(
+                        icon: "sparkles",
+                        tint: .orange,
+                        title: "Still writing your suggestions",
+                        body: "Your itinerary is ready to read in the meantime."
+                    )
+                } else if group.canRetry {
+                    infoBanner(
+                        icon: "exclamationmark.triangle.fill",
+                        tint: .orange,
+                        title: "Suggestions didn't come through",
+                        body: group.viewerIsAdmin
+                            ? "Your itinerary is fine. You can try the rest again."
+                            : "Your itinerary is fine. Ask the organizer to try the rest again."
+                    )
+                    if group.viewerIsAdmin {
+                        Button { store.send(.retry) } label: { Text("Try again") }
+                            .buttonStyle(SecondaryButtonStyle(fullWidth: true))
+                    }
+                }
             }
-            .buttonStyle(.plain)
         case .error:
             VStack(spacing: 12) {
                 infoBanner(icon: "exclamationmark.triangle.fill", tint: .orange, title: "Something went wrong", body: group.viewerIsAdmin ? "Generation failed. You can try again." : "Generation failed. Ask the organizer to retry.")

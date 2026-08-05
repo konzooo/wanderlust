@@ -45,7 +45,7 @@ final class AnalyticsStoreTests: XCTestCase {
     func testItineraryGenerationLogsOneStartAndOneSuccess() async {
         let store = makeTripStore(itinerary: SuccessfulItineraryGenerator())
 
-        store.generateItinerary()
+        store.generate(.itinerary)
         await waitUntil { store.state.itineraryResponse.isLoaded }
 
         XCTAssertEqual(componentEvents(.tripGenerationStarted, "itinerary").count, 1)
@@ -56,7 +56,7 @@ final class AnalyticsStoreTests: XCTestCase {
     func testItineraryGenerationLogsOneSanitizedFailure() async {
         let store = makeTripStore(itinerary: FailingItineraryGenerator())
 
-        store.generateItinerary()
+        store.generate(.itinerary)
         await waitUntil { store.state.itineraryResponse.error != nil }
 
         XCTAssertEqual(componentEvents(.tripGenerationStarted, "itinerary").count, 1)
@@ -75,7 +75,7 @@ final class AnalyticsStoreTests: XCTestCase {
     ) -> TripOutputStore {
         TripOutputStore(
             initialState: .init(
-                tripSummary: "Lisbon",
+                generationRequest: .init(input: .mock),
                 details: .init(
                     destination: .init(name: "Lisbon, Portugal"),
                     members: .init(groupType: .solo),
@@ -116,19 +116,19 @@ final class AnalyticsStoreTests: XCTestCase {
 }
 
 private struct SuccessfulItineraryGenerator: ItineraryGenerating {
-    func generate(userMessage: String) async throws -> Trip.Itinerary {
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.Itinerary {
         .mock
     }
 }
 
 private struct FailingItineraryGenerator: ItineraryGenerating {
-    func generate(userMessage: String) async throws -> Trip.Itinerary {
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.Itinerary {
         throw URLError(.notConnectedToInternet)
     }
 }
 
 private struct SuccessfulSuggestionsGenerator: SuggestionsGenerating {
-    func generate(userMessage: String) async throws -> Trip.Suggestions {
+    func generate(_ request: TripGenerationRequest) async throws -> Trip.Suggestions {
         .mock
     }
 }

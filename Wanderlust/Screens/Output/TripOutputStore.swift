@@ -35,6 +35,10 @@ class TripOutputStore: ObservableStore {
 
     private let imageService: ImageService
 
+    /// Owns every in-flight generation task for this screen. See
+    /// `TripGenerationCoordinator` for why nothing may bypass it.
+    private let coordinator = TripGenerationCoordinator()
+
     init(
         initialState: State,
         imageService: ImageService = UnsplashService(),
@@ -85,22 +89,28 @@ class TripOutputStore: ObservableStore {
                 return
             }
 
-            // Just fetch Itinerary and Suggestions if they are not leaded yet
-            if !state.itineraryResponse.isLoaded {
-                generateItinerary()
-            }
-            if !state.suggestionsResponse.isLoaded {
-                generateSuggestions()
+            // Start every component that has never been attempted. Components
+            // already running are left alone by the coordinator, and a
+            // component that FAILED is left alone on purpose: re-generating it
+            // silently on every re-appear would spend the traveller's quota
+            // without them asking. Recovery is `.retry`.
+            for component in TripComponent.automatic {
+                generate(component)
             }
 
             // Always try to fetch Images
             fetchDestinationImage()
-            
+
         case .retry:
             retryCount += 1
-            generateItinerary()
+            // Re-runs exactly the components that need it. Previously this
+            // re-ran the itinerary only, so a suggestions failure was
+            // unrecoverable without regenerating the entire trip.
+            for component in TripComponent.automatic where response(for: component).needsRetry {
+                generate(component, restart: true)
+            }
             fetchDestinationImage()
-            
+
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
 
@@ -164,7 +174,12 @@ class TripOutputStore: ObservableStore {
 // MARK: ---- STATE ----
 extension TripOutputStore {
     struct State: Hashable, Equatable, KeyPathMutable {
-        var tripSummary: String
+        /// What this trip needs to be generated. `nil` in the read-only modes
+        /// (`.groupTrip`, `.sharedTrip`) and on a saved trip that is already
+        /// complete — in those cases there is nothing left to ask the backend
+        /// for, and the absence is what makes that structurally true rather
+        /// than a runtime guard someone can forget.
+        var generationRequest: TripGenerationRequest? = nil
         var details: Trip.Details
         var selectedContentTab: OutputTab = .itinerary
         var favorites: Trip.Favorites = .init()
@@ -299,79 +314,115 @@ extension TripOutputStore {
         }
     }
 
-    /// Fetches and processes itinerary data from the configured LLM provider.
-    /// Updates state independently on the main thread.
-    func generateItinerary() {
-        state.itineraryResponse = .loading
+    // MARK: - Generation
+
+    /// Starts one component, honouring single-flight.
+    ///
+    /// With `restart: false` (the default) a component that is already running
+    /// is left alone and a component that already succeeded is not re-run — the
+    /// reason navigating back onto this screen mid-generation no longer buys a
+    /// second copy of everything. `restart: true` is the explicit retry path: it
+    /// cancels whatever is outstanding and supersedes it.
+    func generate(_ component: TripComponent, restart: Bool = false) {
+        guard let request = state.generationRequest else { return }
+        guard restart || response(for: component).isUnstarted else { return }
+
         let startedAt = Date()
-        let attempt = retryCount + 1
-        logGeneration(.tripGenerationStarted, component: "itinerary", attempt: attempt)
-        Task {
+        let attempt = coordinator.begin(component, restart: restart) { [weak self] attempt in
+            guard let self else { return }
             do {
-                // Fetch and process the itinerary data
-                let response = try await itineraryService.generate(userMessage: state.tripSummary)
-                
-                // Fetch the image again using the destination normalized by the LLM.
-                fetchDestinationImage()
-                
-                // Save itinerary response
-                await MainActor.run {
-                    state.itineraryResponse = .loaded(response)
-                    logGeneration(
-                        .tripGenerationSucceeded,
-                        component: "itinerary",
-                        attempt: attempt,
-                        duration: startedAt
-                    )
+                switch component {
+                case .itinerary:
+                    let itinerary = try await itineraryService.generate(request)
+                    guard coordinator.isCurrent(component, attempt: attempt) else { return }
+                    state.itineraryResponse = .loaded(itinerary)
+                    // Re-fetch using the destination the model normalized.
+                    fetchDestinationImage()
                     logResultViewedIfNeeded()
+
+                case .suggestions:
+                    let suggestions = try await suggestionsService.generate(request)
+                    guard coordinator.isCurrent(component, attempt: attempt) else { return }
+                    state.suggestionsResponse = .loaded(suggestions)
+
+                case .deepDive:
+                    // Interest deep dives have no client entry point yet; the
+                    // server already enforces their per-trip cap.
+                    return
                 }
+                logGeneration(
+                    .tripGenerationSucceeded,
+                    component: component.rawValue,
+                    attempt: attempt,
+                    duration: startedAt
+                )
             } catch {
-                // Handle any errors during the process
-                await MainActor.run {
-                    state.itineraryResponse = .error(error)
-                    logGeneration(
-                        .tripGenerationFailed,
-                        component: "itinerary",
-                        attempt: attempt,
-                        duration: startedAt,
-                        error: error
-                    )
-                }
+                // A superseded attempt writes nothing — not even its failure.
+                // Otherwise a cancelled call's error would land on top of the
+                // retry that replaced it.
+                guard coordinator.isCurrent(component, attempt: attempt),
+                      !(error is CancellationError) else { return }
+                setFailure(component, error)
+                logGeneration(
+                    .tripGenerationFailed,
+                    component: component.rawValue,
+                    attempt: attempt,
+                    duration: startedAt,
+                    error: error
+                )
+            }
+        }
+
+        // `nil` means the coordinator suppressed this as a duplicate. The run
+        // already in flight owns the component, so leave its state alone.
+        guard let attempt else { return }
+        setLoading(component)
+        logGeneration(
+            .tripGenerationStarted,
+            component: component.rawValue,
+            attempt: attempt
+        )
+    }
+
+    /// This screen's live state for one component, flattened so the coordinator
+    /// logic can reason about every component without caring what it holds.
+    func response(for component: TripComponent) -> ComponentResponse {
+        switch component {
+        case .itinerary: ComponentResponse(state.itineraryResponse)
+        case .suggestions: ComponentResponse(state.suggestionsResponse)
+        case .deepDive: ComponentResponse(AsyncValue<Trip.Suggestions>.initial)
+        }
+    }
+
+    struct ComponentResponse: Equatable {
+        /// Never attempted. The only state `onAppear` may start from.
+        let isUnstarted: Bool
+        /// Worth re-running on an explicit retry.
+        let needsRetry: Bool
+
+        init<T: Equatable & Sendable>(_ value: AsyncValue<T>) {
+            switch value {
+            case .initial: (isUnstarted, needsRetry) = (true, true)
+            case .loading: (isUnstarted, needsRetry) = (false, false)
+            case .error: (isUnstarted, needsRetry) = (false, true)
+            case .loaded: (isUnstarted, needsRetry) = (false, false)
             }
         }
     }
 
-    func generateSuggestions() {
-        state.suggestionsResponse = .loading
-        let startedAt = Date()
-        let attempt = retryCount + 1
-        logGeneration(.tripGenerationStarted, component: "suggestions", attempt: attempt)
-        Task {
-            do {
-                // Fetch and process the itinerary data
-                let response = try await suggestionsService.generate(userMessage: state.tripSummary)
-                await MainActor.run {
-                    state.suggestionsResponse = .loaded(response)
-                    logGeneration(
-                        .tripGenerationSucceeded,
-                        component: "suggestions",
-                        attempt: attempt,
-                        duration: startedAt
-                    )
-                }
-            } catch {
-                // Handle any errors during the process
-                await MainActor.run {
-                    state.suggestionsResponse = .error(error)
-                    logGeneration(
-                        .tripGenerationFailed,
-                        component: "suggestions",
-                        attempt: attempt,
-                        duration: startedAt,
-                        error: error
-                    )
-                }
-            }
+    private func setLoading(_ component: TripComponent) {
+        switch component {
+        case .itinerary: state.itineraryResponse = .loading
+        case .suggestions: state.suggestionsResponse = .loading
+        case .deepDive: break
+        }
+    }
+
+    private func setFailure(_ component: TripComponent, _ error: Error) {
+        switch component {
+        case .itinerary: state.itineraryResponse = .error(error)
+        case .suggestions: state.suggestionsResponse = .error(error)
+        case .deepDive: break
         }
     }
 
@@ -418,25 +469,22 @@ extension TripOutputStore {
         }
     }
     
+    /// Writes the current screen state back onto an already-saved trip.
+    ///
+    /// Merge-on-complete: the itinerary is the baseline and must be ready, but
+    /// anything still generating writes as `.absent` and is merged over what is
+    /// already on disk, so a re-save triggered by (say) a favourite toggle can
+    /// never wipe a component that finished in an earlier session.
     private func reSaveTrip() {
-        guard case let .loaded(itinerary) = state.itineraryResponse,
-              case let .loaded(suggestions) = state.suggestionsResponse else {
-            return
-        }
-        
-        // Build the full Trip with all the data in the current statae
-        let trip = Trip(
-            details: state.details,
-            itinerary: itinerary,
-            suggestions: suggestions,
-            favorites: state.favorites,
-            shareCode: state.shareCode
-        )
+        guard let trip = currentTrip() else { return }
 
         Task {
              do {
                  let storage = try TripStorage()
-                 try storage.save(trip)
+                 let stored = try storage
+                     .fetch(inGrouping: trip.groupingFolder)
+                     .first { $0.duplicateIdentity == trip.duplicateIdentity }
+                 try storage.save(stored.map(trip.merged(over:)) ?? trip)
              } catch {
                  // Handle error (could add error state)
                  print("Failed to save trip: \(error)")
@@ -444,20 +492,33 @@ extension TripOutputStore {
          }
     }
 
-    private func saveTrip(confirmOverride: Bool) {
-        guard case let .loaded(itinerary) = state.itineraryResponse else {
-            print("saveTrip: Data not loaded yet. itinerary: \(state.itineraryResponse), suggestions: \(state.suggestionsResponse)")
-            return 
-        }
-                
-        // Build the full Trip with all the data in the current statae
-        let trip = Trip(
+    /// The trip as it currently stands on screen, or `nil` if the baseline
+    /// itinerary hasn't arrived yet and there is nothing worth saving.
+    ///
+    /// Every component is recorded as what it actually is — ready, failed, or
+    /// not yet requested. Nothing is filled in with an empty stand-in, which is
+    /// what used to make a still-loading suggestions call indistinguishable
+    /// from a genuinely empty one for the rest of the trip's life.
+    private func currentTrip() -> Trip? {
+        guard case let .loaded(itinerary) = state.itineraryResponse else { return nil }
+        return Trip(
             details: state.details,
             itinerary: itinerary,
-            suggestions: state.suggestionsResponse.data ?? .init(),
+            suggestionsState: state.suggestionsResponse.persisted,
             favorites: state.favorites,
-            shareCode: state.shareCode
+            shareCode: state.shareCode,
+            tripKey: state.generationRequest?.tripKey
         )
+    }
+
+    private func saveTrip(confirmOverride: Bool) {
+        // Saving is permitted as soon as the baseline is ready — that fast save
+        // is a flow travellers already have. A component still generating is
+        // recorded as `.absent` and merged in by `reSaveTrip` when it lands.
+        guard let trip = currentTrip() else {
+            print("saveTrip: Data not loaded yet. itinerary: \(state.itineraryResponse), suggestions: \(state.suggestionsResponse)")
+            return
+        }
 
         // Save
         Task {
@@ -510,19 +571,14 @@ extension TripOutputStore {
     }
 
     private func deleteTrip() {
-        guard case let .loaded(itinerary) = state.itineraryResponse,
-              case let .loaded(suggestions) = state.suggestionsResponse else { return }
-        
+        // Deletion matches on `duplicateIdentity` (the trip's details), so it
+        // only needs the baseline — a trip whose suggestions failed is still a
+        // trip the traveller can delete.
+        guard let trip = currentTrip() else { return }
+
         Task {
             do {
                 let storage = try TripStorage()
-                let trip = Trip(
-                    details: state.details,
-                    itinerary: itinerary,
-                    suggestions: suggestions,
-                    favorites: state.favorites,
-                    shareCode: state.shareCode
-                )
                 try storage.delete(trip)
                 await MainActor.run {
                     state.alert = nil
@@ -672,18 +728,14 @@ extension TripOutputStore {
     /// Saves the recipient's current favorite selections back onto their local
     /// copy of a received shared trip. Fire-and-forget, mirroring `reSaveTrip`.
     private func persistReceivedTripFavorites() {
-        guard case let .loaded(itinerary) = state.itineraryResponse, let code = state.shareCode else { return }
-        let trip = Trip(
-            details: state.details,
-            itinerary: itinerary,
-            suggestions: state.suggestionsResponse.data,
-            favorites: state.favorites,
-            shareCode: code
-        )
+        guard state.shareCode != nil, let trip = currentTrip() else { return }
         Task {
             do {
                 let storage = try ReceivedSharedTripStorage.received()
-                try storage.save(trip)
+                let stored = try storage
+                    .fetch(inGrouping: trip.groupingFolder)
+                    .first { $0.duplicateIdentity == trip.duplicateIdentity }
+                try storage.save(stored.map(trip.merged(over:)) ?? trip)
             } catch {
                 print("Failed to persist received trip favorites: \(error)")
             }

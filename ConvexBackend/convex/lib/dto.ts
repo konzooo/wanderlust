@@ -1,5 +1,6 @@
 import { Doc, Id } from "../_generated/dataModel";
 import { MIN_MEMBERS_TO_GENERATE } from "./validators";
+import { componentsNeedingRetry, currentStates } from "../generate";
 
 /**
  * Client-facing shapes. These are the ONLY things any query returns to a
@@ -17,6 +18,17 @@ export type MemberDTO = {
   isYou: boolean;
 };
 
+/**
+ * What happened to one generated component. A bare `null` payload could not
+ * distinguish "never generated" from "failed", so the client had nothing to
+ * offer a retry on.
+ */
+export type ComponentStateDTO =
+  | { state: "absent" }
+  | { state: "generating" }
+  | { state: "failed"; code: string }
+  | { state: "ready" };
+
 export type GroupDTO = {
   groupId: string;
   code: string;
@@ -31,6 +43,10 @@ export type GroupDTO = {
   members: MemberDTO[];
   itinerary: unknown | null;
   suggestions: unknown | null;
+  /** Per-component state, keyed by component name. */
+  componentStates: Record<string, ComponentStateDTO>;
+  /** Whether anything is worth retrying — drives the admin's retry affordance. */
+  canRetry: boolean;
   imageUrl: string | null;
   errorCode: string | null;
 };
@@ -108,6 +124,11 @@ export function toGroupDTO(
     members: members.map((m) => toMemberDTO(m, viewerMemberId)),
     itinerary: group.itinerary ?? null,
     suggestions: group.suggestions ?? null,
+    componentStates: currentStates(group),
+    canRetry:
+      group.status !== "collecting" &&
+      group.status !== "generating" &&
+      componentsNeedingRetry(group).length > 0,
     imageUrl: group.imageUrl ?? null,
     errorCode: group.errorCode ?? null,
   };

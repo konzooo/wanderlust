@@ -395,22 +395,7 @@ extension View {
     NavigationStack {
         TripOutputScreen(
             initialState: .init(
-                tripSummary: """
-                    Basic Information:
-                    - Destination: tokio
-                    - Travel Mode: Solo
-                    - Number of Days: 2
-                    - Start Month: 4
-
-                    Preferences:
-                    Question 1: Right
-                    Question 2: Both
-                    Question 3: Left
-                    Question 4: Both
-                    Question 5: Right
-                    Question 6: Both
-                    Question 7: Left
-                    """,
+                generationRequest: .init(input: .mock),
                 details: .mock,
                 selectedContentTab: .itinerary,
                 mode: .newTrip,

@@ -313,7 +313,6 @@ struct SavedTripsScreen: View {
             .loaded(trip.suggestions!) : .initial
 
         let state = TripOutputStore.State(
-            tripSummary: trip.details.destination.name,
             details: trip.details,
             selectedContentTab: .itinerary,
             favorites: trip.favorites,
@@ -342,7 +341,6 @@ struct SavedTripsScreen: View {
             .loaded(trip.suggestions!) : .initial
 
         let state = TripOutputStore.State(
-            tripSummary: trip.details.destination.name,
             details: trip.details,
             selectedContentTab: .itinerary,
             favorites: trip.favorites,

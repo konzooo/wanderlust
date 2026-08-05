@@ -53,12 +53,13 @@ class NavigationRouter: ObservableObject {
         path.append(.questionnaire(state))
     }
 
-    /// Navigate to the itinerary result screen. Requires a non-empty trip summary.
+    /// Navigate to the itinerary result screen. Requires a destination — either
+    /// to generate against, or because content is already loaded for it.
     func goToItineraryResult(
-        _ state: TripOutputStore.State = .init(tripSummary: "", details: .mock, mode: .newTrip),
+        _ state: TripOutputStore.State = .init(details: .mock, mode: .newTrip),
         resetStack: Bool = false
     ) {
-        precondition(!state.tripSummary.isEmpty, "Trip summary must not be empty")
+        precondition(!state.details.destination.name.isEmpty, "Destination must not be empty")
         if resetStack {
             path.removeAll()
             path.append(.savedTrips)
@@ -114,8 +115,9 @@ class NavigationRouter: ObservableObject {
     func goToGroupOutput(_ group: GroupDTO) {
         guard let itinerary = group.itinerary else { return }
         let month = Month(rawValue: group.startMonth) ?? .january
+        // No `generationRequest`: a group trip is generated server-side and
+        // arrives complete, so this screen has nothing to ask the backend for.
         var state = TripOutputStore.State(
-            tripSummary: group.destination.isEmpty ? group.name : group.destination,
             details: Trip.Details(
                 destination: Place(name: group.destination),
                 members: Trip.Details.Members(groupType: .group),

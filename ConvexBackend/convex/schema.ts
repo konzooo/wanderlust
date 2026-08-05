@@ -1,11 +1,13 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
+  groupComponentStates,
   groupStatus,
   memberPreferences,
   memberRole,
   memberStatus,
 } from "./lib/validators";
+import { generationComponent, tripMode } from "./lib/components";
 
 /**
  * Group Trips data model.
@@ -43,6 +45,12 @@ export default defineSchema({
      */
     itinerary: v.optional(v.any()),
     suggestions: v.optional(v.any()),
+    /**
+     * What happened to each component, alongside the payloads above. Absent on
+     * groups generated before per-component state existed; `dto.ts` derives
+     * those from whether the payload is there.
+     */
+    componentStates: v.optional(groupComponentStates),
     imageUrl: v.optional(v.string()),
     /** Destination photo for the invite link's rich preview (cached from Unsplash). */
     shareImageUrl: v.optional(v.string()),
@@ -101,4 +109,77 @@ export default defineSchema({
     shareImageUrl: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_code", ["code"]),
+
+  /**
+   * One row per app install, keyed by the SHA-256 hash of an install token the
+   * device mints on first launch and keeps in its Keychain (same discipline as
+   * the group capability tokens — the raw value never lands here).
+   *
+   * This is IDENTITY FOR RATE LIMITING, not authorization. A determined caller
+   * can mint fresh install tokens, which is exactly why `globalBudget` exists
+   * underneath it. Nothing here grants access to anyone else's data.
+   */
+  installs: defineTable({
+    installHash: v.string(),
+    createdAt: v.number(),
+    /** Start of the current rolling 24h counting window. */
+    windowStart: v.number(),
+    /**
+     * Model calls ATTEMPTED in the current window. Attempts, not commits: a
+     * failing call still costs money and still needs throttling. The per-trip
+     * caps below deliberately count the other way.
+     */
+    windowCount: v.number(),
+    totalCount: v.number(),
+  }).index("by_hash", ["installHash"]),
+
+  /**
+   * One row per generation of a component that carries a per-trip cap (today
+   * only `deepDive`, capped at 3 — D9). Uncapped components are throttled by
+   * the install window alone and write nothing here.
+   *
+   * A row is inserted as `reserved` before the model call and promoted to
+   * `committed` after it succeeds; a failed call deletes its row, so failures
+   * never consume the cap. Stale `reserved` rows (an action that died mid-call)
+   * age out of the count — see RESERVATION_TTL_MS.
+   */
+  generationSlots: defineTable({
+    installHash: v.string(),
+    /** Opaque, client-minted, stable-per-trip key. Never a user identifier. */
+    tripKey: v.string(),
+    component: generationComponent,
+    /** Normalised interest label, for rejecting the same deep dive twice. */
+    label: v.optional(v.string()),
+    status: v.union(v.literal("reserved"), v.literal("committed")),
+    createdAt: v.number(),
+  }).index("by_trip_component", ["installHash", "tripKey", "component"]),
+
+  /**
+   * Single-row rolling backstop on total model calls per day across all
+   * installs. Install tokens are self-minted, so this is the only limit an
+   * abusive caller cannot walk around by re-installing. It protects the API
+   * key's bill; it is not a fairness mechanism.
+   */
+  globalBudget: defineTable({
+    windowStart: v.number(),
+    windowCount: v.number(),
+  }),
+
+  /**
+   * Per-call telemetry from the Responses adapter. This table is the ONLY
+   * admissible source for a cost or latency claim about generation — §6 of the
+   * plan withdraws every estimate made before it existed. No prompt text, no
+   * trip content, no install hash: counts, codes and durations only.
+   */
+  generationTelemetry: defineTable({
+    component: generationComponent,
+    mode: tripMode,
+    inputTokens: v.number(),
+    cachedInputTokens: v.number(),
+    outputTokens: v.number(),
+    durationMs: v.number(),
+    /** Absent on success; a stable `OpenAIError` code otherwise. */
+    errorCode: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_component", ["component", "createdAt"]),
 });

@@ -74,55 +74,24 @@ extension TripOrganizer {
 }
 
 extension TripOrganizer {
-    func generateTripSummary(profile: TravellerProfileSnapshot? = nil) -> String {
-        // 1. Compute the numeric month index
-        //    (so that January = 1, February = 2, etc.)
-        let monthIndex = Month.all.firstIndex(of: tripDetails.month) ?? 0
-
-        // 2. Start building the summary
-        var summary = """
-        Basic Information:
-        - Destination: \(tripDetails.destination.name)
-        - Travel Mode: \(tripDetails.members.groupType.rawValue.capitalized)
-        - Number of Days: \(tripDetails.duration)
-        - Start Month: \(monthIndex + 1)
-        """
-
-        // 3. Add group specification details if available
-        if tripDetails.members.avgAge != nil || tripDetails.members.gender != nil || tripDetails.members.customizations != nil {
-            summary += "\n\nGroup Specification:"
-            
-            if let avgAge = tripDetails.members.avgAge {
-                summary += "\n- Average Age: \(avgAge)"
-            }
-            
-            if let gender = tripDetails.members.gender {
-                summary += "\n- Gender: \(gender.rawValue.capitalized)"
-            }
-            
-            if let customizations = tripDetails.members.customizations, !customizations.isEmpty {
-                summary += "\n- Extra details: \(customizations)"
-            }
+    /// The structured inputs the backend needs to generate this trip.
+    ///
+    /// Replaces the old prose trip summary. The app used to flatten these
+    /// answers into a paragraph and hand it to the model, which made the app a
+    /// co-author of the prompt; now it hands over data and the backend writes
+    /// every word the model reads.
+    func generationInput(profile: TravellerProfileSnapshot? = nil) -> TripGenerationInput {
+        let answers: [PreferenceAnswer] = questionaireList.compactMap { step in
+            guard let response = step.response,
+                  let choice = PreferenceChoice(rawValue: response.rawValue)
+            else { return nil }
+            return PreferenceAnswer(questionID: step.id, choice: choice)
         }
-
-        summary += "\n\nPreferences:"
-
-        // 4. Append each questionnaire answer by question ID
-        for step in questionaireList {
-            // If no response is given yet, show "N/A" or some placeholder
-            let responseString = step.response?.rawValue.capitalized ?? "N/A"
-
-            // Here, `step.id` is the question number in your default data
-            summary += "\nQuestion \(step.id): \(responseString)"
-        }
-
-        if let profile {
-            summary += "\n\nTraveller DNA (persistent fallback context):"
-            summary += profile.promptSummary
-        }
-
-        print("\n ---- SUMMARY: ---- \n\(summary)")
-        return summary
+        return TripGenerationInput(
+            details: tripDetails,
+            answers: answers,
+            profile: profile
+        )
     }
 }
 

@@ -168,4 +168,6 @@ export const groupComponentStates = v.object({
   itinerary: v.optional(componentState),
   suggestions: v.optional(componentState),
   knowBeforeYouGo: v.optional(componentState),
+  worthIt: v.optional(componentState),
+  whereToStay: v.optional(componentState),
 });

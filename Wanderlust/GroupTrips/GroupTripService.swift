@@ -176,6 +176,8 @@ struct GroupDTO: Decodable, Equatable {
     let code: String
     let name: String
     let destination: String
+    private let durationDaysRaw: Double
+    var durationDays: Int { Int(durationDaysRaw) }
     let startMonth: String
     let status: GroupStatus
     let viewerIsAdmin: Bool
@@ -184,6 +186,9 @@ struct GroupDTO: Decodable, Equatable {
     let itinerary: Trip.Itinerary?
     let suggestions: Trip.Suggestions?
     let knowBeforeYouGo: Trip.KnowBeforeYouGo?
+    let worthItItems: [Trip.WorthItItem]?
+    let whereToStay: [Trip.StayArea]?
+    let interestPrompts: [String]
     /// What happened to each component, keyed by component name. A `nil`
     /// payload alone could not distinguish "not generated" from "failed", so
     /// there was nothing to offer a retry on.
@@ -204,8 +209,10 @@ struct GroupDTO: Decodable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case groupId, code, name, destination, startMonth, status
+        case durationDaysRaw = "durationDays"
         case viewerIsAdmin, canAutoGenerate, members, itinerary, suggestions
-        case knowBeforeYouGo, componentStates, canRetry, imageUrl, errorCode
+        case knowBeforeYouGo, worthItItems, whereToStay, interestPrompts
+        case componentStates, canRetry, imageUrl, errorCode
         case completedCountRaw = "completedCount"
         case memberCountRaw = "memberCount"
     }
@@ -216,6 +223,7 @@ struct GroupDTO: Decodable, Equatable {
         code = try container.decode(String.self, forKey: .code)
         name = try container.decode(String.self, forKey: .name)
         destination = try container.decode(String.self, forKey: .destination)
+        durationDaysRaw = (try? container.decode(Double.self, forKey: .durationDaysRaw)) ?? 0
         startMonth = try container.decode(String.self, forKey: .startMonth)
         status = try container.decode(GroupStatus.self, forKey: .status)
         viewerIsAdmin = try container.decode(Bool.self, forKey: .viewerIsAdmin)
@@ -226,6 +234,15 @@ struct GroupDTO: Decodable, Equatable {
         knowBeforeYouGo = try? container.decodeIfPresent(
             Trip.KnowBeforeYouGo.self, forKey: .knowBeforeYouGo
         )
+        worthItItems = try? container.decodeIfPresent(
+            [Trip.WorthItItem].self, forKey: .worthItItems
+        )
+        whereToStay = try? container.decodeIfPresent(
+            [Trip.StayArea].self, forKey: .whereToStay
+        )
+        interestPrompts = (try? container.decodeIfPresent(
+            [String].self, forKey: .interestPrompts
+        )) ?? []
         // Tolerated rather than required: a client running against a backend
         // that predates per-component state should still show the trip.
         componentStates = (try? container.decodeIfPresent(

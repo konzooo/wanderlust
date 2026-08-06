@@ -51,6 +51,10 @@ export default defineSchema({
     suggestions: v.optional(v.any()),
     /** Mirrors CoreModels `Trip.KnowBeforeYouGo`. Absent on older groups. */
     knowBeforeYouGo: v.optional(v.any()),
+    /** Shared content; each member's verdict remains device-local. */
+    worthIt: v.optional(v.any()),
+    /** Shared neighbourhood guide used by the group's Near You setup. */
+    whereToStay: v.optional(v.any()),
     /**
      * What happened to each component, alongside the payloads above. Absent on
      * groups generated before per-component state existed; `dto.ts` derives

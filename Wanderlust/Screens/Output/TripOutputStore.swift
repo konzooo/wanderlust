@@ -409,9 +409,8 @@ extension TripOutputStore {
 
     /// The pills inside Discover.
     ///
-    /// Worth-it/Skip appears only when there are cards, and never on a group
-    /// trip: deciding is personal, and a group trip has no personal layer to
-    /// record the decision in.
+    /// Worth-it/Skip appears only when there are cards. On a group trip the
+    /// cards are shared while decisions live in the device-local personal layer.
     var discoverSegments: [DiscoverSegment] {
         var segments: [DiscoverSegment] = [.suggestions]
         if showsWorthItSegment { segments.append(.worthIt) }
@@ -427,7 +426,6 @@ extension TripOutputStore {
     /// generation. A trip that never asked for cards — an old saved file — has
     /// no pill, and a call that came back genuinely empty loses it again.
     private var showsWorthItSegment: Bool {
-        guard state.mode != .groupTrip else { return false }
         switch state.worthItResponse {
         case .initial: return false
         case .loading, .error: return true
@@ -435,14 +433,13 @@ extension TripOutputStore {
         }
     }
 
-    /// The Worth-it/Skip section's state, already filtered by mode.
+    /// The Worth-it/Skip section's live component state.
     var worthItValue: AsyncValue<[Trip.WorthItItem]> {
-        state.mode == .groupTrip ? .loaded([]) : state.worthItResponse
+        state.worthItResponse
     }
 
-    /// The Worth-it/Skip cards to render, already filtered by mode.
+    /// The Worth-it/Skip cards to render.
     var worthItCards: [Trip.WorthItItem] {
-        guard state.mode != .groupTrip else { return [] }
         return state.worthItItems ?? []
     }
 

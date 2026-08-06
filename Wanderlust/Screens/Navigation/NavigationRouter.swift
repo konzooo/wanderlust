@@ -121,7 +121,7 @@ class NavigationRouter: ObservableObject {
             details: Trip.Details(
                 destination: Place(name: group.destination),
                 members: Trip.Details.Members(groupType: .group),
-                duration: 0,
+                duration: group.durationDays,
                 month: month
             ),
             mode: .groupTrip
@@ -134,6 +134,13 @@ class NavigationRouter: ObservableObject {
         if let briefing = group.knowBeforeYouGo {
             state.knowBeforeYouGoResponse = .loaded(briefing)
         }
+        if let items = group.worthItItems {
+            state.worthItResponse = .loaded(items)
+        }
+        if let areas = group.whereToStay {
+            state.whereToStayResponse = .loaded(areas)
+        }
+        state.interestPrompts = group.interestPrompts
         if let imageUrl = group.imageUrl, let url = URL(string: imageUrl) {
             state.imageUrlResponse = .loaded(url)
         }

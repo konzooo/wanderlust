@@ -34,6 +34,7 @@ export type GroupDTO = {
   code: string;
   name: string;
   destination: string;
+  durationDays: number;
   startMonth: string;
   status: "collecting" | "generating" | "ready" | "error";
   viewerIsAdmin: boolean;
@@ -44,6 +45,9 @@ export type GroupDTO = {
   itinerary: unknown | null;
   suggestions: unknown | null;
   knowBeforeYouGo: unknown | null;
+  worthItItems: unknown | null;
+  whereToStay: unknown | null;
+  interestPrompts: unknown | null;
   /** Per-component state, keyed by component name. */
   componentStates: Record<string, ComponentStateDTO>;
   /** Whether anything is worth retrying — drives the admin's retry affordance. */
@@ -124,6 +128,7 @@ export function toGroupDTO(
     code: group.code,
     name: group.name,
     destination: group.destination,
+    durationDays: group.durationDays,
     startMonth: group.startMonth,
     status: group.status,
     viewerIsAdmin: viewer?.role === "admin",
@@ -137,6 +142,9 @@ export function toGroupDTO(
     itinerary: group.itinerary ?? null,
     suggestions: group.suggestions ?? null,
     knowBeforeYouGo: group.knowBeforeYouGo ?? null,
+    worthItItems: envelopeField(group.worthIt, "items"),
+    whereToStay: envelopeField(group.whereToStay, "areas"),
+    interestPrompts: envelopeField(group.suggestions, "interestPrompts"),
     componentStates: currentStates(group),
     canRetry:
       group.status !== "collecting" &&
@@ -145,4 +153,10 @@ export function toGroupDTO(
     imageUrl: group.imageUrl ?? null,
     errorCode: group.errorCode ?? null,
   };
+}
+
+/** Focused component calls return an envelope; clients consume its collection. */
+function envelopeField(value: unknown, field: string): unknown | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  return (value as Record<string, unknown>)[field] ?? null;
 }

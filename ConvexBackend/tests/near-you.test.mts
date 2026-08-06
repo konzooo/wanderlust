@@ -161,5 +161,7 @@ test("Near You stays solo-manual and does not alter the deep-dive cap", () => {
   assert.equal(COMPONENTS.deepDive.perTripCap, 3);
   assert.equal(COMPONENTS.nearYou.perTripCap, null);
   assert.equal(GROUP_COMPONENTS.includes("nearYou" as never), false);
+  assert.equal(GROUP_COMPONENTS.includes("worthIt"), true);
+  assert.equal(GROUP_COMPONENTS.includes("whereToStay"), true);
   assert.match(buildSystemPrompt("nearYou", "solo"), /supplied candidate/i);
 });

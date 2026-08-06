@@ -182,7 +182,7 @@ export const commitComponent = internalMutation({
     const group = await ctx.db.get(args.groupId);
     if (!group || group.generationVersion !== args.generationVersion) return;
 
-    // A component a group never generates (a deep dive is solo-only) has no
+    // A component outside the eager group set has no
     // column to write to, so there is nothing to commit.
     const field = PAYLOAD_FIELD[args.component as GroupComponent];
     if (!field) return;
@@ -369,19 +369,26 @@ export const run = internalAction({
   },
 });
 
-/** The components a group trip generates. Deep dives are solo-only (§10). */
+/** Eager shared content. Deep dives remain explicit and admin-triggered. */
 export const GROUP_COMPONENTS = [
   "itinerary",
   "suggestions",
   "knowBeforeYouGo",
+  "worthIt",
+  "whereToStay",
 ] as const;
 export type GroupComponent = (typeof GROUP_COMPONENTS)[number];
 
 /** Where each group component's payload is stored on the document. */
-const PAYLOAD_FIELD: Record<GroupComponent, "itinerary" | "suggestions" | "knowBeforeYouGo"> = {
+const PAYLOAD_FIELD: Record<
+  GroupComponent,
+  "itinerary" | "suggestions" | "knowBeforeYouGo" | "worthIt" | "whereToStay"
+> = {
   itinerary: "itinerary",
   suggestions: "suggestions",
   knowBeforeYouGo: "knowBeforeYouGo",
+  worthIt: "worthIt",
+  whereToStay: "whereToStay",
 };
 
 type ComponentStates = Doc<"groups">["componentStates"] & {};
@@ -402,6 +409,8 @@ export function currentStates(group: Doc<"groups">): ResolvedStates {
     itinerary: stored?.itinerary ?? derivedState(group.itinerary),
     suggestions: stored?.suggestions ?? derivedState(group.suggestions),
     knowBeforeYouGo: stored?.knowBeforeYouGo ?? derivedState(group.knowBeforeYouGo),
+    worthIt: stored?.worthIt ?? derivedState(group.worthIt),
+    whereToStay: stored?.whereToStay ?? derivedState(group.whereToStay),
   };
 }
 
@@ -421,12 +430,9 @@ export function componentsNeedingRetry(group: Doc<"groups">): GroupComponent[] {
 /**
  * Runs one group component and records its cost/latency either way.
  *
- * Always the `split` variant, which for the two components a group generates
- * means "the suggestions call, unenlarged". A group trip has no personal layer
- * (§4), so Worth-it/Skip has nothing to record a decision in and where-to-stay
- * has no Near You to feed — generating either would be paying for content no
- * member can reach. Group output is therefore byte-identical to what it was
- * before the S5 content landed, deliberately.
+ * Always the measured `split` variant. Worth-it and Where-to-stay are shared
+ * content, while each member's Worth-it decisions remain local to their own
+ * device and therefore never enter this action.
  */
 async function callGroupComponent(
   ctx: { runMutation: (ref: any, args: any) => Promise<any> },

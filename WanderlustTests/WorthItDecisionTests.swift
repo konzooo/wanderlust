@@ -116,13 +116,13 @@ final class WorthItDecisionTests: XCTestCase {
 
     // MARK: - Segment visibility
 
-    /// A group trip has no personal layer to record a decision in, so the
-    /// segment is not offered at all — rather than offered and silently inert.
-    func testWorthItSegmentIsHiddenOnAGroupTrip() {
+    /// Group cards are shared content; the decision is restored from the
+    /// device-local personal layer.
+    func testWorthItSegmentIsVisibleOnAGroupTrip() {
         let store = makeStore(mode: .groupTrip)
 
-        XCTAssertTrue(store.worthItCards.isEmpty)
-        XCTAssertFalse(store.discoverSegments.contains(.worthIt))
+        XCTAssertEqual(store.worthItCards.count, Trip.WorthItItem.mockSet.count)
+        XCTAssertTrue(store.discoverSegments.contains(.worthIt))
     }
 
     func testWorthItSegmentIsHiddenWhenThereAreNoCards() {

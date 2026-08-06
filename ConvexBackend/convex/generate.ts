@@ -438,7 +438,11 @@ export async function callGroupComponent(
   ctx: { runMutation: (ref: any, args: any) => Promise<any> },
   component: Component,
   input: GroupTripInput,
-  options?: { interest?: string; alreadyRecommended?: string[] },
+  options?: {
+    interest?: string;
+    alreadyRecommended?: string[];
+    nearYouCandidates?: import("./lib/prompts").NearYouCandidate[];
+  },
 ): Promise<ComponentResult> {
   const startedAt = Date.now();
   try {
@@ -447,6 +451,7 @@ export async function callGroupComponent(
       input: { mode: "group", group: input },
       interest: options?.interest,
       alreadyRecommended: options?.alreadyRecommended,
+      nearYouCandidates: options?.nearYouCandidates,
       variant: "split",
     });
     await ctx.runMutation(internal.quota.recordTelemetry, {

@@ -1,5 +1,7 @@
 import CoreArchitecture
 import CoreModels
+import Combine
+import ConvexMobile
 import MapKit
 import Networking
 import XCTest
@@ -18,6 +20,21 @@ final class NearYouTests: XCTestCase {
         XCTAssertFalse(json.contains("mapURL"))
         XCTAssertTrue(json.contains("distanceMetres"))
         XCTAssertTrue(json.contains("walkingMinutes"))
+    }
+
+    func testGroupPayloadCannotContainExactAccommodationInput() throws {
+        let exactAddress = "Carrer de Mallorca 166, 2A"
+        let payload = GroupNearYouActionPayload(
+            accommodation: centre(precision: .address).accommodation,
+            discovery: discovery(),
+            replace: false
+        )
+        let json = String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
+
+        XCTAssertFalse(json.contains(exactAddress))
+        XCTAssertFalse(json.contains("rawAddress"))
+        XCTAssertTrue(json.contains("Hotel Example"))
+        XCTAssertTrue(json.contains("\"latitude\":41.385"))
     }
 
     func testUnknownModelCandidateIDCannotMaterialize() {
@@ -107,6 +124,167 @@ final class NearYouTests: XCTestCase {
         XCTAssertEqual(map.neighbourhoodInputs, [Trip.StayArea.mockSet[0].area])
         XCTAssertEqual(store.state.accommodation?.precision, .neighbourhood)
         XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+    }
+
+    func testAnyGroupMemberCanSetAddressLevelSharedNearYou() async {
+        let map = StubNearYouMapService()
+        map.addressResult = .resolved(.init(
+            title: "Hotel Example",
+            subtitle: "Carrer de Mallorca",
+            centre: centre(precision: .address)
+        ))
+        let group = StubGroupNearYouGenerator(output: nearYou())
+        let store = makeGroupStore(map: map, group: group)
+        XCTAssertTrue(store.visibleTabs.contains(.nearYou))
+
+        store.send(.resolveNearYouAddress("Carrer de Mallorca 166"))
+        await settle()
+
+        XCTAssertEqual(map.addressInputs, ["Carrer de Mallorca 166"])
+        XCTAssertEqual(group.payloads.count, 1)
+        XCTAssertFalse(group.payloads[0].replace)
+        XCTAssertEqual(store.state.accommodation?.precision, .address)
+        XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
+        XCTAssertEqual(store.state.groupNearYouSetBy, "Alex")
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+    }
+
+    func testGroupWhereToStayUsesSharedNeighbourhoodCentre() async {
+        let map = StubNearYouMapService()
+        map.neighbourhoodCentre = centre(precision: .neighbourhood)
+        let group = StubGroupNearYouGenerator(output: nearYou())
+        let store = makeGroupStore(map: map, group: group)
+
+        store.send(.chooseNearYouArea(Trip.StayArea.mockSet[0]))
+        await settle()
+
+        XCTAssertEqual(map.neighbourhoodInputs, [Trip.StayArea.mockSet[0].area])
+        XCTAssertEqual(group.payloads.first?.accommodation.precision, "neighbourhood")
+        XCTAssertEqual(store.state.accommodation?.precision, .neighbourhood)
+    }
+
+    func testGroupGetsOneWarnedSuccessfulReplacementOnly() async {
+        let map = StubNearYouMapService()
+        let group = StubGroupNearYouGenerator(output: nearYou())
+        let store = makeGroupStore(map: map, group: group)
+
+        store.send(.chooseNearYouResolution(.init(
+            title: "Stay",
+            subtitle: nil,
+            centre: centre(precision: .address)
+        )))
+        await settle()
+        XCTAssertTrue(store.groupNearYouRequiresReplacementWarning)
+        XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
+
+        // The screen presents the warning before dispatching this action.
+        store.send(.regenerateNearYou)
+        await settle()
+        XCTAssertEqual(group.payloads.map(\.replace), [false, true])
+        XCTAssertEqual(store.state.groupNearYouGenerationCount, 2)
+        XCTAssertFalse(store.canReplaceGroupNearYou)
+
+        store.send(.regenerateNearYou)
+        await settle()
+        XCTAssertEqual(group.payloads.count, 2)
+    }
+
+    func testFailedGroupNearYouRetriesOnlyExplicitlyAndDoesNotConsumeReplacement() async {
+        let map = StubNearYouMapService()
+        let group = StubGroupNearYouGenerator(output: nearYou())
+        group.failuresRemaining = 1
+        let store = makeGroupStore(map: map, group: group)
+
+        store.send(.chooseNearYouResolution(.init(
+            title: "Stay",
+            subtitle: nil,
+            centre: centre(precision: .address)
+        )))
+        await settle()
+        XCTAssertNotNil(store.state.nearYouResponse.error)
+        XCTAssertEqual(group.payloads.count, 1)
+        XCTAssertEqual(store.state.groupNearYouGenerationCount, 0)
+
+        store.send(.onAppear)
+        await settle()
+        XCTAssertEqual(group.payloads.count, 1)
+
+        store.send(.retryNearYou)
+        await settle()
+        XCTAssertEqual(group.payloads.count, 2)
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+        XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
+    }
+
+    func testReopenedGroupNearYouDoesNotRegenerate() async {
+        let map = StubNearYouMapService()
+        let group = StubGroupNearYouGenerator(output: nearYou())
+        var state = TripOutputStore.State(
+            details: .mock,
+            mode: .groupTrip,
+            itineraryResponse: .loaded(.mock),
+            suggestionsResponse: .loaded(.mock),
+            nearYouResponse: .loaded(nearYou()),
+            accommodation: centre(precision: .address).accommodation
+        )
+        state.groupId = "group-a"
+        state.groupNearYouGenerationCount = 1
+        let store = TripOutputStore(
+            initialState: state,
+            imageService: StubImageService(),
+            nearYouMapService: map,
+            groupNearYouService: group,
+            groupTripObserver: EmptyGroupObserver(),
+            groupCredentials: GroupTripCredentials(
+                groupId: "group-a",
+                code: "12345",
+                memberId: "member-a",
+                memberToken: "member-token",
+                adminToken: nil
+            )
+        )
+
+        store.send(.onAppear)
+        await settle()
+
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+        XCTAssertTrue(group.payloads.isEmpty)
+        XCTAssertEqual(map.discoveryCallCount, 0)
+    }
+
+    func testSharedNearYouArrivesLiveForAnotherMember() async throws {
+        let observer = GroupObserverStub()
+        var state = TripOutputStore.State(
+            details: .mock,
+            mode: .groupTrip,
+            itineraryResponse: .loaded(.mock),
+            suggestionsResponse: .loaded(.mock)
+        )
+        state.groupId = "group-a"
+        let store = TripOutputStore(
+            initialState: state,
+            imageService: StubImageService(),
+            groupTripObserver: observer,
+            groupCredentials: GroupTripCredentials(
+                groupId: "group-a",
+                code: "12345",
+                memberId: "member-b",
+                memberToken: "member-token-b",
+                adminToken: nil
+            )
+        )
+        store.send(.onAppear)
+
+        observer.send(try groupDTO(
+            accommodation: centre(precision: .address).accommodation,
+            nearYou: nearYou(),
+            count: 1
+        ))
+        await settle()
+
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+        XCTAssertEqual(store.state.groupNearYouSetBy, "Alex")
+        XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
     }
 
     func testAmbiguousAddressWaitsForExplicitChoice() async {
@@ -315,6 +493,36 @@ final class NearYouTests: XCTestCase {
         )
     }
 
+    private func makeGroupStore(
+        map: StubNearYouMapService,
+        group: StubGroupNearYouGenerator
+    ) -> TripOutputStore {
+        var state = TripOutputStore.State(
+            details: .mock,
+            mode: .groupTrip,
+            itineraryResponse: .loaded(.mock),
+            suggestionsResponse: .loaded(.mock),
+            knowBeforeYouGoResponse: .loaded(.mock)
+        )
+        state.groupId = "group-a"
+        state.whereToStayResponse = .loaded(Trip.StayArea.mockSet)
+        state.worthItResponse = .loaded([])
+        return TripOutputStore(
+            initialState: state,
+            imageService: StubImageService(),
+            nearYouMapService: map,
+            groupNearYouService: group,
+            groupTripObserver: EmptyGroupObserver(),
+            groupCredentials: GroupTripCredentials(
+                groupId: "group-a",
+                code: "12345",
+                memberId: "member-a",
+                memberToken: "member-token",
+                adminToken: nil
+            )
+        )
+    }
+
     private func candidate(
         id: UUID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
         name: String = "Grounded Cafe",
@@ -371,6 +579,33 @@ final class NearYouTests: XCTestCase {
 
     private func object<T: Encodable>(_ value: T) throws -> Any {
         try JSONSerialization.jsonObject(with: JSONEncoder().encode(value))
+    }
+
+    private func groupDTO(
+        accommodation: CoarseAccommodation,
+        nearYou: Trip.NearYou,
+        count: Int
+    ) throws -> GroupDTO {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "groupId": "group-a",
+            "code": "12345",
+            "name": "Friends",
+            "destination": "Barcelona",
+            "durationDays": 4.0,
+            "startMonth": "may",
+            "status": "ready",
+            "viewerIsAdmin": false,
+            "canAutoGenerate": false,
+            "members": [],
+            "completedCount": 2.0,
+            "memberCount": 2.0,
+            "accommodation": try object(accommodation),
+            "nearYou": try object(nearYou),
+            "nearYouSetBy": "Alex",
+            "nearYouGenerationCount": Double(count),
+            "nearYouOperationState": ["state": "ready"]
+        ])
+        return try JSONDecoder().decode(GroupDTO.self, from: data)
     }
 
     private func settle() async {
@@ -476,6 +711,66 @@ private final class StubNearYouGenerator: NearYouGenerating {
             ],
             sparseMessage: candidates.count < 4 ? "A short, grounded list." : nil
         )
+    }
+}
+
+@MainActor
+private final class StubGroupNearYouGenerator: GroupNearYouGenerating {
+    let output: Trip.NearYou
+    var failuresRemaining = 0
+    private(set) var payloads: [GroupNearYouActionPayload] = []
+
+    init(output: Trip.NearYou) {
+        self.output = output
+    }
+
+    func generateGroupNearYou(
+        groupId: String,
+        memberToken: String,
+        payload: GroupNearYouActionPayload
+    ) async throws -> GroupNearYouResultDTO {
+        payloads.append(payload)
+        if failuresRemaining > 0 {
+            failuresRemaining -= 1
+            throw TripGenerationError.transport
+        }
+        return GroupNearYouResultDTO(
+            accommodation: CoarseAccommodation(
+                label: payload.accommodation.label,
+                latitude: payload.accommodation.latitude,
+                longitude: payload.accommodation.longitude,
+                precision: CoarseAccommodation.Precision(
+                    rawValue: payload.accommodation.precision
+                )!
+            ),
+            nearYou: output,
+            nearYouSetBy: "Alex",
+            generationCount: payload.replace ? 2 : 1
+        )
+    }
+}
+
+private struct EmptyGroupObserver: GroupTripObserving {
+    func observeGroup(
+        groupId: String,
+        memberToken: String
+    ) -> AnyPublisher<GroupDTO, ClientError> {
+        Empty(completeImmediately: false).eraseToAnyPublisher()
+    }
+}
+
+private final class GroupObserverStub: GroupTripObserving {
+    private let subject = PassthroughSubject<GroupDTO, ClientError>()
+
+    func observeGroup(
+        groupId: String,
+        memberToken: String
+    ) -> AnyPublisher<GroupDTO, ClientError> {
+        subject.eraseToAnyPublisher()
+    }
+
+    func send(_ group: GroupDTO) {
+        subject.send(group)
     }
 }
 

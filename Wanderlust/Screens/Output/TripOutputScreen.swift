@@ -17,6 +17,7 @@ struct TripOutputScreen: View {
     @State private var isDrawerOpen = false
     @State private var hasDismissedOutputOnThisVisit = false
     @State private var previousFavoriteCount = 0
+    @State private var pendingGroupNearYouReplacement: GroupNearYouReplacementAction?
     @AppStorage(OnboardingPreferenceKey.newTripOutputPermanentlyDismissed) private var hasPermanentlyDismissedOutputOnboarding = false
     
     init(initialState: TripOutputStore.State) {
@@ -113,6 +114,22 @@ struct TripOutputScreen: View {
             Text(store.shareErrorMessage ?? "")
         }
 
+        .alert("This is the group's only regeneration", isPresented: Binding(
+            get: { pendingGroupNearYouReplacement != nil },
+            set: { if !$0 { pendingGroupNearYouReplacement = nil } }
+        )) {
+            Button("Continue", role: .destructive) {
+                let action = pendingGroupNearYouReplacement
+                pendingGroupNearYouReplacement = nil
+                performGroupNearYouReplacement(action)
+            }
+            Button("Cancel", role: .cancel) {
+                pendingGroupNearYouReplacement = nil
+            }
+        } message: {
+            Text("The shared Near You result can be replaced successfully only once. After this, nobody in the group can regenerate it again.")
+        }
+
         // On appear trigger Itinerary generation
         .onAppear {
             AnalyticsTracker.shared.log(.screenViewed(.tripOutput))
@@ -151,6 +168,9 @@ struct TripOutputScreen: View {
                     addressResolution: store.state.nearYouAddressResolution,
                     whereToStay: store.state.whereToStayResponse,
                     destination: store.fullDestinationString,
+                    isGroup: store.state.mode == .groupTrip,
+                    setBy: store.state.groupNearYouSetBy,
+                    canReplace: store.canReplaceGroupNearYou,
                     favorites: favoritesBinding,
                     onSearchAddress: { store.send(.resolveNearYouAddress($0)) },
                     onChooseResolution: { store.send(.chooseNearYouResolution($0)) },
@@ -159,8 +179,8 @@ struct TripOutputScreen: View {
                         ? { store.send(.retryComponent(.whereToStay)) }
                         : nil,
                     onRetryNearYou: { store.send(.retryNearYou) },
-                    onRegenerate: { store.send(.regenerateNearYou) },
-                    onChangeStay: { store.send(.changeNearYouStay) }
+                    onRegenerate: { requestGroupNearYouReplacement(.regenerate) },
+                    onChangeStay: { requestGroupNearYouReplacement(.changeStay) }
                 )
 
             case .knowBeforeYouGo:
@@ -244,6 +264,22 @@ struct TripOutputScreen: View {
         )
     }
 
+    private func requestGroupNearYouReplacement(_ action: GroupNearYouReplacementAction) {
+        if store.groupNearYouRequiresReplacementWarning {
+            pendingGroupNearYouReplacement = action
+        } else {
+            performGroupNearYouReplacement(action)
+        }
+    }
+
+    private func performGroupNearYouReplacement(_ action: GroupNearYouReplacementAction?) {
+        switch action {
+        case .regenerate: store.send(.regenerateNearYou)
+        case .changeStay: store.send(.changeNearYouStay)
+        case nil: break
+        }
+    }
+
 
     var itineraryHeader: some View {
         // Explicit argument labels throughout (no trailing closure): TopHeader
@@ -316,6 +352,11 @@ struct TripOutputScreen: View {
     private var backButtonTitle: String {
         store.state.mode == .groupTrip ? "Dashboard" : "Trips"
     }
+}
+
+private enum GroupNearYouReplacementAction {
+    case regenerate
+    case changeStay
 }
 
 private struct TripOutputOnboardingOverlay: View {

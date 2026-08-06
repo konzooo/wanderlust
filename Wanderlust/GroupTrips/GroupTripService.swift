@@ -175,6 +175,30 @@ final class GroupTripService {
             throw TripGenerationService.mapped(error)
         }
     }
+
+    /// Any member may set the one shared grounded Near You result. The payload
+    /// has no raw address field; MapKit has already resolved it locally.
+    func generateGroupNearYou(
+        groupId: String,
+        memberToken: String,
+        payload: GroupNearYouActionPayload
+    ) async throws -> GroupNearYouResultDTO {
+        do {
+            return try await client.action("groupNearYou:generate", with: [
+                "groupId": groupId,
+                "memberToken": memberToken,
+                "accommodation": payload.accommodation,
+                "candidates": payload.candidates.map { $0 as (any ConvexEncodable)? },
+                "practical": payload.practical.map { $0 as (any ConvexEncodable)? },
+                "unavailablePracticalKinds": payload.unavailablePracticalKinds.map {
+                    $0 as (any ConvexEncodable)?
+                },
+                "replace": payload.replace
+            ])
+        } catch let error as ClientError {
+            throw TripGenerationService.mapped(error)
+        }
+    }
 }
 
 protocol GroupDeepDiveGenerating {
@@ -186,6 +210,13 @@ protocol GroupDeepDiveGenerating {
 }
 
 extension GroupTripService: GroupDeepDiveGenerating {}
+extension GroupTripService: GroupNearYouGenerating {}
+
+protocol GroupTripObserving {
+    func observeGroup(groupId: String, memberToken: String) -> AnyPublisher<GroupDTO, ClientError>
+}
+
+extension GroupTripService: GroupTripObserving {}
 
 /// Decodes any Convex mutation that returns an acknowledgement object (e.g.
 /// `{ submitted: true }`). The library's no-result `mutation` overload decodes
@@ -217,6 +248,12 @@ struct GroupDTO: Decodable, Equatable {
     let whereToStay: [Trip.StayArea]?
     let interestPrompts: [String]
     let deepDives: [Trip.Suggestions.Category]?
+    let accommodation: CoarseAccommodation?
+    let nearYou: Trip.NearYou?
+    let nearYouSetBy: String?
+    private let nearYouGenerationCountRaw: Double
+    var nearYouGenerationCount: Int { Int(nearYouGenerationCountRaw) }
+    let nearYouOperationState: GroupComponentStateDTO
     /// What happened to each component, keyed by component name. A `nil`
     /// payload alone could not distinguish "not generated" from "failed", so
     /// there was nothing to offer a retry on.
@@ -240,6 +277,8 @@ struct GroupDTO: Decodable, Equatable {
         case durationDaysRaw = "durationDays"
         case viewerIsAdmin, canAutoGenerate, members, itinerary, suggestions
         case knowBeforeYouGo, worthItItems, whereToStay, interestPrompts, deepDives
+        case accommodation, nearYou, nearYouSetBy, nearYouOperationState
+        case nearYouGenerationCountRaw = "nearYouGenerationCount"
         case componentStates, canRetry, imageUrl, errorCode
         case completedCountRaw = "completedCount"
         case memberCountRaw = "memberCount"
@@ -274,6 +313,17 @@ struct GroupDTO: Decodable, Equatable {
         deepDives = try? container.decodeIfPresent(
             [Trip.Suggestions.Category].self, forKey: .deepDives
         )
+        accommodation = try? container.decodeIfPresent(
+            CoarseAccommodation.self, forKey: .accommodation
+        )
+        nearYou = try? container.decodeIfPresent(Trip.NearYou.self, forKey: .nearYou)
+        nearYouSetBy = try container.decodeIfPresent(String.self, forKey: .nearYouSetBy)
+        nearYouGenerationCountRaw = (try? container.decodeIfPresent(
+            Double.self, forKey: .nearYouGenerationCountRaw
+        )) ?? (nearYou == nil ? 0 : 1)
+        nearYouOperationState = (try? container.decodeIfPresent(
+            GroupComponentStateDTO.self, forKey: .nearYouOperationState
+        )) ?? .init(state: nearYou == nil ? .absent : .ready, code: nil)
         // Tolerated rather than required: a client running against a backend
         // that predates per-component state should still show the trip.
         componentStates = (try? container.decodeIfPresent(
@@ -288,7 +338,7 @@ struct GroupDTO: Decodable, Equatable {
 }
 
 /// Mirrors `ComponentStateDTO` in `ConvexBackend/convex/lib/dto.ts`.
-struct GroupComponentStateDTO: Decodable, Equatable {
+struct GroupComponentStateDTO: Decodable, Equatable, Hashable {
     enum Kind: String, Decodable {
         case absent, generating, failed, ready
     }

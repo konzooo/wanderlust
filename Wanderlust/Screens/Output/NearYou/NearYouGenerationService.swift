@@ -144,3 +144,112 @@ enum NearYouServices {
         DebugSettings.useMockTripData ? MockNearYouService() : BackendNearYouService()
     }
 }
+
+// MARK: - Shared group Near You
+
+/// Full MapKit-owned venue facts sent for server persistence. The backend
+/// strips this to `NearYouBackendCandidate` before composing the model prompt.
+struct GroupNearYouGroundedCandidate: Codable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let category: String
+    let latitude: Double
+    let longitude: Double
+    let distanceMetres: Int
+    let walkingMinutes: Int
+    let mapURL: String
+
+    init(_ candidate: Trip.NearYouCandidate) {
+        id = candidate.id
+        name = candidate.name
+        category = candidate.category
+        latitude = candidate.latitude
+        longitude = candidate.longitude
+        distanceMetres = candidate.distanceMetres
+        walkingMinutes = candidate.walkingMinutes
+        mapURL = candidate.mapURL.absoluteString
+    }
+}
+
+extension GroupNearYouGroundedCandidate: ConvexEncodable {}
+
+struct GroupNearYouPracticalInput: Codable, Equatable, Sendable {
+    let kind: String
+    let candidate: GroupNearYouGroundedCandidate
+
+    init(_ value: Trip.NearYouPracticalPlace) {
+        kind = value.kind.rawValue
+        candidate = GroupNearYouGroundedCandidate(value.candidate)
+    }
+}
+
+extension GroupNearYouPracticalInput: ConvexEncodable {}
+
+struct GroupNearYouAccommodationInput: Codable, Equatable, Sendable {
+    let label: String
+    let latitude: Double
+    let longitude: Double
+    let precision: String
+
+    init(_ value: CoarseAccommodation) {
+        label = value.label
+        latitude = value.latitude
+        longitude = value.longitude
+        precision = value.precision.rawValue
+    }
+}
+
+extension GroupNearYouAccommodationInput: ConvexEncodable {}
+
+/// Exact address input is structurally absent. It exists only in the transient
+/// store action that asks MapKit to resolve a centre.
+struct GroupNearYouActionPayload: Codable, Equatable, Sendable {
+    let accommodation: GroupNearYouAccommodationInput
+    let candidates: [GroupNearYouGroundedCandidate]
+    let practical: [GroupNearYouPracticalInput]
+    let unavailablePracticalKinds: [String]
+    let replace: Bool
+
+    init(accommodation: CoarseAccommodation, discovery: NearYouDiscovery, replace: Bool) {
+        self.accommodation = GroupNearYouAccommodationInput(accommodation)
+        candidates = discovery.editorialCandidates.map(GroupNearYouGroundedCandidate.init)
+        practical = discovery.practical.map(GroupNearYouPracticalInput.init)
+        unavailablePracticalKinds = discovery.unavailablePracticalKinds
+            .map(\.rawValue)
+            .sorted()
+        self.replace = replace
+    }
+}
+
+struct GroupNearYouResultDTO: Decodable, Equatable, Sendable {
+    let accommodation: CoarseAccommodation
+    let nearYou: Trip.NearYou
+    let nearYouSetBy: String
+    private let generationCountRaw: Double
+    var generationCount: Int { Int(generationCountRaw) }
+
+    init(
+        accommodation: CoarseAccommodation,
+        nearYou: Trip.NearYou,
+        nearYouSetBy: String,
+        generationCount: Int
+    ) {
+        self.accommodation = accommodation
+        self.nearYou = nearYou
+        self.nearYouSetBy = nearYouSetBy
+        generationCountRaw = Double(generationCount)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case accommodation, nearYou, nearYouSetBy
+        case generationCountRaw = "generationCount"
+    }
+}
+
+protocol GroupNearYouGenerating {
+    func generateGroupNearYou(
+        groupId: String,
+        memberToken: String,
+        payload: GroupNearYouActionPayload
+    ) async throws -> GroupNearYouResultDTO
+}

@@ -13,7 +13,9 @@ public extension Trip {
     /// The model never creates this value. It receives a privacy-minimised copy
     /// containing only `id`, `name`, `category`, `distanceMetres` and
     /// `walkingMinutes`, and may return only the `id`. Coordinates, route facts
-    /// and the map URL remain client-owned from discovery through rendering.
+    /// and the map URL remain MapKit-owned. A shared group result persists those
+    /// client facts on the server so every member renders the same grounding,
+    /// but they are still never passed to the model.
     struct NearYouCandidate: Codable, Equatable, Hashable, Sendable, Identifiable {
         public let id: UUID
         public let name: String
@@ -116,7 +118,7 @@ public extension Trip {
         }
     }
 
-    /// The complete, already-grounded result persisted with a solo trip.
+    /// The complete, already-grounded result persisted with a solo or group trip.
     ///
     /// `sparseMessage` is allowed to be non-nil even when there are editorial
     /// sections: it is the honest note that the real candidate pool was thin.

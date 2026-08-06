@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
   groupComponentStates,
+  componentState,
   groupStatus,
   memberPreferences,
   memberRole,
@@ -57,6 +58,15 @@ export default defineSchema({
     whereToStay: v.optional(v.any()),
     /** Append-only, organizer-triggered shared interest deep dives. */
     deepDives: v.optional(v.any()),
+    /** Shared grounded result. The exact address is never accepted by an API. */
+    accommodation: v.optional(v.any()),
+    nearYou: v.optional(v.any()),
+    nearYouSetBy: v.optional(v.string()),
+    /** Successful initial generation + at most one successful replacement. */
+    nearYouGenerationCount: v.optional(v.number()),
+    nearYouOperationVersion: v.optional(v.number()),
+    nearYouOperationState: v.optional(componentState),
+    nearYouOperationStartedAt: v.optional(v.number()),
     /**
      * What happened to each component, alongside the payloads above. Absent on
      * groups generated before per-component state existed; `dto.ts` derives

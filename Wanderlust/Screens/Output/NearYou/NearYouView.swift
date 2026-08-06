@@ -2,8 +2,8 @@
 //  NearYouView.swift
 //  Wanderlust
 //
-//  The complete solo Near You flow: device-side grounding, adaptive editorial
-//  picks, and a visually separate deterministic practical layer.
+//  The complete solo/group Near You flow: device-side grounding, adaptive
+//  editorial picks, and a visually separate deterministic practical layer.
 //
 
 import CoreArchitecture
@@ -42,6 +42,9 @@ struct NearYouView: View {
     let addressResolution: AsyncValue<NearYouAddressResolution>
     let whereToStay: AsyncValue<[Trip.StayArea]>
     let destination: String
+    let isGroup: Bool
+    let setBy: String?
+    let canReplace: Bool
     @Binding var favorites: Trip.Favorites
     let onSearchAddress: (String) -> Void
     let onChooseResolution: (NearYouResolutionChoice) -> Void
@@ -68,7 +71,9 @@ struct NearYouView: View {
                     .font(DS.Typography.sectionHeader)
                     .foregroundStyle(.primary)
 
-                Text("Your address or hotel is resolved by Apple Maps on this device. The exact input is never sent or saved.")
+                Text(isGroup
+                     ? "Apple Maps resolves the address or hotel on this device. The exact input is never sent or saved; only the coarse stay and grounded result are shared with the group."
+                     : "Your address or hotel is resolved by Apple Maps on this device. The exact input is never sent or saved.")
                     .font(.kanit(14))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -211,7 +216,9 @@ struct NearYouView: View {
                     .foregroundStyle(Color.appTint)
                 Text("Near You didn't come through")
                     .font(DS.Typography.sectionHeader)
-                Text("Your stay stays on this device. The rest of the trip is unaffected.")
+                Text(isGroup
+                     ? "The shared result was not changed. The rest of the group trip is unaffected."
+                     : "Your stay stays on this device. The rest of the trip is unaffected.")
                     .font(.kanit(14))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -229,6 +236,9 @@ struct NearYouView: View {
             NearYouResultsView(
                 output: output,
                 accommodation: accommodation,
+                isGroup: isGroup,
+                setBy: setBy,
+                canReplace: canReplace,
                 favorites: $favorites,
                 onRegenerate: onRegenerate,
                 onChangeStay: onChangeStay
@@ -246,6 +256,9 @@ struct NearYouView: View {
 private struct NearYouResultsView: View {
     let output: Trip.NearYou
     let accommodation: CoarseAccommodation
+    let isGroup: Bool
+    let setBy: String?
+    let canReplace: Bool
     @Binding var favorites: Trip.Favorites
     let onRegenerate: () -> Void
     let onChangeStay: () -> Void
@@ -280,13 +293,21 @@ private struct NearYouResultsView: View {
 
                 practicalLayer
 
-                HStack(spacing: 12) {
-                    Button("Change stay", action: onChangeStay)
-                        .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
-                    Button("Regenerate", action: onRegenerate)
-                        .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
+                if canReplace {
+                    HStack(spacing: 12) {
+                        Button(isGroup ? "Change shared stay" : "Change stay", action: onChangeStay)
+                            .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
+                        Button(isGroup ? "Regenerate once" : "Regenerate", action: onRegenerate)
+                            .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
+                    }
+                    .padding(.top, .Padding.sm)
+                } else if isGroup {
+                    Label("The group's one regeneration has been used.", systemImage: "checkmark.seal")
+                        .font(.kanit(14))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, .Padding.sm)
                 }
-                .padding(.top, .Padding.sm)
             }
             .padding(.horizontal, .Padding.sm3)
             .padding(.vertical, .Padding.md)
@@ -306,6 +327,11 @@ private struct NearYouResultsView: View {
                 .foregroundStyle(Color.appTint)
             } else {
                 Text("Walking facts come directly from Apple Maps.")
+                    .font(.kanit(13))
+                    .foregroundStyle(.secondary)
+            }
+            if isGroup, let setBy {
+                Text("Shared by \(setBy)")
                     .font(.kanit(13))
                     .foregroundStyle(.secondary)
             }

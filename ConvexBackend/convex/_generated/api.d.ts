@@ -10,6 +10,7 @@
 
 import type * as generate from "../generate.js";
 import type * as groupDeepDives from "../groupDeepDives.js";
+import type * as groupNearYou from "../groupNearYou.js";
 import type * as groups from "../groups.js";
 import type * as http from "../http.js";
 import type * as lib_codes from "../lib/codes.js";
@@ -36,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   generate: typeof generate;
   groupDeepDives: typeof groupDeepDives;
+  groupNearYou: typeof groupNearYou;
   groups: typeof groups;
   http: typeof http;
   "lib/codes": typeof lib_codes;

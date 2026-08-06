@@ -128,6 +128,30 @@ final class GroupTripPersonalLayerTests: XCTestCase {
         )
     }
 
+    func testOlderGroupDTOStillDecodesWithoutParityFields() throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "groupId": "group-a",
+            "code": "12345",
+            "name": "Old group",
+            "destination": "Barcelona",
+            "startMonth": "may",
+            "status": "ready",
+            "viewerIsAdmin": false,
+            "canAutoGenerate": false,
+            "members": [],
+            "completedCount": 0.0,
+            "memberCount": 0.0
+        ])
+
+        let group = try JSONDecoder().decode(GroupDTO.self, from: data)
+
+        XCTAssertNil(group.worthItItems)
+        XCTAssertNil(group.whereToStay)
+        XCTAssertNil(group.nearYou)
+        XCTAssertEqual(group.nearYouGenerationCount, 0)
+        XCTAssertEqual(group.nearYouOperationState.state, .absent)
+    }
+
     private func waitUntil(
         timeoutNanoseconds: UInt64 = 1_000_000_000,
         _ condition: @escaping @MainActor () -> Bool

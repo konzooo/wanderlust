@@ -2,8 +2,9 @@
 //  NearYouMapService.swift
 //  Wanderlust
 //
-//  Device-side grounding for Near You. No accommodation input crosses this
-//  boundary; only the resulting candidate facts can be sent to the backend.
+//  Device-side grounding for Near You. No exact accommodation input crosses
+//  this boundary; only the coarse centre and resulting candidate facts can be
+//  persisted for a shared group result.
 //
 
 import CoreModels

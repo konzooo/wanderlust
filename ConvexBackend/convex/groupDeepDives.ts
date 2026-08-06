@@ -72,6 +72,7 @@ export const snapshot = internalQuery({
         group.suggestions,
         group.worthIt,
         group.deepDives,
+        group.nearYou,
       ]),
     };
   },
@@ -212,6 +213,12 @@ export function collectAlreadyRecommended(values: unknown[]): string[] {
     add(record.placeName);
     // Worth-it titles are recommendations even when their locations array is absent.
     add(record.place);
+    // Grounded Near You editorial picks carry the venue under `candidate`.
+    // Practical rows have no `explanation` and deliberately stay excluded.
+    if (typeof record.explanation === "string" &&
+        typeof record.candidate === "object" && record.candidate !== null) {
+      add((record.candidate as Record<string, unknown>).name);
+    }
     Object.values(record).forEach(walk);
   };
   values.forEach(walk);

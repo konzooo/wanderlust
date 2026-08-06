@@ -49,6 +49,11 @@ export type GroupDTO = {
   whereToStay: unknown | null;
   interestPrompts: unknown | null;
   deepDives: unknown | null;
+  accommodation: unknown | null;
+  nearYou: unknown | null;
+  nearYouSetBy: string | null;
+  nearYouGenerationCount: number;
+  nearYouOperationState: ComponentStateDTO;
   /** Per-component state, keyed by component name. */
   componentStates: Record<string, ComponentStateDTO>;
   /** Whether anything is worth retrying — drives the admin's retry affordance. */
@@ -147,6 +152,14 @@ export function toGroupDTO(
     whereToStay: envelopeField(group.whereToStay, "areas"),
     interestPrompts: envelopeField(group.suggestions, "interestPrompts"),
     deepDives: group.deepDives ?? null,
+    accommodation: group.accommodation ?? null,
+    nearYou: group.nearYou ?? null,
+    nearYouSetBy: group.nearYouSetBy ?? null,
+    nearYouGenerationCount:
+      group.nearYouGenerationCount ?? (group.nearYou === undefined ? 0 : 1),
+    nearYouOperationState:
+      group.nearYouOperationState ??
+      (group.nearYou === undefined ? { state: "absent" } : { state: "ready" }),
     componentStates: currentStates(group),
     canRetry:
       group.status !== "collecting" &&

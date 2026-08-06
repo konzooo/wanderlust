@@ -143,6 +143,23 @@ class NavigationRouter: ObservableObject {
         }
         state.interestPrompts = group.interestPrompts
         state.deepDives = group.deepDives
+        state.accommodation = group.accommodation
+        state.groupNearYouSetBy = group.nearYouSetBy
+        state.groupNearYouGenerationCount = group.nearYouGenerationCount
+        switch group.nearYouOperationState.state {
+        case .generating:
+            state.nearYouResponse = .loading
+        case .failed:
+            state.nearYouResponse = .error(
+                TripGenerationError.backend(
+                    code: group.nearYouOperationState.code ?? "group_near_you_failed"
+                )
+            )
+        case .ready:
+            if let nearYou = group.nearYou { state.nearYouResponse = .loaded(nearYou) }
+        case .absent:
+            break
+        }
         if let imageUrl = group.imageUrl, let url = URL(string: imageUrl) {
             state.imageUrlResponse = .loaded(url)
         }

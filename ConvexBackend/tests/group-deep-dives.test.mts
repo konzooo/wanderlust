@@ -40,7 +40,16 @@ test("group alreadyRecommended is live and deduplicated", () => {
       { locations: [{ placeName: "Mercado Central" }] },
       { place: "City Museum" },
       { locations: [{ placeName: "mercado central" }] },
+      {
+        sections: [{
+          picks: [{
+            candidate: { name: "Grounded Cafe" },
+            explanation: "Fits the group.",
+          }],
+        }],
+        practical: [{ kind: "pharmacy", candidate: { name: "Practical Pharmacy" } }],
+      },
     ]),
-    ["Mercado Central", "City Museum"],
+    ["Mercado Central", "City Museum", "Grounded Cafe"],
   );
 });

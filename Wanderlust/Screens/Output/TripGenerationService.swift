@@ -12,7 +12,7 @@ enum TripComponent: String, CaseIterable, Sendable {
     case deepDive
     case worthIt
     case whereToStay
-    /// Manual, solo-only. Never part of `automatic` or group generation.
+    /// Manual and explicit. Never part of eager solo or group generation.
     case nearYou
 
     /// A required component's failure fails the whole generation; everything

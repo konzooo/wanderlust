@@ -8,6 +8,7 @@
 import CoreModels
 import CoreArchitecture
 import DesignSystem
+import Combine
 import Foundation
 import Networking
 import UIKit
@@ -52,7 +53,12 @@ class TripOutputStore: ObservableStore {
     private let nearYouService: any NearYouGenerating
     private let groupPersonalStore: any GroupTripPersonalStoring
     private let groupDeepDiveService: any GroupDeepDiveGenerating
+    private let groupNearYouService: any GroupNearYouGenerating
+    private let groupTripObserver: any GroupTripObserving
     private let groupCredentials: GroupTripCredentials?
+    private var groupSubscription: AnyCancellable?
+    /// True only after the member acknowledged the one-replacement warning.
+    private var replacingGroupNearYou = false
 
     /// Near You is manual and has its own two-stage task (MapKit, then model),
     /// independent from the eager component coordinator. The last grounded
@@ -95,12 +101,16 @@ class TripOutputStore: ObservableStore {
         nearYouService: (any NearYouGenerating)? = nil,
         groupPersonalStore: (any GroupTripPersonalStoring)? = nil,
         groupDeepDiveService: (any GroupDeepDiveGenerating)? = nil,
+        groupNearYouService: (any GroupNearYouGenerating)? = nil,
+        groupTripObserver: (any GroupTripObserving)? = nil,
         groupCredentials: GroupTripCredentials? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
         var restoredState = initialState
         self.groupPersonalStore = groupPersonalStore ?? GroupTripPersonalStore()
         self.groupDeepDiveService = groupDeepDiveService ?? GroupTripService.shared
+        self.groupNearYouService = groupNearYouService ?? GroupTripService.shared
+        self.groupTripObserver = groupTripObserver ?? GroupTripService.shared
         self.groupCredentials = groupCredentials
             ?? initialState.groupId.flatMap(GroupTripCredentialsStore.load)
         if let groupId = initialState.groupId {
@@ -141,6 +151,7 @@ class TripOutputStore: ObservableStore {
             // locally-cached received trip), so we must NEVER invoke the
             // on-device LLM (that path reads the bundled OpenAI key).
             if state.mode.isReadOnly {
+                if state.mode == .groupTrip { startGroupObservation() }
                 // A pre-loaded (server- or locally-cache-supplied) image must
                 // win: refetching would silently swap it for a different
                 // Unsplash pick every time this screen reappears.
@@ -211,10 +222,18 @@ class TripOutputStore: ObservableStore {
             retryNearYou(reuseDiscovery: true)
 
         case .regenerateNearYou:
+            if state.mode == .groupTrip {
+                guard state.groupNearYouGenerationCount < 2 else { return }
+                replacingGroupNearYou = state.groupNearYouGenerationCount == 1
+            }
             retryCount += 1
             retryNearYou(reuseDiscovery: false)
 
         case .changeNearYouStay:
+            if state.mode == .groupTrip {
+                guard state.groupNearYouGenerationCount < 2 else { return }
+                replacingGroupNearYou = state.groupNearYouGenerationCount == 1
+            }
             nearYouTask?.cancel()
             lastNearYouDiscovery = nil
             lastNearYouCentre = nil
@@ -298,6 +317,8 @@ extension TripOutputStore {
         /// Keychain and never become navigation/state values.
         var groupId: String? = nil
         var groupViewerIsAdmin: Bool = false
+        var groupNearYouSetBy: String? = nil
+        var groupNearYouGenerationCount: Int = 0
         var saved: Bool = false
         let mode: Mode
         /// The code this trip was published under (if the owner has shared it)
@@ -405,13 +426,12 @@ extension TripOutputStore {
 extension TripOutputStore {
     /// The tabs this screen offers.
     ///
-    /// Visibility is a product rule, not a rendering detail: Near You is
-    /// personal and address-grounded, so it is absent from the read-only modes
-    /// entirely and gated behind ``OutputFeatureFlags/nearYouEnabled`` until
-    /// there is real grounding behind it.
+    /// Visibility is a product rule, not a rendering detail. Near You is live
+    /// for solo and group trips because both have a complete grounded flow;
+    /// received solo shares remain immutable snapshots without accommodation.
     var visibleTabs: [OutputTab] {
         var tabs: [OutputTab] = [.discover]
-        if OutputFeatureFlags.nearYouEnabled && !state.mode.isReadOnly {
+        if OutputFeatureFlags.nearYouEnabled && state.mode != .sharedTrip {
             tabs.append(.nearYou)
         }
         if OutputFeatureFlags.knowBeforeYouGoEnabled {
@@ -509,6 +529,14 @@ extension TripOutputStore {
         return deepDiveErrorMessage
     }
 
+    var groupNearYouRequiresReplacementWarning: Bool {
+        state.mode == .groupTrip && state.groupNearYouGenerationCount == 1
+    }
+
+    var canReplaceGroupNearYou: Bool {
+        state.mode != .groupTrip || state.groupNearYouGenerationCount < 2
+    }
+
     /// Storage keeps dives separate for provenance and cap accounting (§10),
     /// while the feed renders them inline as additional dynamic categories.
     var suggestionsWithDeepDives: AsyncValue<Trip.Suggestions> {
@@ -559,7 +587,7 @@ extension TripOutputStore {
     }
 
     private func resolveNearYouAddress(_ rawAddress: String) {
-        guard !state.mode.isReadOnly else { return }
+        guard state.mode != .sharedTrip else { return }
         nearYouTask?.cancel()
         state.nearYouAddressResolution = .loading
         let destination = state.fullDestinationString
@@ -586,7 +614,7 @@ extension TripOutputStore {
     }
 
     private func resolveNearYouArea(_ area: Trip.StayArea) {
-        guard !state.mode.isReadOnly else { return }
+        guard state.mode != .sharedTrip else { return }
         nearYouTask?.cancel()
         state.nearYouAddressResolution = .loading
         let destination = state.fullDestinationString
@@ -619,9 +647,17 @@ extension TripOutputStore {
         around centre: NearYouSearchCentre,
         discovery existingDiscovery: NearYouDiscovery?
     ) {
-        guard !state.mode.isReadOnly, let request = effectiveNearYouRequest else {
+        guard state.mode != .sharedTrip else { return }
+        let request = effectiveNearYouRequest
+        if state.mode != .groupTrip && request == nil {
             state.nearYouResponse = .error(
                 TripGenerationError.backend(code: "missing_trip_context")
+            )
+            return
+        }
+        if state.mode == .groupTrip && (state.groupId == nil || groupCredentials == nil) {
+            state.nearYouResponse = .error(
+                TripGenerationError.backend(code: "missing_group_capability")
             )
             return
         }
@@ -631,7 +667,7 @@ extension TripOutputStore {
         state.accommodation = centre.accommodation
         state.nearYouAddressResolution = .initial
         state.nearYouResponse = .loading
-        let context = alreadyRecommended()
+        let context = state.mode == .groupTrip ? [] : alreadyRecommended()
         let startedAt = Date()
         let attempt = retryCount + 1
         logGeneration(.tripGenerationStarted, component: "nearYou", attempt: attempt)
@@ -649,7 +685,27 @@ extension TripOutputStore {
                 lastNearYouDiscovery = discovery
 
                 let output: Trip.NearYou
-                if discovery.editorialCandidates.isEmpty {
+                if state.mode == .groupTrip {
+                    guard let groupId = state.groupId,
+                          let memberToken = groupCredentials?.memberToken else {
+                        throw TripGenerationError.backend(code: "missing_group_capability")
+                    }
+                    let result = try await groupNearYouService.generateGroupNearYou(
+                        groupId: groupId,
+                        memberToken: memberToken,
+                        payload: GroupNearYouActionPayload(
+                            accommodation: centre.accommodation,
+                            discovery: discovery,
+                            replace: replacingGroupNearYou
+                        )
+                    )
+                    try Task.checkCancellation()
+                    state.accommodation = result.accommodation
+                    state.groupNearYouSetBy = result.nearYouSetBy
+                    state.groupNearYouGenerationCount = result.generationCount
+                    replacingGroupNearYou = false
+                    output = result.nearYou
+                } else if discovery.editorialCandidates.isEmpty {
                     // Nothing exists for the model to select. Do not spend a
                     // call asking it to decorate an empty list.
                     output = Trip.NearYou(
@@ -659,6 +715,9 @@ extension TripOutputStore {
                         sparseMessage: "MapKit found no editorial places here with a verified walking route."
                     )
                 } else {
+                    guard let request else {
+                        throw TripGenerationError.backend(code: "missing_trip_context")
+                    }
                     let payload = try await nearYouService.generate(
                         request,
                         candidates: discovery.editorialCandidates,
@@ -680,7 +739,7 @@ extension TripOutputStore {
 
                 state.nearYouResponse = .loaded(output)
                 lastCompletedNearYou = output
-                lastCompletedNearYouAccommodation = centre.accommodation
+                lastCompletedNearYouAccommodation = state.accommodation
                 if state.saved { reSaveTrip() }
                 logGeneration(
                     .tripGenerationSucceeded,
@@ -700,6 +759,73 @@ extension TripOutputStore {
                     duration: startedAt,
                     error: error
                 )
+            }
+        }
+    }
+}
+
+// MARK: - Live shared group output
+
+extension TripOutputStore {
+    private func startGroupObservation() {
+        guard groupSubscription == nil,
+              let groupId = state.groupId,
+              let memberToken = groupCredentials?.memberToken else { return }
+
+        groupSubscription = groupTripObserver
+            .observeGroup(groupId: groupId, memberToken: memberToken)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [weak self] group in
+                    Task { @MainActor [weak self] in
+                        self?.applyLiveGroup(group)
+                    }
+                }
+            )
+    }
+
+    private func applyLiveGroup(_ group: GroupDTO) {
+        guard group.groupId == state.groupId else { return }
+        state.groupViewerIsAdmin = group.viewerIsAdmin
+
+        if let itinerary = group.itinerary { state.itineraryResponse = .loaded(itinerary) }
+        if let suggestions = group.suggestions {
+            state.suggestionsResponse = .loaded(suggestions)
+        }
+        if let briefing = group.knowBeforeYouGo {
+            state.knowBeforeYouGoResponse = .loaded(briefing)
+        }
+        if let items = group.worthItItems { state.worthItResponse = .loaded(items) }
+        if let areas = group.whereToStay { state.whereToStayResponse = .loaded(areas) }
+        if !group.interestPrompts.isEmpty { state.interestPrompts = group.interestPrompts }
+        if let deepDives = group.deepDives {
+            state.deepDives = deepDives
+            deepDiveCapReached = deepDives.count >= Self.maxDeepDives
+        }
+        if let image = group.imageUrl.flatMap(URL.init(string:)) {
+            state.imageUrlResponse = .loaded(image)
+        }
+
+        if let accommodation = group.accommodation {
+            state.accommodation = accommodation
+        }
+        state.groupNearYouSetBy = group.nearYouSetBy
+        state.groupNearYouGenerationCount = group.nearYouGenerationCount
+        switch group.nearYouOperationState.state {
+        case .absent:
+            if let output = group.nearYou { state.nearYouResponse = .loaded(output) }
+        case .generating:
+            state.nearYouResponse = .loading
+        case .failed:
+            state.nearYouResponse = .error(
+                TripGenerationError.backend(
+                    code: group.nearYouOperationState.code ?? "group_near_you_failed"
+                )
+            )
+        case .ready:
+            if let output = group.nearYou {
+                state.nearYouResponse = .loaded(output)
+                replacingGroupNearYou = false
             }
         }
     }

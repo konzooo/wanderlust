@@ -18,6 +18,7 @@ import SwiftUI
 struct FavouritesSheet: View {
     let destination: String
     let sections: [Trip.FavouriteSection]
+    let privacyNote: String?
     /// Called once the traveller has confirmed. Confirmation is owned here, not
     /// by the screen underneath: an alert presented on the screen dismisses this
     /// sheet in order to show itself, so un-hearting one item would throw the
@@ -37,6 +38,16 @@ struct FavouritesSheet: View {
                         sections: sections,
                         onRemoveFavorite: { pendingRemoval = $0 }
                     )
+                }
+            }
+            .safeAreaInset(edge: .top) {
+                if let privacyNote {
+                    Text(privacyNote)
+                        .font(.kanit(14))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, .Padding.md)
+                        .padding(.vertical, .Spacing.small)
                 }
             }
             .gradientBackground()
@@ -111,6 +122,7 @@ struct FavouritesSheet: View {
                 ]
             )
         ],
+        privacyNote: nil,
         onRemoveFavorite: { _ in },
         onClose: {}
     )
@@ -120,6 +132,7 @@ struct FavouritesSheet: View {
     FavouritesSheet(
         destination: "Barcelona, Spain",
         sections: [],
+        privacyNote: "These favourites are yours on this device.",
         onRemoveFavorite: { _ in },
         onClose: {}
     )

@@ -126,6 +126,7 @@ class NavigationRouter: ObservableObject {
             ),
             mode: .groupTrip
         )
+        state.groupId = group.groupId
         state.itineraryResponse = .loaded(itinerary)
         if let suggestions = group.suggestions {
             state.suggestionsResponse = .loaded(suggestions)

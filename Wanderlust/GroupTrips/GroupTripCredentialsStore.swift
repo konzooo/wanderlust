@@ -96,6 +96,7 @@ enum GroupTripCredentialsStore {
         if let data = try? JSONEncoder().encode(summaries.filter { $0.groupId != groupId }) {
             UserDefaults.standard.set(data, forKey: summariesKey)
         }
+        GroupTripPersonalStore().clear(groupId: groupId)
     }
 
     private static func memberTokenKey(_ groupId: String) -> String {

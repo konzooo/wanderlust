@@ -85,6 +85,9 @@ struct TripOutputScreen: View {
             FavouritesSheet(
                 destination: store.fullDestinationString,
                 sections: store.favouriteSections,
+                privacyNote: store.state.mode == .groupTrip
+                    ? "These favourites are yours on this device. They are not shared with the group."
+                    : nil,
                 onRemoveFavorite: { favoriteId in
                     store.send(.removeFavorite(favoriteId))
                 },
@@ -148,7 +151,7 @@ struct TripOutputScreen: View {
                     addressResolution: store.state.nearYouAddressResolution,
                     whereToStay: store.state.whereToStayResponse,
                     destination: store.fullDestinationString,
-                    favorites: $store.state.favorites,
+                    favorites: favoritesBinding,
                     onSearchAddress: { store.send(.resolveNearYouAddress($0)) },
                     onChooseResolution: { store.send(.chooseNearYouResolution($0)) },
                     onChooseArea: { store.send(.chooseNearYouArea($0)) },
@@ -186,7 +189,7 @@ struct TripOutputScreen: View {
         case .suggestions:
             TravelTipsView(
                 suggestions: store.suggestionsWithDeepDives,
-                favorites: $store.state.favorites,
+                favorites: favoritesBinding,
                 onRetry: canRetry ? { store.send(.retryComponent(.suggestions)) } : nil
             )
             .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
@@ -222,7 +225,7 @@ struct TripOutputScreen: View {
             // segment you can only reach once it succeeded would be unreachable.
             ItineraryCard(
                 tripItinerary: store.itineraryResponse,
-                favorites: $store.state.favorites
+                favorites: favoritesBinding
             )
         }
     }
@@ -232,6 +235,13 @@ struct TripOutputScreen: View {
     /// that does nothing.
     private var canRetry: Bool {
         !store.state.mode.isReadOnly
+    }
+
+    private var favoritesBinding: Binding<Trip.Favorites> {
+        Binding(
+            get: { store.state.favorites },
+            set: { store.send(.setFavorites($0)) }
+        )
     }
 
 

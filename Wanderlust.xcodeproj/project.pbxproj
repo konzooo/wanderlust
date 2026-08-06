@@ -24,6 +24,8 @@
 		AA7800010000000000000001 /* NearYouGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7800020000000000000002 /* NearYouGenerationService.swift */; };
 		AA7900010000000000000001 /* NearYouView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7900020000000000000002 /* NearYouView.swift */; };
 		AA7A00010000000000000001 /* NearYouTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7A00020000000000000002 /* NearYouTests.swift */; };
+		AAB000010000000000000001 /* GroupTripPersonalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB000020000000000000002 /* GroupTripPersonalStore.swift */; };
+		AAB000030000000000000003 /* GroupTripPersonalLayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB000040000000000000004 /* GroupTripPersonalLayerTests.swift */; };
 		AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000020000000000000002 /* AnalyticsStoreTests.swift */; };
 		AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3000020000000000000002 /* TripPersistenceTests.swift */; };
 		AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */; };
@@ -173,6 +175,8 @@
 		AA7800020000000000000002 /* NearYouGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouGenerationService.swift; sourceTree = "<group>"; };
 		AA7900020000000000000002 /* NearYouView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouView.swift; sourceTree = "<group>"; };
 		AA7A00020000000000000002 /* NearYouTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouTests.swift; sourceTree = "<group>"; };
+		AAB000020000000000000002 /* GroupTripPersonalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripPersonalStore.swift; sourceTree = "<group>"; };
+		AAB000040000000000000004 /* GroupTripPersonalLayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripPersonalLayerTests.swift; sourceTree = "<group>"; };
 		AA1000020000000000000002 /* AnalyticsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsStoreTests.swift; sourceTree = "<group>"; };
 		AA3000020000000000000002 /* TripPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPersistenceTests.swift; sourceTree = "<group>"; };
 		AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -367,6 +371,7 @@
 			children = (
 				6A5022352E6B4CC55BC3492D /* GroupTripService.swift */,
 				1899E73E07BC2D97B8B362BA /* GroupTripCredentialsStore.swift */,
+				AAB000020000000000000002 /* GroupTripPersonalStore.swift */,
 				A5838D40D1A8A278054EEEB7 /* SelectAllTextField.swift */,
 			);
 			path = GroupTrips;
@@ -558,6 +563,7 @@
 				AA7400020000000000000002 /* DiscoverContentTests.swift */,
 				AA6800020000000000000002 /* KnowBeforeYouGoTests.swift */,
 				AA7A00020000000000000002 /* NearYouTests.swift */,
+				AAB000040000000000000004 /* GroupTripPersonalLayerTests.swift */,
 				5D4EFFC52CB05B0F007E3FF2 /* WanderlustTests.swift */,
 			);
 			path = WanderlustTests;
@@ -1006,6 +1012,7 @@
 				7C1142CA0D39B9AED4381062 /* GroupQuestionnaireDraftStore.swift in Sources */,
 				09BF7BFE463967564DA59F92 /* GroupTripService.swift in Sources */,
 				95123D3ADEACD8AB626EEC85 /* GroupTripCredentialsStore.swift in Sources */,
+				AAB000010000000000000001 /* GroupTripPersonalStore.swift in Sources */,
 				E62E79C0F76A809743B787BE /* SelectAllTextField.swift in Sources */,
 				6E41836EC6ABFF23AF5EB483 /* GroupTripCreateStore.swift in Sources */,
 				22C70A98EBDD52A6B339A03F /* GroupTripCreateScreen.swift in Sources */,
@@ -1040,6 +1047,7 @@
 				AA7400010000000000000001 /* DiscoverContentTests.swift in Sources */,
 				AA6800010000000000000001 /* KnowBeforeYouGoTests.swift in Sources */,
 				AA7A00010000000000000001 /* NearYouTests.swift in Sources */,
+				AAB000030000000000000003 /* GroupTripPersonalLayerTests.swift in Sources */,
 				5D4EFFC62CB05B0F007E3FF2 /* WanderlustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

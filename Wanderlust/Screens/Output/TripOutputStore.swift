@@ -50,6 +50,7 @@ class TripOutputStore: ObservableStore {
     private let deepDiveService: any DeepDiveGenerating
     private let nearYouMapService: any NearYouMapServicing
     private let nearYouService: any NearYouGenerating
+    private let groupPersonalStore: any GroupTripPersonalStoring
 
     /// Near You is manual and has its own two-stage task (MapKit, then model),
     /// independent from the eager component coordinator. The last grounded
@@ -89,9 +90,17 @@ class TripOutputStore: ObservableStore {
         deepDiveService: (any DeepDiveGenerating)? = nil,
         nearYouMapService: (any NearYouMapServicing)? = nil,
         nearYouService: (any NearYouGenerating)? = nil,
+        groupPersonalStore: (any GroupTripPersonalStoring)? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
-        state = initialState
+        var restoredState = initialState
+        self.groupPersonalStore = groupPersonalStore ?? GroupTripPersonalStore()
+        if let groupId = initialState.groupId {
+            let personal = self.groupPersonalStore.load(groupId: groupId)
+            restoredState.favorites = personal.favorites
+            restoredState.worthItDecisions = personal.worthItDecisions
+        }
+        state = restoredState
         self.imageService = imageService
         self.variant = variant
         self.itineraryService = itineraryService ?? TripPlanningServices.itinerary()
@@ -170,6 +179,9 @@ class TripOutputStore: ObservableStore {
         case .decideWorthIt(let id, let decision):
             applyWorthIt(decision, to: id)
 
+        case .setFavorites(let favorites):
+            setFavorites(favorites)
+
         case .generateDeepDive(let interest):
             generate(.deepDive, interest: interest)
 
@@ -217,6 +229,7 @@ class TripOutputStore: ObservableStore {
                 persistReceivedTripFavorites()
                 router?.pop()
             } else if state.mode == .groupTrip {
+                persistGroupPersonalLayer()
                 router?.pop()
             } else if state.saved {
                 if state.mode == .savedTrip {
@@ -269,6 +282,9 @@ extension TripOutputStore {
         var selectedContentTab: OutputTab = .discover
         var discoverSegment: DiscoverSegment = .suggestions
         var favorites: Trip.Favorites = .init()
+        /// Present only for a group output. Capability tokens remain in the
+        /// Keychain and never become navigation/state values.
+        var groupId: String? = nil
         var saved: Bool = false
         let mode: Mode
         /// The code this trip was published under (if the owner has shared it)
@@ -336,6 +352,8 @@ extension TripOutputStore {
         case retryComponent(TripComponent)
         /// Record (or, with `nil`, undo) a Worth-it/Skip decision.
         case decideWorthIt(UUID, WorthItDecision?)
+        /// Central binding write so group hearts persist locally as one layer.
+        case setFavorites(Trip.Favorites)
         /// Generate one append-only category for the tapped interest chip.
         case generateDeepDive(String)
         /// Exact input is a transient action value. It is never stored on
@@ -711,6 +729,18 @@ extension TripOutputStore {
     func removeFavourite(_ id: UUID) {
         state.favorites.remove(id)
         state.worthItDecisions[id] = nil
+        persistGroupPersonalLayer()
+    }
+
+    private func setFavorites(_ favorites: Trip.Favorites) {
+        // A Worth-it card cannot remain `.kept` after it is unhearted through
+        // the favourites sheet or another content surface.
+        for (id, decision) in state.worthItDecisions
+        where decision == .kept && !favorites.contains(id) {
+            state.worthItDecisions[id] = nil
+        }
+        state.favorites = favorites
+        persistGroupPersonalLayer()
     }
 
     /// Records a Worth-it/Skip decision, or undoes it with `nil`.
@@ -737,6 +767,18 @@ extension TripOutputStore {
             // Skipping, and undoing a skip, deliberately leave favourites alone.
             break
         }
+        persistGroupPersonalLayer()
+    }
+
+    private func persistGroupPersonalLayer() {
+        guard let groupId = state.groupId else { return }
+        groupPersonalStore.save(
+            GroupTripPersonalLayer(
+                favorites: state.favorites,
+                worthItDecisions: state.worthItDecisions
+            ),
+            groupId: groupId
+        )
     }
 
     // MARK: - Generation

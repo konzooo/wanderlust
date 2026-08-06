@@ -272,6 +272,36 @@ export function completeness(data: unknown): Completeness {
 }
 
 /**
+ * Whether the itinerary obeyed its own segmentation rule.
+ *
+ * The prompt is explicit: one segment per day for trips of five days or fewer,
+ * and no more than five segments for longer ones. This check was missing from
+ * the first two matrix runs, and its absence hid a live defect — short trips
+ * came back as a **single** segment ("3 days" rendered as one card), and some
+ * long trips came back with one segment per day instead of grouped.
+ *
+ * It is separated from `laneViolations` because it needs the trip's length,
+ * which is a property of the request rather than of the response.
+ */
+export function itineraryShapeViolations(
+  data: unknown,
+  durationDays: number,
+): string[] {
+  if (!isRecord(data)) return ["itinerary is not an object"];
+  const segments = asArray(data.segments).length;
+
+  if (durationDays <= 5) {
+    return segments === durationDays
+      ? []
+      : [`${durationDays}-day trip returned ${segments} segments, expected one per day`];
+  }
+  if (segments < 2 || segments > 5) {
+    return [`${durationDays}-day trip returned ${segments} segments, expected 2-5`];
+  }
+  return [];
+}
+
+/**
  * Lane checks the prompts can actually be held to.
  *
  * Each of these is a rule stated in a prompt, so a violation is the model

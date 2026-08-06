@@ -76,6 +76,13 @@ enum DesignPlayground {
     /// opening it costs nothing and calls nothing.
     private static let outputVariants: [DesignVariant] = [
         DesignVariant(
+            id: "output-eval-samples",
+            title: "Trip Output — real evaluation output",
+            subtitle: "Eight destinations of actual model output from the §13 matrix run, in the real screen. For judging factuality, which nothing offline can score."
+        ) {
+            EvalSampleBrowser()
+        },
+        DesignVariant(
             id: "output-shell",
             title: "Trip Output — Discover / Know Before You Go shell",
             subtitle: "Tabs, sticky Discover pills, Worth-it/Skip decisions and the favourites sheet, on mock content."

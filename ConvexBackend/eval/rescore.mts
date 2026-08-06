@@ -12,8 +12,10 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { FIXTURES } from "./fixtures";
 import {
   completeness,
+  itineraryShapeViolations,
   laneViolations,
   linkScore,
   repeatedSentences,
@@ -93,6 +95,19 @@ for (const arm of ["combined", "split"]) {
   }
   console.log("");
 }
+
+const shape = run.records.flatMap((r) => {
+  if (!r.ok || r.component !== "itinerary" || r.arm !== "shared") return [];
+  const fixture = FIXTURES.find((f) => f.id === r.fixture);
+  return fixture
+    ? itineraryShapeViolations(r.data, fixture.input.durationDays).map(
+        (v) => `  ${r.fixture.padEnd(30)} ${v}`,
+      )
+    : [];
+});
+console.log("## itinerary shape");
+console.log(shape.length === 0 ? "  all fixtures obeyed the rule" : shape.join("\n"));
+console.log("");
 
 function pct(part: number, whole: number) {
   return whole === 0 ? "n/a" : `${((part / whole) * 100).toFixed(0)}%`;

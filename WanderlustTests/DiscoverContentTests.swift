@@ -93,7 +93,7 @@ final class DiscoverContentTests: XCTestCase {
         )
 
         store.send(.onAppear)
-        await settle()
+        await waitUntil { store.state.worthItResponse.data != nil }
 
         XCTAssertEqual(store.state.worthItResponse.data?.count, 4)
         XCTAssertEqual(store.state.whereToStayResponse.data?.count, 5)
@@ -106,9 +106,8 @@ final class DiscoverContentTests: XCTestCase {
         let store = makeStore(variant: .combined, suggestions: FailingSuggestionsService())
 
         store.send(.onAppear)
-        await settle()
+        await waitUntil { store.state.suggestionsResponse.error != nil }
 
-        XCTAssertNotNil(store.state.suggestionsResponse.error)
         XCTAssertNotNil(store.state.worthItResponse.error)
         XCTAssertNotNil(store.state.whereToStayResponse.error)
     }
@@ -118,9 +117,8 @@ final class DiscoverContentTests: XCTestCase {
         let store = makeStore(variant: .split, suggestions: FailingSuggestionsService())
 
         store.send(.onAppear)
-        await settle()
+        await waitUntil { store.state.suggestionsResponse.error != nil }
 
-        XCTAssertNotNil(store.state.suggestionsResponse.error)
         XCTAssertNil(store.state.worthItResponse.error)
         XCTAssertNil(store.state.whereToStayResponse.error)
     }
@@ -132,9 +130,9 @@ final class DiscoverContentTests: XCTestCase {
         let store = makeStore(variant: .combined, suggestions: suggestions)
 
         store.send(.onAppear)
-        await settle()
+        await waitUntil { suggestions.callCount == 1 }
         store.send(.retryComponent(.worthIt))
-        await settle()
+        await waitUntil { suggestions.callCount == 2 }
 
         XCTAssertEqual(suggestions.callCount, 2)
     }
@@ -181,6 +179,39 @@ final class DiscoverContentTests: XCTestCase {
         XCTAssertFalse(keys.contains("worthItDecisions"))
     }
 
+    // MARK: - The bundled evaluation output
+
+    /// The debug browser's samples are raw model output, so they decode through
+    /// exactly the same path a real response does. If a schema changes and this
+    /// file stops decoding, the browser silently shows an empty list — which is
+    /// indistinguishable from "the run produced nothing" and would quietly
+    /// remove the only surface for judging factuality.
+    func testTheBundledEvaluationSamplesStillDecode() throws {
+        let samples = EvalSample.all
+
+        XCTAssertEqual(samples.count, 8, "One per §13 destination archetype")
+        for sample in samples {
+            XCTAssertFalse(sample.itinerary.segments.isEmpty, sample.id)
+            XCTAssertFalse(sample.suggestions.staticSuggestions.isEmpty, sample.id)
+            XCTAssertEqual(sample.worthIt.count, 4, "\(sample.id): D7 asks for four")
+            XCTAssertGreaterThanOrEqual(sample.whereToStay.count, 3, sample.id)
+            XCTAssertEqual(sample.interestPrompts.count, 3, "\(sample.id): D8 asks for three")
+        }
+    }
+
+    /// The month a sample renders is read back from its fixture, and `Month`'s
+    /// raw values are mixed case — `August` and `September` are capitalised and
+    /// the rest are not. A plain `Month(rawValue:)` would label two of the eight
+    /// samples January.
+    func testSampleMonthsSurviveTheMixedCaseRawValues() {
+        let months = EvalSample.all.map(\.outputState.details.month)
+        XCTAssertTrue(months.contains(.August), "barcelona-family-summer is an August trip")
+        XCTAssertEqual(
+            months.filter { $0 == .january }.count, 1,
+            "Only Cape Verde is a January trip; more than one means a fallback fired"
+        )
+    }
+
     // MARK: - Helpers
 
     private func makeStore(
@@ -205,8 +236,26 @@ final class DiscoverContentTests: XCTestCase {
         )
     }
 
-    private func settle() async {
-        for _ in 0..<32 { await Task.yield() }
+    /// Waits for a condition instead of spinning a fixed number of yields.
+    ///
+    /// Yield-spinning is a race dressed up as synchronisation: it passes on an
+    /// idle machine and fails under a full suite, which is the worst way for a
+    /// test to fail — it looks like the code broke. These stores drive real
+    /// `Task`s through a coordinator, so the only honest wait is on the state
+    /// the test is actually asserting about.
+    private func waitUntil(
+        timeout: TimeInterval = 3,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ condition: @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return }
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        XCTFail("Timed out waiting for the store to settle", file: file, line: line)
     }
 
     private func roundTrip(_ trip: Trip) throws -> Trip {

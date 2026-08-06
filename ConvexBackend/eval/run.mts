@@ -24,6 +24,7 @@ import { FIXTURES, TRUNCATION_PROBE_CEILING, type Fixture } from "./fixtures";
 import {
   completeness,
   costUSD,
+  itineraryShapeViolations,
   jaccard,
   laneViolations,
   linkScore,
@@ -352,6 +353,26 @@ function summarise(
       );
     }
   }
+  lines.push("");
+
+  lines.push("## Itinerary shape");
+  lines.push("");
+  lines.push(
+    "One segment per day up to five days, then no more than five. Shared across " +
+      "both arms — the itinerary call is identical.",
+  );
+  lines.push("");
+  const shape = fixtures.flatMap((fixture) => {
+    const row = records.find(
+      (r) => r.fixture === fixture.id && r.arm === "shared" && r.ok,
+    );
+    return row
+      ? itineraryShapeViolations(row.data, fixture.input.durationDays).map(
+          (v) => `- \`${fixture.id}\`: ${v}`,
+        )
+      : [];
+  });
+  lines.push(shape.length === 0 ? "All fixtures obeyed the rule." : shape.join("\n"));
   lines.push("");
 
   lines.push("## Induced failure");

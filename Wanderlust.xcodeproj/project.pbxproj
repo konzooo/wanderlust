@@ -29,6 +29,8 @@
 		22C70A98EBDD52A6B339A03F /* GroupTripCreateScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */; };
 		2376A248BA52548A813D14B0 /* GroupOnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4094912D9593FA81DA180FB9 /* GroupOnboardingSheet.swift */; };
 		5BA329CEEDA5C197EA48C686 /* DesignPlayground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */; };
+		AA7500010000000000000001 /* EvalSampleBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7500020000000000000002 /* EvalSampleBrowser.swift */; };
+		AA7600010000000000000001 /* EvalSamples.json in Resources */ = {isa = PBXBuildFile; fileRef = AA7600020000000000000002 /* EvalSamples.json */; };
 		5D13F3702D3AD8590094407E /* QuestionnaireScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D13F36F2D3AD8560094407E /* QuestionnaireScreen.swift */; };
 		5D22A9B32DB8EAA100B13C44 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D22A9B12DB8EAA100B13C44 /* HomeScreen.swift */; };
 		5D22A9B42DB8EAA100B13C44 /* HomeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D22A9B22DB8EAA100B13C44 /* HomeStore.swift */; };
@@ -251,6 +253,8 @@
 		61CA97062E16C64D00791288 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
 		6A5022352E6B4CC55BC3492D /* GroupTripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripService.swift; sourceTree = "<group>"; };
 		8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignPlayground.swift; sourceTree = "<group>"; };
+		AA7500020000000000000002 /* EvalSampleBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalSampleBrowser.swift; sourceTree = "<group>"; };
+		AA7600020000000000000002 /* EvalSamples.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = EvalSamples.json; sourceTree = "<group>"; };
 		8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripCreateScreen.swift; sourceTree = "<group>"; };
 		A4057D1E9A5E0D37EA9B0301 /* GroupDashboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupDashboardScreen.swift; sourceTree = "<group>"; };
 		AA041251E74B9209F2AAE9E4 /* GroupJoinScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupJoinScreen.swift; sourceTree = "<group>"; };
@@ -732,6 +736,8 @@
 			isa = PBXGroup;
 			children = (
 				8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */,
+				AA7500020000000000000002 /* EvalSampleBrowser.swift */,
+				AA7600020000000000000002 /* EvalSamples.json */,
 				E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */,
 				C0DE019F8F54000100000002 /* QuestionnaireConceptLab.swift */,
 			);
@@ -859,6 +865,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F69681D32D326ECF00E76538 /* Assets.xcassets in Resources */,
+				AA7600010000000000000001 /* EvalSamples.json in Resources */,
 				5DB3AF582D9C7B80004D22E2 /* 1024.png in Resources */,
 				5DB3AF592D9C7B80004D22E2 /* 60.png in Resources */,
 				5DB3AF5A2D9C7B80004D22E2 /* 29.png in Resources */,
@@ -923,6 +930,7 @@
 				5D4536B42D80DF7A00490001 /* SegmentItineraryView.swift in Sources */,
 				5D37CAAE2D2C288800E5C85E /* BasicInfoScreen.swift in Sources */,
 				5BA329CEEDA5C197EA48C686 /* DesignPlayground.swift in Sources */,
+				AA7500010000000000000001 /* EvalSampleBrowser.swift in Sources */,
 				0F415E840931ACCB739FA5E1 /* DebugMenuScreen.swift in Sources */,
 				C0DE019F8F54000100000001 /* QuestionnaireConceptLab.swift in Sources */,
 				5DED710D2D4BE57700FFC8A4 /* Card.swift in Sources */,

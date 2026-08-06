@@ -17,7 +17,7 @@ export const OPENAI_MODEL = "gpt-4o-mini";
  * not merely background knowledge. Luna keeps the search pass inexpensive
  * while giving it a stronger editorial model than the default mini call.
  */
-export const NEAR_YOU_MODEL = "gpt-5.6-luna";
+export const NEAR_YOU_MODEL = "gpt-5.6-terra";
 
 export type OpenAIWebSource = {
   url: string;

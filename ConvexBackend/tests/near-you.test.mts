@@ -80,7 +80,7 @@ test("live search is required, not stored, and Near You requests one broad searc
       approximateLocation: { city: "Barcelona" },
     },
   });
-  assert.equal(body.model, "gpt-5.6-luna");
+  assert.equal(body.model, "gpt-5.6-terra");
   assert.equal(body.store, false);
   assert.equal(body.tool_choice, "required");
   assert.equal(body.max_tool_calls, 1);

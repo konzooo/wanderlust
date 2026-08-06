@@ -48,6 +48,7 @@ export type GroupDTO = {
   worthItItems: unknown | null;
   whereToStay: unknown | null;
   interestPrompts: unknown | null;
+  deepDives: unknown | null;
   /** Per-component state, keyed by component name. */
   componentStates: Record<string, ComponentStateDTO>;
   /** Whether anything is worth retrying — drives the admin's retry affordance. */
@@ -145,6 +146,7 @@ export function toGroupDTO(
     worthItItems: envelopeField(group.worthIt, "items"),
     whereToStay: envelopeField(group.whereToStay, "areas"),
     interestPrompts: envelopeField(group.suggestions, "interestPrompts"),
+    deepDives: group.deepDives ?? null,
     componentStates: currentStates(group),
     canRetry:
       group.status !== "collecting" &&

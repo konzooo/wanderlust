@@ -434,16 +434,19 @@ export function componentsNeedingRetry(group: Doc<"groups">): GroupComponent[] {
  * content, while each member's Worth-it decisions remain local to their own
  * device and therefore never enter this action.
  */
-async function callGroupComponent(
+export async function callGroupComponent(
   ctx: { runMutation: (ref: any, args: any) => Promise<any> },
   component: Component,
   input: GroupTripInput,
+  options?: { interest?: string; alreadyRecommended?: string[] },
 ): Promise<ComponentResult> {
   const startedAt = Date.now();
   try {
     const result = await runComponent({
       component,
       input: { mode: "group", group: input },
+      interest: options?.interest,
+      alreadyRecommended: options?.alreadyRecommended,
       variant: "split",
     });
     await ctx.runMutation(internal.quota.recordTelemetry, {

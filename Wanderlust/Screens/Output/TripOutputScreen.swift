@@ -196,12 +196,12 @@ struct TripOutputScreen: View {
 
             // Below the feed rather than inside it, so the row stays put while
             // the carousels move.
-            if OutputFeatureFlags.interestChipsEnabled && !store.state.mode.isReadOnly {
+            if OutputFeatureFlags.interestChipsEnabled && store.state.mode != .sharedTrip {
                 InterestChipsRow(
                     chips: store.interestChips,
                     used: store.usedDeepDiveInterests,
                     loading: store.deepDiveInFlightInterest,
-                    errorMessage: store.deepDiveErrorMessage,
+                    errorMessage: store.deepDiveGuidanceMessage,
                     onTap: store.canGenerateDeepDive
                         ? { store.send(.generateDeepDive($0)) }
                         : nil

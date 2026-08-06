@@ -164,7 +164,7 @@ final class TripGenerationService {
     /// Turns the Convex transport error into a typed generation error. A
     /// `ConvexError` payload is the JSON-encoded value the backend threw — for
     /// us always a bare string code, so the quotes come off before matching.
-    private static func mapped(_ error: ClientError) -> TripGenerationError {
+    static func mapped(_ error: ClientError) -> TripGenerationError {
         switch error {
         case .ConvexError(let data):
             let code = (try? JSONDecoder().decode(String.self, from: Data(data.utf8)))

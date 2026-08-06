@@ -51,12 +51,15 @@ class TripOutputStore: ObservableStore {
     private let nearYouMapService: any NearYouMapServicing
     private let nearYouService: any NearYouGenerating
     private let groupPersonalStore: any GroupTripPersonalStoring
+    private let groupDeepDiveService: any GroupDeepDiveGenerating
+    private let groupCredentials: GroupTripCredentials?
 
     /// Near You is manual and has its own two-stage task (MapKit, then model),
     /// independent from the eager component coordinator. The last grounded
     /// discovery is kept only in memory so a backend-only retry does not repeat
     /// MapKit work; persisted results remain the sole reopen source.
     private var nearYouTask: Task<Void, Never>?
+    private var groupDeepDiveTask: Task<Void, Never>?
     private var lastNearYouDiscovery: NearYouDiscovery?
     /// Exact while this screen lives, coarse after reopen. Keeping the resolved
     /// centre here lets an in-session retry route from the same point without
@@ -91,10 +94,15 @@ class TripOutputStore: ObservableStore {
         nearYouMapService: (any NearYouMapServicing)? = nil,
         nearYouService: (any NearYouGenerating)? = nil,
         groupPersonalStore: (any GroupTripPersonalStoring)? = nil,
+        groupDeepDiveService: (any GroupDeepDiveGenerating)? = nil,
+        groupCredentials: GroupTripCredentials? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
         var restoredState = initialState
         self.groupPersonalStore = groupPersonalStore ?? GroupTripPersonalStore()
+        self.groupDeepDiveService = groupDeepDiveService ?? GroupTripService.shared
+        self.groupCredentials = groupCredentials
+            ?? initialState.groupId.flatMap(GroupTripCredentialsStore.load)
         if let groupId = initialState.groupId {
             let personal = self.groupPersonalStore.load(groupId: groupId)
             restoredState.favorites = personal.favorites
@@ -183,7 +191,11 @@ class TripOutputStore: ObservableStore {
             setFavorites(favorites)
 
         case .generateDeepDive(let interest):
-            generate(.deepDive, interest: interest)
+            if state.mode == .groupTrip {
+                generateGroupDeepDive(interest)
+            } else {
+                generate(.deepDive, interest: interest)
+            }
 
         case .resolveNearYouAddress(let address):
             resolveNearYouAddress(address)
@@ -285,6 +297,7 @@ extension TripOutputStore {
         /// Present only for a group output. Capability tokens remain in the
         /// Keychain and never become navigation/state values.
         var groupId: String? = nil
+        var groupViewerIsAdmin: Bool = false
         var saved: Bool = false
         let mode: Mode
         /// The code this trip was published under (if the owner has shared it)
@@ -477,11 +490,23 @@ extension TripOutputStore {
 
     /// Client courtesy only; D9's actual control remains the backend mutation.
     var canGenerateDeepDive: Bool {
-        state.generationRequest != nil
-            && !state.mode.isReadOnly
+        let hasGenerationAuthority = state.mode == .groupTrip
+            ? state.groupViewerIsAdmin && state.groupId != nil && groupCredentials?.adminToken != nil
+            : state.generationRequest != nil && !state.mode.isReadOnly
+        return hasGenerationAuthority
             && !deepDiveCapReached
             && (state.deepDives?.count ?? 0) < Self.maxDeepDives
             && deepDiveInFlightInterest == nil
+    }
+
+    var deepDiveGuidanceMessage: String? {
+        if state.mode == .groupTrip && !state.groupViewerIsAdmin {
+            return "Only the trip organizer can add a shared deep dive."
+        }
+        if state.mode == .groupTrip && (state.deepDives?.count ?? 0) >= Self.maxDeepDives {
+            return "This group has used all three shared deep dives."
+        }
+        return deepDiveErrorMessage
     }
 
     /// Storage keeps dives separate for provenance and cap accounting (§10),
@@ -917,6 +942,53 @@ extension TripOutputStore {
             component: component.rawValue,
             attempt: attempt
         )
+    }
+
+    private func generateGroupDeepDive(_ rawInterest: String) {
+        let interest = rawInterest.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !interest.isEmpty,
+              canGenerateDeepDive,
+              !usedDeepDiveInterests.contains(interest),
+              let groupId = state.groupId,
+              let adminToken = groupCredentials?.adminToken else { return }
+
+        groupDeepDiveTask?.cancel()
+        deepDiveInFlightInterest = interest
+        deepDiveErrorMessage = nil
+        let startedAt = Date()
+        let attempt = retryCount + 1
+        logGeneration(.tripGenerationStarted, component: "deepDive", attempt: attempt)
+
+        groupDeepDiveTask = Task { [weak self] in
+            guard let self else { return }
+            defer { deepDiveInFlightInterest = nil }
+            do {
+                let category = try await groupDeepDiveService.generateGroupDeepDive(
+                    groupId: groupId,
+                    adminToken: adminToken,
+                    interest: interest
+                )
+                try Task.checkCancellation()
+                state.deepDives = (state.deepDives ?? []) + [category]
+                logGeneration(
+                    .tripGenerationSucceeded,
+                    component: "deepDive",
+                    attempt: attempt,
+                    duration: startedAt
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                setDeepDiveFailure(error, interest: interest)
+                logGeneration(
+                    .tripGenerationFailed,
+                    component: "deepDive",
+                    attempt: attempt,
+                    duration: startedAt,
+                    error: error
+                )
+            }
+        }
     }
 
     /// Which call actually produces a section, in this build's variant.

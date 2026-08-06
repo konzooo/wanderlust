@@ -155,6 +155,15 @@ export const recordTelemetry = internalMutation({
   },
 });
 
+/** Group manual calls share the unspoofable global budget but no install cap. */
+export const reserveGlobalModelCall = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    await consumeGlobalBudget(ctx, Date.now());
+    return { reserved: true };
+  },
+});
+
 // MARK: - Window accounting ----------------------------------------------------
 
 async function consumeGlobalBudget(ctx: MutationCtx, now: number) {

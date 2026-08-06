@@ -127,6 +127,7 @@ class NavigationRouter: ObservableObject {
             mode: .groupTrip
         )
         state.groupId = group.groupId
+        state.groupViewerIsAdmin = group.viewerIsAdmin
         state.itineraryResponse = .loaded(itinerary)
         if let suggestions = group.suggestions {
             state.suggestionsResponse = .loaded(suggestions)
@@ -141,6 +142,7 @@ class NavigationRouter: ObservableObject {
             state.whereToStayResponse = .loaded(areas)
         }
         state.interestPrompts = group.interestPrompts
+        state.deepDives = group.deepDives
         if let imageUrl = group.imageUrl, let url = URL(string: imageUrl) {
             state.imageUrlResponse = .loaded(url)
         }

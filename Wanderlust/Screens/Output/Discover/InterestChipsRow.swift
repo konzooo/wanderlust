@@ -24,9 +24,9 @@ struct InterestChipsRow: View {
     var used: Set<String> = []
     /// The one request currently in flight. All chips pause until it settles.
     var loading: String? = nil
-    /// Latest safe, user-facing failure copy from the store.
+    /// Latest safe failure or permission/cap guidance from the store.
     var errorMessage: String? = nil
-    /// `nil` once the trip's three deep dives are gone, or in read-only modes.
+    /// `nil` once the trip's three deep dives are gone or this viewer cannot add one.
     let onTap: ((String) -> Void)?
 
     var body: some View {

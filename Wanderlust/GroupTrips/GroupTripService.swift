@@ -158,7 +158,34 @@ final class GroupTripService {
             "adminToken": adminToken
         ])
     }
+
+    /// Adds one organizer-triggered deep dive to shared group state.
+    func generateGroupDeepDive(
+        groupId: String,
+        adminToken: String,
+        interest: String
+    ) async throws -> Trip.Suggestions.Category {
+        do {
+            return try await client.action("groupDeepDives:generate", with: [
+                "groupId": groupId,
+                "adminToken": adminToken,
+                "interest": interest
+            ])
+        } catch let error as ClientError {
+            throw TripGenerationService.mapped(error)
+        }
+    }
 }
+
+protocol GroupDeepDiveGenerating {
+    func generateGroupDeepDive(
+        groupId: String,
+        adminToken: String,
+        interest: String
+    ) async throws -> Trip.Suggestions.Category
+}
+
+extension GroupTripService: GroupDeepDiveGenerating {}
 
 /// Decodes any Convex mutation that returns an acknowledgement object (e.g.
 /// `{ submitted: true }`). The library's no-result `mutation` overload decodes
@@ -189,6 +216,7 @@ struct GroupDTO: Decodable, Equatable {
     let worthItItems: [Trip.WorthItItem]?
     let whereToStay: [Trip.StayArea]?
     let interestPrompts: [String]
+    let deepDives: [Trip.Suggestions.Category]?
     /// What happened to each component, keyed by component name. A `nil`
     /// payload alone could not distinguish "not generated" from "failed", so
     /// there was nothing to offer a retry on.
@@ -211,7 +239,7 @@ struct GroupDTO: Decodable, Equatable {
         case groupId, code, name, destination, startMonth, status
         case durationDaysRaw = "durationDays"
         case viewerIsAdmin, canAutoGenerate, members, itinerary, suggestions
-        case knowBeforeYouGo, worthItItems, whereToStay, interestPrompts
+        case knowBeforeYouGo, worthItItems, whereToStay, interestPrompts, deepDives
         case componentStates, canRetry, imageUrl, errorCode
         case completedCountRaw = "completedCount"
         case memberCountRaw = "memberCount"
@@ -243,6 +271,9 @@ struct GroupDTO: Decodable, Equatable {
         interestPrompts = (try? container.decodeIfPresent(
             [String].self, forKey: .interestPrompts
         )) ?? []
+        deepDives = try? container.decodeIfPresent(
+            [Trip.Suggestions.Category].self, forKey: .deepDives
+        )
         // Tolerated rather than required: a client running against a backend
         // that predates per-component state should still show the trip.
         componentStates = (try? container.decodeIfPresent(

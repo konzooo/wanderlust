@@ -74,4 +74,88 @@ final class GroupTripPersonalLayerTests: XCTestCase {
         XCTAssertFalse(layer.favorites.contains(item.id))
         XCTAssertNil(layer.worthItDecisions[item.id])
     }
+
+    func testOnlyOrganizerCanGenerateSharedGroupDeepDive() async throws {
+        let generated = Trip.Suggestions.Category(
+            ID: nil,
+            title: "Shared running routes",
+            texts: [LocationLinkableText(text: "Run the river path.")],
+            requestedInterest: "Running routes"
+        )
+        let service = GroupDeepDiveServiceStub(result: generated)
+        let credentials = GroupTripCredentials(
+            groupId: "group-a",
+            code: "12345",
+            memberId: "member-a",
+            memberToken: "member-token",
+            adminToken: "admin-token"
+        )
+        var state = TripOutputStore.State(details: .mock, mode: .groupTrip)
+        state.groupId = "group-a"
+        state.groupViewerIsAdmin = true
+        state.itineraryResponse = .loaded(.mock)
+        let store = TripOutputStore(
+            initialState: state,
+            groupPersonalStore: persistence,
+            groupDeepDiveService: service,
+            groupCredentials: credentials
+        )
+
+        store.send(.generateDeepDive("Running routes"))
+        try await waitUntil { store.state.deepDives?.count == 1 }
+
+        XCTAssertEqual(store.state.deepDives?.first?.title, generated.title)
+        let serviceCalls = await service.calls()
+        XCTAssertEqual(serviceCalls, 1)
+
+        state.groupViewerIsAdmin = false
+        let memberStore = TripOutputStore(
+            initialState: state,
+            groupPersonalStore: persistence,
+            groupDeepDiveService: service,
+            groupCredentials: GroupTripCredentials(
+                groupId: "group-a",
+                code: "12345",
+                memberId: "member-b",
+                memberToken: "member-token-b",
+                adminToken: nil
+            )
+        )
+        XCTAssertFalse(memberStore.canGenerateDeepDive)
+        XCTAssertEqual(
+            memberStore.deepDiveGuidanceMessage,
+            "Only the trip organizer can add a shared deep dive."
+        )
+    }
+
+    private func waitUntil(
+        timeoutNanoseconds: UInt64 = 1_000_000_000,
+        _ condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let deadline = ContinuousClock.now + .nanoseconds(Int64(timeoutNanoseconds))
+        while !condition() {
+            if ContinuousClock.now >= deadline { XCTFail("Timed out waiting for state"); return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
+}
+
+private actor GroupDeepDiveServiceStub: GroupDeepDiveGenerating {
+    let result: Trip.Suggestions.Category
+    private var callCount = 0
+
+    init(result: Trip.Suggestions.Category) {
+        self.result = result
+    }
+
+    func generateGroupDeepDive(
+        groupId: String,
+        adminToken: String,
+        interest: String
+    ) async throws -> Trip.Suggestions.Category {
+        callCount += 1
+        return result
+    }
+
+    func calls() -> Int { callCount }
 }

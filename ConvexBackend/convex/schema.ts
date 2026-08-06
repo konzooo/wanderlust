@@ -55,6 +55,8 @@ export default defineSchema({
     worthIt: v.optional(v.any()),
     /** Shared neighbourhood guide used by the group's Near You setup. */
     whereToStay: v.optional(v.any()),
+    /** Append-only, organizer-triggered shared interest deep dives. */
+    deepDives: v.optional(v.any()),
     /**
      * What happened to each component, alongside the payloads above. Absent on
      * groups generated before per-component state existed; `dto.ts` derives
@@ -182,6 +184,18 @@ export default defineSchema({
     status: v.union(v.literal("reserved"), v.literal("committed")),
     createdAt: v.number(),
   }).index("by_trip_component", ["installHash", "tripKey", "component"]),
+
+  /**
+   * Group deep-dive cap accounting. Group calls do not belong to a member's
+   * install, so their three-result cap is scoped directly to the group.
+   */
+  groupGenerationSlots: defineTable({
+    groupId: v.id("groups"),
+    component: generationComponent,
+    label: v.string(),
+    status: v.union(v.literal("reserved"), v.literal("committed")),
+    createdAt: v.number(),
+  }).index("by_group_component", ["groupId", "component"]),
 
   /**
    * Single-row rolling backstop on total model calls per day across all

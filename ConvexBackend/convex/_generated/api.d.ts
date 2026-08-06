@@ -9,6 +9,7 @@
  */
 
 import type * as generate from "../generate.js";
+import type * as groupDeepDives from "../groupDeepDives.js";
 import type * as groups from "../groups.js";
 import type * as http from "../http.js";
 import type * as lib_codes from "../lib/codes.js";
@@ -17,7 +18,9 @@ import type * as lib_dto from "../lib/dto.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_prompts from "../lib/prompts.js";
 import type * as lib_schemas from "../lib/schemas.js";
+import type * as lib_stableIds from "../lib/stableIds.js";
 import type * as lib_tokens from "../lib/tokens.js";
+import type * as lib_validation from "../lib/validation.js";
 import type * as lib_validators from "../lib/validators.js";
 import type * as quota from "../quota.js";
 import type * as share from "../share.js";
@@ -32,6 +35,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   generate: typeof generate;
+  groupDeepDives: typeof groupDeepDives;
   groups: typeof groups;
   http: typeof http;
   "lib/codes": typeof lib_codes;
@@ -40,7 +44,9 @@ declare const fullApi: ApiFromModules<{
   "lib/openai": typeof lib_openai;
   "lib/prompts": typeof lib_prompts;
   "lib/schemas": typeof lib_schemas;
+  "lib/stableIds": typeof lib_stableIds;
   "lib/tokens": typeof lib_tokens;
+  "lib/validation": typeof lib_validation;
   "lib/validators": typeof lib_validators;
   quota: typeof quota;
   share: typeof share;

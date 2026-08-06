@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { randomShareCode } from "./lib/codes";
 import { hashToken, newToken } from "./lib/tokens";
 import { toSharedTripDTO } from "./lib/dto";
+import { stampMissingStableIds } from "./lib/stableIds";
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_DESTINATION_LENGTH = 160;
@@ -70,13 +71,13 @@ export const publishTrip = mutation({
       durationDays: args.durationDays,
       startMonth: args.startMonth,
       groupType: args.groupType,
-      itinerary: args.itinerary,
-      suggestions: args.suggestions,
-      knowBeforeYouGo: args.knowBeforeYouGo,
+      itinerary: stampMissingStableIds(args.itinerary),
+      suggestions: stampMissingStableIds(args.suggestions),
+      knowBeforeYouGo: stampMissingStableIds(args.knowBeforeYouGo),
       favorites: args.favorites,
-      deepDives: args.deepDives,
-      worthItItems: args.worthItItems,
-      whereToStay: args.whereToStay,
+      deepDives: stampMissingStableIds(args.deepDives),
+      worthItItems: stampMissingStableIds(args.worthItItems),
+      whereToStay: stampMissingStableIds(args.whereToStay),
       interestPrompts: args.interestPrompts,
       imageUrl: args.imageUrl ?? undefined,
       createdAt: Date.now(),

@@ -20,6 +20,7 @@ import {
 import { OpenAIError } from "./lib/openai";
 import { ValidationError } from "./lib/validation";
 import type { GroupTripInput, Component } from "./lib/prompts";
+import { stampMissingStableIds } from "./lib/stableIds";
 
 async function collectMembers(
   ctx: QueryCtx,
@@ -191,7 +192,7 @@ export const commitComponent = internalMutation({
         ...currentStates(group),
         [args.component]: { state: "ready" as const },
       },
-      [field]: args.data,
+      [field]: stampMissingStableIds(args.data),
     });
   },
 });

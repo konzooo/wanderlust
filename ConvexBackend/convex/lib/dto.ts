@@ -77,6 +77,7 @@ export type SharedTripDTO = {
   suggestions: unknown | null;
   knowBeforeYouGo: unknown | null;
   favorites: unknown | null;
+  deepDives: unknown | null;
   /** Content only — see the `sharedTrips` schema on why decisions are absent. */
   worthItItems: unknown | null;
   whereToStay: unknown | null;
@@ -97,6 +98,7 @@ export function toSharedTripDTO(doc: Doc<"sharedTrips">): SharedTripDTO {
     suggestions: doc.suggestions ?? null,
     knowBeforeYouGo: doc.knowBeforeYouGo ?? null,
     favorites: doc.favorites ?? null,
+    deepDives: doc.deepDives ?? null,
     worthItItems: doc.worthItItems ?? null,
     whereToStay: doc.whereToStay ?? null,
     interestPrompts: doc.interestPrompts ?? null,

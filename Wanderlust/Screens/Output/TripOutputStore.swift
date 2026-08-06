@@ -28,6 +28,16 @@ class TripOutputStore: ObservableStore {
     /// Non-nil → present the native share sheet for this URL.
     @Published var shareSheetURL: URL?
     @Published var shareErrorMessage: String?
+    /// Ephemeral UI state for the one spend-gated deep-dive call allowed at a
+    /// time. The generated content itself lives in `State.deepDives`.
+    @Published private(set) var deepDiveInFlightInterest: String?
+    @Published private(set) var deepDiveErrorMessage: String?
+    @Published private(set) var deepDiveCapReached = false
+
+    /// Server-side duplicate/cap errors can reveal committed slots missing
+    /// from this local copy. Remember them for this screen lifetime so a chip
+    /// does not immediately offer the same rejected request again.
+    private var blockedDeepDiveInterestKeys: Set<String> = []
     
     // Navigation
     var router: NavigationRouter?
@@ -37,6 +47,7 @@ class TripOutputStore: ObservableStore {
     private let worthItService: any WorthItGenerating
     private let whereToStayService: any WhereToStayGenerating
     private let knowBeforeYouGoService: any KnowBeforeYouGoGenerating
+    private let deepDiveService: any DeepDiveGenerating
 
     private let imageService: ImageService
 
@@ -57,6 +68,7 @@ class TripOutputStore: ObservableStore {
         worthItService: (any WorthItGenerating)? = nil,
         whereToStayService: (any WhereToStayGenerating)? = nil,
         knowBeforeYouGoService: (any KnowBeforeYouGoGenerating)? = nil,
+        deepDiveService: (any DeepDiveGenerating)? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
         state = initialState
@@ -67,6 +79,7 @@ class TripOutputStore: ObservableStore {
         self.worthItService = worthItService ?? TripPlanningServices.worthIt()
         self.whereToStayService = whereToStayService ?? TripPlanningServices.whereToStay()
         self.knowBeforeYouGoService = knowBeforeYouGoService ?? TripPlanningServices.knowBeforeYouGo()
+        self.deepDiveService = deepDiveService ?? TripPlanningServices.deepDive()
     }
 
     func setRouter(_ router: NavigationRouter) {
@@ -123,6 +136,9 @@ class TripOutputStore: ObservableStore {
 
         case .decideWorthIt(let id, let decision):
             applyWorthIt(decision, to: id)
+
+        case .generateDeepDive(let interest):
+            generate(.deepDive, interest: interest)
 
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
@@ -255,6 +271,8 @@ extension TripOutputStore {
         case retryComponent(TripComponent)
         /// Record (or, with `nil`, undo) a Worth-it/Skip decision.
         case decideWorthIt(UUID, WorthItDecision?)
+        /// Generate one append-only category for the tapped interest chip.
+        case generateDeepDive(String)
         case saveTrip(confirmOverride: Bool = false)
         case shareTrip
         /// Confirmation is the presenter's job — the favourites sheet owns its
@@ -350,11 +368,49 @@ extension TripOutputStore {
     /// older build can carry a duplicate, and a chip row with "Climbing gyms"
     /// twice is a bug the traveller can see.
     static let fixedInterestChips = ["Running routes", "Remote-work cafés", "Climbing gyms"]
+    static let maxDeepDives = 3
 
     var interestChips: [String] {
         var seen = Set<String>()
         return (state.interestPrompts + Self.fixedInterestChips).filter {
             seen.insert(Self.chipKey($0)).inserted
+        }
+    }
+
+    /// The exact chip labels whose result is already committed locally.
+    /// `requestedInterest` is present on S8 results; title is the migration
+    /// fallback for older files that already carried a hand-built deep dive.
+    var usedDeepDiveInterests: Set<String> {
+        let usedKeys = Set((state.deepDives ?? []).map {
+            Self.chipKey($0.requestedInterest ?? $0.title)
+        }).union(blockedDeepDiveInterestKeys)
+        return Set(interestChips.filter { usedKeys.contains(Self.chipKey($0)) })
+    }
+
+    /// Client courtesy only; D9's actual control remains the backend mutation.
+    var canGenerateDeepDive: Bool {
+        state.generationRequest != nil
+            && !state.mode.isReadOnly
+            && !deepDiveCapReached
+            && (state.deepDives?.count ?? 0) < Self.maxDeepDives
+            && deepDiveInFlightInterest == nil
+    }
+
+    /// Storage keeps dives separate for provenance and cap accounting (§10),
+    /// while the feed renders them inline as additional dynamic categories.
+    var suggestionsWithDeepDives: AsyncValue<Trip.Suggestions> {
+        switch state.suggestionsResponse {
+        case .initial:
+            return .initial
+        case .loading:
+            return .loading
+        case .error(let error):
+            return .error(error)
+        case .loaded(let suggestions):
+            return .loaded(Trip.Suggestions(
+                dynamicSuggestions: suggestions.dynamicSuggestions + (state.deepDives ?? []),
+                staticSuggestions: suggestions.staticSuggestions
+            ))
         }
     }
 
@@ -462,10 +518,21 @@ extension TripOutputStore {
     /// reason navigating back onto this screen mid-generation no longer buys a
     /// second copy of everything. `restart: true` is the explicit retry path: it
     /// cancels whatever is outstanding and supersedes it.
-    func generate(_ requested: TripComponent, restart: Bool = false) {
+    func generate(
+        _ requested: TripComponent,
+        interest: String? = nil,
+        restart: Bool = false
+    ) {
         let component = owningComponent(requested)
         guard let request = state.generationRequest else { return }
-        guard restart || response(for: component).isUnstarted else { return }
+        let deepDiveInterest = interest?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if component == .deepDive {
+            guard let deepDiveInterest, !deepDiveInterest.isEmpty,
+                  canGenerateDeepDive,
+                  !usedDeepDiveInterests.contains(deepDiveInterest) else { return }
+        } else {
+            guard restart || response(for: component).isUnstarted else { return }
+        }
 
         // Derived at call time, from what this trip currently holds (§11).
         // Never persisted: a stored copy goes stale the moment a component is
@@ -477,6 +544,12 @@ extension TripOutputStore {
         let startedAt = Date()
         let attempt = coordinator.begin(component, restart: restart) { [weak self] attempt in
             guard let self else { return }
+            defer {
+                if component == .deepDive,
+                   coordinator.isCurrent(component, attempt: attempt) {
+                    deepDiveInFlightInterest = nil
+                }
+            }
             do {
                 switch component {
                 case .itinerary:
@@ -512,9 +585,24 @@ extension TripOutputStore {
                     state.knowBeforeYouGoResponse = .loaded(briefing)
 
                 case .deepDive:
-                    // Interest deep dives have no client entry point yet; the
-                    // server already enforces their per-trip cap.
-                    return
+                    guard let deepDiveInterest else { return }
+                    let category = try await deepDiveService.generate(
+                        request,
+                        interest: deepDiveInterest,
+                        alreadyRecommended: context
+                    )
+                    guard coordinator.isCurrent(component, attempt: attempt) else { return }
+                    // Preserve the model's display title while carrying the
+                    // exact tapped label for duplicate prevention after reopen.
+                    let persisted = Trip.Suggestions.Category(
+                        id: category.id,
+                        ID: category.ID,
+                        title: category.title,
+                        texts: category.texts,
+                        requestedInterest: deepDiveInterest
+                    )
+                    state.deepDives = (state.deepDives ?? []) + [persisted]
+                    if state.saved { reSaveTrip() }
                 }
                 logGeneration(
                     .tripGenerationSucceeded,
@@ -528,7 +616,11 @@ extension TripOutputStore {
                 // retry that replaced it.
                 guard coordinator.isCurrent(component, attempt: attempt),
                       !(error is CancellationError) else { return }
-                setFailure(component, error)
+                if component == .deepDive {
+                    setDeepDiveFailure(error, interest: deepDiveInterest)
+                } else {
+                    setFailure(component, error)
+                }
                 logGeneration(
                     .tripGenerationFailed,
                     component: component.rawValue,
@@ -542,6 +634,10 @@ extension TripOutputStore {
         // `nil` means the coordinator suppressed this as a duplicate. The run
         // already in flight owns the component, so leave its state alone.
         guard let attempt else { return }
+        if component == .deepDive {
+            deepDiveInFlightInterest = deepDiveInterest
+            deepDiveErrorMessage = nil
+        }
         setLoading(component)
         logGeneration(
             .tripGenerationStarted,
@@ -653,6 +749,27 @@ extension TripOutputStore {
         case .whereToStay: state.whereToStayResponse = .error(error)
         case .knowBeforeYouGo: state.knowBeforeYouGoResponse = .error(error)
         case .deepDive: break
+        }
+    }
+
+    private func setDeepDiveFailure(_ error: Error, interest: String?) {
+        guard let generation = error as? TripGenerationError else {
+            deepDiveErrorMessage = "Couldn't open that deep dive. Try again."
+            return
+        }
+        switch generation {
+        case .deepDiveLimit:
+            deepDiveCapReached = true
+            deepDiveErrorMessage = "You've opened all three deep dives for this trip."
+        case .duplicateDeepDive:
+            if let interest { blockedDeepDiveInterestKeys.insert(Self.chipKey(interest)) }
+            deepDiveErrorMessage = "That deep dive is already part of this trip."
+        case .installDailyLimit:
+            deepDiveErrorMessage = "You've reached today's generation limit. Try again tomorrow."
+        case .serviceBusy:
+            deepDiveErrorMessage = "Deep dives are busy right now. Try again later."
+        case .truncatedOutput, .backend, .transport:
+            deepDiveErrorMessage = "Couldn't open that deep dive. Try again."
         }
     }
 
@@ -884,6 +1001,7 @@ extension TripOutputStore {
                     // unlike the personal layer, which deliberately does not.
                     knowBeforeYouGo: state.knowBeforeYouGoResponse.data,
                     favorites: state.favorites,
+                    deepDives: state.deepDives,
                     // Content travels; decisions do not (§4). The recipient
                     // gets the four cards undecided, because deciding is the
                     // point of the section — there is deliberately no argument

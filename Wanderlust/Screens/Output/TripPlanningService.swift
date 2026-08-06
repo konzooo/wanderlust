@@ -114,6 +114,15 @@ protocol KnowBeforeYouGoGenerating {
     func generate(_ request: TripGenerationRequest) async throws -> Trip.KnowBeforeYouGo
 }
 
+/// Produces one append-only category for the interest the traveller tapped.
+protocol DeepDiveGenerating {
+    func generate(
+        _ request: TripGenerationRequest,
+        interest: String,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions.Category
+}
+
 // MARK: - Live services
 
 /// Every live service is thin: everything that used to make these interesting
@@ -178,6 +187,23 @@ struct BackendKnowBeforeYouGoService: KnowBeforeYouGoGenerating {
     }
 }
 
+struct BackendDeepDiveService: DeepDiveGenerating {
+    var service: TripGenerationService = .shared
+
+    func generate(
+        _ request: TripGenerationRequest,
+        interest: String,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions.Category {
+        try await service.generate(
+            .deepDive,
+            for: request,
+            interest: interest,
+            alreadyRecommended: alreadyRecommended
+        )
+    }
+}
+
 enum TripPlanningServices {
     static func itinerary() -> any ItineraryGenerating {
         DebugSettings.useMockTripData ? MockItineraryService() : BackendItineraryService()
@@ -199,6 +225,10 @@ enum TripPlanningServices {
         DebugSettings.useMockTripData
             ? MockKnowBeforeYouGoService()
             : BackendKnowBeforeYouGoService()
+    }
+
+    static func deepDive() -> any DeepDiveGenerating {
+        DebugSettings.useMockTripData ? MockDeepDiveService() : BackendDeepDiveService()
     }
 }
 
@@ -301,6 +331,24 @@ struct MockKnowBeforeYouGoService: KnowBeforeYouGoGenerating {
     func generate(_ request: TripGenerationRequest) async throws -> Trip.KnowBeforeYouGo {
         try? await Task.sleep(nanoseconds: delayNanoseconds)
         return .mock
+    }
+}
+
+struct MockDeepDiveService: DeepDiveGenerating {
+    var delayNanoseconds: UInt64 = 1_000_000_000
+
+    func generate(
+        _ request: TripGenerationRequest,
+        interest: String,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions.Category {
+        try? await Task.sleep(nanoseconds: delayNanoseconds)
+        let sample = Trip.Suggestions.mock.dynamicSuggestions[0]
+        return Trip.Suggestions.Category(
+            ID: nil,
+            title: interest,
+            texts: sample.texts
+        )
     }
 }
 

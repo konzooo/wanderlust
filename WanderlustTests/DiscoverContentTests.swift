@@ -164,6 +164,125 @@ final class DiscoverContentTests: XCTestCase {
         )
     }
 
+    // MARK: - Interest deep dives (S8)
+
+    func testTappingAChipAppendsAndRendersADeepDiveWithExactProvenance() async {
+        let deepDive = RecordingDeepDiveService()
+        let store = makeStore(
+            variant: .split,
+            suggestions: MockSuggestionsService(),
+            deepDive: deepDive
+        )
+        store.state.itineraryResponse = .loaded(.mock)
+        store.state.suggestionsResponse = .loaded(.mock)
+        store.state.interestPrompts = ["Natural wine bars"]
+
+        store.send(.generateDeepDive("Natural wine bars"))
+        await waitUntil { store.state.deepDives?.count == 1 }
+
+        XCTAssertEqual(deepDive.callCount, 1)
+        XCTAssertEqual(deepDive.interests, ["Natural wine bars"])
+        XCTAssertFalse(deepDive.contexts[0].isEmpty, "§11 context must reach the later call")
+        XCTAssertEqual(store.state.deepDives?[0].title, "Barcelona bottle shops")
+        XCTAssertEqual(store.state.deepDives?[0].requestedInterest, "Natural wine bars")
+        XCTAssertEqual(store.usedDeepDiveInterests, ["Natural wine bars"])
+
+        guard case let .loaded(rendered) = store.suggestionsWithDeepDives else {
+            return XCTFail("The feed should remain loaded after appending a dive")
+        }
+        XCTAssertEqual(
+            rendered.dynamicSuggestions.count,
+            Trip.Suggestions.mock.dynamicSuggestions.count + 1
+        )
+    }
+
+    func testADeepDiveFailureReturnsTheChipAndCanRetryWithoutConsumingTheCap() async {
+        let deepDive = FailingOnceDeepDiveService()
+        let store = makeStore(
+            variant: .split,
+            suggestions: MockSuggestionsService(),
+            deepDive: deepDive
+        )
+        store.state.itineraryResponse = .loaded(.mock)
+        store.state.suggestionsResponse = .loaded(.mock)
+        store.state.interestPrompts = ["Natural wine bars"]
+
+        store.send(.generateDeepDive("Natural wine bars"))
+        await waitUntil {
+            deepDive.callCount == 1 && store.deepDiveInFlightInterest == nil
+        }
+
+        XCTAssertNil(store.state.deepDives)
+        XCTAssertTrue(store.canGenerateDeepDive)
+        XCTAssertFalse(store.usedDeepDiveInterests.contains("Natural wine bars"))
+
+        store.send(.generateDeepDive("Natural wine bars"))
+        await waitUntil { store.state.deepDives?.count == 1 }
+
+        XCTAssertEqual(deepDive.callCount, 2)
+        XCTAssertEqual(store.state.deepDives?.count, 1)
+    }
+
+    func testClientRejectsDuplicateInterestsAndStopsAtThree() async {
+        let deepDive = RecordingDeepDiveService()
+        let store = makeStore(
+            variant: .split,
+            suggestions: MockSuggestionsService(),
+            deepDive: deepDive
+        )
+        store.state.interestPrompts = ["Natural wine bars", "Sunday markets"]
+        store.state.deepDives = [
+            dive("Wine", requestedInterest: "Natural wine bars")
+        ]
+
+        store.send(.generateDeepDive("Natural wine bars"))
+        await Task.yield()
+        XCTAssertEqual(deepDive.callCount, 0, "A committed interest must be rejected locally")
+
+        store.state.deepDives = [
+            dive("Wine", requestedInterest: "Natural wine bars"),
+            dive("Runs", requestedInterest: "Running routes"),
+            dive("Climbs", requestedInterest: "Climbing gyms")
+        ]
+        store.send(.generateDeepDive("Sunday markets"))
+        await Task.yield()
+
+        XCTAssertEqual(deepDive.callCount, 0)
+        XCTAssertFalse(store.canGenerateDeepDive)
+        XCTAssertEqual(store.state.deepDives?.count, 3)
+    }
+
+    func testRequestedInterestSurvivesSaveAndReopen() throws {
+        var trip = Trip(details: .mock, itinerary: .mock, suggestions: .mock)
+        trip.deepDives = [dive("Barcelona bottle shops", requestedInterest: "Natural wine bars")]
+
+        let reopened = try roundTrip(trip)
+
+        XCTAssertEqual(reopened.deepDives?[0].id, trip.deepDives?[0].id)
+        XCTAssertEqual(reopened.deepDives?[0].requestedInterest, "Natural wine bars")
+        XCTAssertEqual(reopened.deepDives?[0].texts.map(\.id), trip.deepDives?[0].texts.map(\.id))
+    }
+
+    func testSharedTripDTODecodesDeepDives() throws {
+        let category = dive("Barcelona bottle shops", requestedInterest: "Natural wine bars")
+        let json = """
+        {
+          "code": "abc123",
+          "title": "Barcelona",
+          "destination": "Barcelona, Spain",
+          "durationDays": 3,
+          "startMonth": "may",
+          "groupType": "couple",
+          "itinerary": \(try encoded(Trip.Itinerary.mock)),
+          "deepDives": \(try encoded([category]))
+        }
+        """
+
+        let dto = try JSONDecoder().decode(SharedTripDTO.self, from: Data(json.utf8))
+
+        XCTAssertEqual(dto.deepDives, [category])
+    }
+
     // MARK: - Sharing
 
     /// §4: content travels, decisions do not. The recipient gets the cards
@@ -176,6 +295,7 @@ final class DiscoverContentTests: XCTestCase {
         XCTAssertTrue(keys.contains("worthItItems"))
         XCTAssertTrue(keys.contains("whereToStay"))
         XCTAssertTrue(keys.contains("interestPrompts"))
+        XCTAssertTrue(keys.contains("deepDives"))
         XCTAssertFalse(keys.contains("worthItDecisions"))
     }
 
@@ -216,7 +336,8 @@ final class DiscoverContentTests: XCTestCase {
 
     private func makeStore(
         variant: SuggestionsVariant,
-        suggestions: any SuggestionsGenerating
+        suggestions: any SuggestionsGenerating,
+        deepDive: any DeepDiveGenerating = InstantDeepDiveService()
     ) -> TripOutputStore {
         TripOutputStore(
             initialState: .init(
@@ -232,6 +353,7 @@ final class DiscoverContentTests: XCTestCase {
             suggestionsService: suggestions,
             worthItService: InstantWorthItService(),
             whereToStayService: InstantWhereToStayService(),
+            deepDiveService: deepDive,
             variant: variant
         )
     }
@@ -264,6 +386,18 @@ final class DiscoverContentTests: XCTestCase {
 
     private func encoded<T: Encodable>(_ value: T) throws -> String {
         String(decoding: try JSONEncoder().encode(value), as: UTF8.self)
+    }
+
+    private func dive(
+        _ title: String,
+        requestedInterest: String? = nil
+    ) -> Trip.Suggestions.Category {
+        Trip.Suggestions.Category(
+            ID: nil,
+            title: title,
+            texts: [LocationLinkableText(text: "A specific local answer")],
+            requestedInterest: requestedInterest
+        )
     }
 }
 
@@ -324,6 +458,59 @@ private struct InstantWorthItService: WorthItGenerating {
 private struct InstantWhereToStayService: WhereToStayGenerating {
     func generate(_ request: TripGenerationRequest) async throws -> [Trip.StayArea] {
         Trip.StayArea.mockSet
+    }
+}
+
+private final class RecordingDeepDiveService: DeepDiveGenerating {
+    private(set) var callCount = 0
+    private(set) var interests: [String] = []
+    private(set) var contexts: [[String]] = []
+
+    func generate(
+        _ request: TripGenerationRequest,
+        interest: String,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions.Category {
+        callCount += 1
+        interests.append(interest)
+        contexts.append(alreadyRecommended)
+        return Trip.Suggestions.Category(
+            ID: nil,
+            title: "Barcelona bottle shops",
+            texts: [LocationLinkableText(text: "Start at a small neighbourhood cellar.")]
+        )
+    }
+}
+
+private final class FailingOnceDeepDiveService: DeepDiveGenerating {
+    private(set) var callCount = 0
+
+    func generate(
+        _ request: TripGenerationRequest,
+        interest: String,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions.Category {
+        callCount += 1
+        if callCount == 1 { throw TripGenerationError.transport }
+        return Trip.Suggestions.Category(
+            ID: nil,
+            title: "Barcelona bottle shops",
+            texts: [LocationLinkableText(text: "Start at a small neighbourhood cellar.")]
+        )
+    }
+}
+
+private struct InstantDeepDiveService: DeepDiveGenerating {
+    func generate(
+        _ request: TripGenerationRequest,
+        interest: String,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions.Category {
+        Trip.Suggestions.Category(
+            ID: nil,
+            title: interest,
+            texts: [LocationLinkableText(text: "A specific local answer")]
+        )
     }
 }
 

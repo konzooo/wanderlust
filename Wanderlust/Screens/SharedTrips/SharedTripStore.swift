@@ -60,6 +60,7 @@ final class SharedTripStore: ObservableObject {
                     knowBeforeYouGoState: dto.knowBeforeYouGo.map(ComponentState.ready) ?? .absent,
                     // Content arrives; the sender's decisions deliberately do
                     // not (§4), so this local copy starts every card undecided.
+                    deepDives: dto.deepDives,
                     worthItItems: dto.worthItItems,
                     whereToStay: dto.whereToStay,
                     interestPrompts: dto.interestPrompts,

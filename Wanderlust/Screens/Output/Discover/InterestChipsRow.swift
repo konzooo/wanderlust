@@ -11,11 +11,8 @@ import SwiftUI
 /// Three model-picked interests plus three the app always offers.
 ///
 /// Tapping one asks for a deep dive on it, capped at three per trip (D9) and
-/// enforced server-side. That tap is S8's work, so this row is gated behind
-/// ``OutputFeatureFlags/interestChipsEnabled`` — a visible chip that does
-/// nothing is worse than no chip, and the honest way to build content ahead of
-/// its behaviour is to keep it out of a shipping build rather than to ship it
-/// inert.
+/// enforced server-side. The row also makes the one in-flight request visible;
+/// a failure returns the chip to its tappable state and leaves the cap alone.
 ///
 /// Visually the same capsule as ``DiscoverPillBar`` at one step down in weight:
 /// these are requests, not navigation, so none of them is ever "selected".
@@ -25,6 +22,10 @@ struct InterestChipsRow: View {
     /// silently vanishes reads as a bug, and the traveller has a right to see
     /// what they spent one of their three on.
     var used: Set<String> = []
+    /// The one request currently in flight. All chips pause until it settles.
+    var loading: String? = nil
+    /// Latest safe, user-facing failure copy from the store.
+    var errorMessage: String? = nil
     /// `nil` once the trip's three deep dives are gone, or in read-only modes.
     let onTap: ((String) -> Void)?
 
@@ -44,6 +45,13 @@ struct InterestChipsRow: View {
                 .padding(.horizontal, .Padding.sm3)
             }
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, .Padding.sm3)
+            }
         }
         .padding(.vertical, .Padding.sm2)
     }
@@ -51,12 +59,18 @@ struct InterestChipsRow: View {
     @ViewBuilder
     private func chipView(_ chip: String) -> some View {
         let isUsed = used.contains(chip)
+        let isLoading = loading == chip
         Button {
             onTap?(chip)
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: isUsed ? "checkmark" : "sparkles")
-                    .font(.system(size: 12, weight: .semibold))
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: isUsed ? "checkmark" : "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                }
                 Text(chip)
                     .font(DS.Typography.tabLabel)
             }
@@ -77,7 +91,7 @@ struct InterestChipsRow: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(isUsed || onTap == nil)
+        .disabled(isUsed || loading != nil || onTap == nil)
     }
 }
 

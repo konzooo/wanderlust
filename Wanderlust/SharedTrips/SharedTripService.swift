@@ -39,6 +39,7 @@ final class SharedTripService {
         suggestions: Trip.Suggestions?,
         knowBeforeYouGo: Trip.KnowBeforeYouGo?,
         favorites: Trip.Favorites,
+        deepDives: [Trip.Suggestions.Category]?,
         worthItItems: [Trip.WorthItItem]?,
         whereToStay: [Trip.StayArea]?,
         interestPrompts: [String],
@@ -58,6 +59,9 @@ final class SharedTripService {
         ]
         if let suggestions {
             args["suggestions"] = suggestions
+        }
+        if let deepDives, !deepDives.isEmpty {
+            args["deepDives"] = deepDives as [(any ConvexEncodable)?]
         }
         // Content travels in a share; the sender's decisions never do (§4).
         // `worthItDecisions` is absent here by design, not by omission — a
@@ -119,6 +123,7 @@ struct SharedTripDTO: Decodable, Equatable {
     let suggestions: Trip.Suggestions?
     let knowBeforeYouGo: Trip.KnowBeforeYouGo?
     let favorites: Trip.Favorites?
+    let deepDives: [Trip.Suggestions.Category]?
     /// Shared content. The sender's `worthItDecisions` are never published, so
     /// there is nothing here to receive them into — the recipient decides.
     let worthItItems: [Trip.WorthItItem]?
@@ -134,7 +139,7 @@ struct SharedTripDTO: Decodable, Equatable {
     /// here — and a negative is only testable against an enumerable list.
     enum CodingKeys: String, CodingKey, CaseIterable {
         case code, title, destination, startMonth, groupType, itinerary, suggestions, favorites
-        case knowBeforeYouGo, worthItItems, whereToStay, interestPrompts, imageUrl
+        case knowBeforeYouGo, deepDives, worthItItems, whereToStay, interestPrompts, imageUrl
         case durationDaysRaw = "durationDays"
     }
 
@@ -159,6 +164,9 @@ struct SharedTripDTO: Decodable, Equatable {
         worthItItems = try? container.decodeIfPresent(
             [Trip.WorthItItem].self, forKey: .worthItItems
         )
+        deepDives = try? container.decodeIfPresent(
+            [Trip.Suggestions.Category].self, forKey: .deepDives
+        )
         whereToStay = try? container.decodeIfPresent([Trip.StayArea].self, forKey: .whereToStay)
         interestPrompts = try? container.decodeIfPresent([String].self, forKey: .interestPrompts)
     }
@@ -168,6 +176,7 @@ struct SharedTripDTO: Decodable, Equatable {
 // these are safe from the Int-vs-Double wire gotcha without extra handling.
 extension Trip.Itinerary: @retroactive ConvexEncodable {}
 extension Trip.Suggestions: @retroactive ConvexEncodable {}
+extension Trip.Suggestions.Category: @retroactive ConvexEncodable {}
 extension Trip.KnowBeforeYouGo: @retroactive ConvexEncodable {}
 extension Trip.Favorites: @retroactive ConvexEncodable {}
 extension Trip.WorthItItem: @retroactive ConvexEncodable {}

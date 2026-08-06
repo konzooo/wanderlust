@@ -115,6 +115,8 @@ export default defineSchema({
     knowBeforeYouGo: v.optional(v.any()),
     /** `Trip.Favorites` — shown read-only-but-editable on the recipient's local copy. */
     favorites: v.optional(v.any()),
+    /** Interest deep dives generated before this solo trip was published. */
+    deepDives: v.optional(v.any()),
     /**
      * Worth-it/Skip cards. CONTENT ONLY — `worthItDecisions` is deliberately
      * not a column here and never will be. Whether the sender skipped Park

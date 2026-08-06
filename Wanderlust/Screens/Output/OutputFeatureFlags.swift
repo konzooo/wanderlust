@@ -28,10 +28,9 @@ enum OutputFeatureFlags {
     /// closed is easier to rework than one that cannot.
     static let knowBeforeYouGoEnabled = true
 
-    /// The interest chips are generated and persisted, but tapping one starts a
-    /// deep dive — and that is S8's work. Until then a visible chip would be a
-    /// control that does nothing, which is worse than no chip.
-    static let interestChipsEnabled = false
+    /// Interest chips now open append-only deep dives through the backend's D9
+    /// cap, persist with the trip, and travel in published solo shares.
+    static let interestChipsEnabled = true
 
     /// Where to stay lives behind "Don't have a place booked yet?" on the Near
     /// You tab (§7), so it is gated with it. The content is generated, saved

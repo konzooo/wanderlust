@@ -177,16 +177,24 @@ struct TripOutputScreen: View {
         switch store.state.discoverSegment {
         case .suggestions:
             TravelTipsView(
-                suggestions: store.suggestionsResponse,
+                suggestions: store.suggestionsWithDeepDives,
                 favorites: $store.state.favorites,
                 onRetry: canRetry ? { store.send(.retryComponent(.suggestions)) } : nil
             )
             .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
 
             // Below the feed rather than inside it, so the row stays put while
-            // the carousels move. Gated until the tap does something (S8).
+            // the carousels move.
             if OutputFeatureFlags.interestChipsEnabled && !store.state.mode.isReadOnly {
-                InterestChipsRow(chips: store.interestChips, onTap: nil)
+                InterestChipsRow(
+                    chips: store.interestChips,
+                    used: store.usedDeepDiveInterests,
+                    loading: store.deepDiveInFlightInterest,
+                    errorMessage: store.deepDiveErrorMessage,
+                    onTap: store.canGenerateDeepDive
+                        ? { store.send(.generateDeepDive($0)) }
+                        : nil
+                )
             }
 
         case .worthIt:

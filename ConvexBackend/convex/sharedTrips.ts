@@ -24,6 +24,8 @@ export const publishTrip = mutation({
     suggestions: v.optional(v.any()),
     knowBeforeYouGo: v.optional(v.any()),
     favorites: v.optional(v.any()),
+    /** Append-only interest deep dives generated before publication. */
+    deepDives: v.optional(v.any()),
     /**
      * Worth-it/Skip **content** travels; the sender's **decisions** never do
      * (§4). The recipient gets the four cards undecided, because deciding is
@@ -72,6 +74,7 @@ export const publishTrip = mutation({
       suggestions: args.suggestions,
       knowBeforeYouGo: args.knowBeforeYouGo,
       favorites: args.favorites,
+      deepDives: args.deepDives,
       worthItItems: args.worthItItems,
       whereToStay: args.whereToStay,
       interestPrompts: args.interestPrompts,

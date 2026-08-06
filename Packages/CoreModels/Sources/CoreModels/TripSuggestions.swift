@@ -5,6 +5,8 @@
 //  Created by Rodrigo Mato on 6/7/25.
 //
 
+import Foundation
+
 // MARK: - Trip.Suggestions
 extension Trip {
     public struct Suggestions: Codable, Equatable, Sendable, Hashable {
@@ -17,14 +19,32 @@ extension Trip {
         }
         
         public struct Category: Codable, Equatable, Sendable, Hashable {
+            /// Stable local identity. Model/backend payloads may omit it; the
+            /// first decode mints one and every local save/share preserves it.
+            public let id: UUID
             public let ID: TipSectionID?
             public let title: String
             public let texts: [LocationLinkableText]
+            /// The chip label that requested this category, for deep dives.
+            ///
+            /// The model is free to write a more destination-specific `title`,
+            /// so title equality cannot reliably mark the original chip as
+            /// spent after save/reopen. Ordinary suggestion categories leave
+            /// this `nil`. Optional for backward-compatible v3 decoding.
+            public let requestedInterest: String?
 
-            public init(ID: TipSectionID?, title: String, texts: [LocationLinkableText]) {
+            public init(
+                id: UUID = UUID(),
+                ID: TipSectionID?,
+                title: String,
+                texts: [LocationLinkableText],
+                requestedInterest: String? = nil
+            ) {
+                self.id = id
                 self.ID = ID
                 self.title = title
                 self.texts = texts
+                self.requestedInterest = requestedInterest
             }
 
             /// Custom decode so an unrecognized category ID degrades to `nil`
@@ -35,13 +55,17 @@ extension Trip {
             /// decode blow up entirely.
             public init(from decoder: Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
+                id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
                 title = try container.decode(String.self, forKey: .title)
                 texts = try container.decode([LocationLinkableText].self, forKey: .texts)
                 ID = try? container.decodeIfPresent(TipSectionID.self, forKey: .ID)
+                requestedInterest = try? container.decodeIfPresent(
+                    String.self, forKey: .requestedInterest
+                )
             }
 
             enum CodingKeys: String, CodingKey {
-                case ID, title, texts
+                case id, ID, title, texts, requestedInterest
             }
         }
         

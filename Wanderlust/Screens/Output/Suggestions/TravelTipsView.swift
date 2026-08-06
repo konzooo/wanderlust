@@ -26,16 +26,6 @@ public struct TravelTipsView: View {
         self.onRetry = onRetry
     }
 
-    // MARK: - Temporary Helper (Remove when backend sends category IDs)
-    private static var temporaryIDCounter = 0
-    private static func temporaryAssignTipSectionID() -> Trip.Suggestions.TipSectionID {
-        let availableIDs = Trip.Suggestions.TipSectionID.allCases
-        let assignedID = availableIDs[temporaryIDCounter % availableIDs.count]
-        temporaryIDCounter += 1
-        return assignedID
-    }
-    // MARK: - Temporary Helper (Remove when backend sends category IDs)
-
     public var body: some View {
         ComponentStateView(
             value: suggestions,
@@ -66,14 +56,16 @@ public struct TravelTipsView: View {
     private static func mapSections(from suggestions: Trip.Suggestions) -> [TipsSection] {
         suggestions.dynamicSuggestions.map { category in
             TipsSection(
-                id: category.ID ?? Self.temporaryAssignTipSectionID(),
+                id: category.id,
+                icon: category.ID ?? .random,
                 title: category.title,
                 cards: category.texts.map { TextCard(id: $0.id, text: $0.linkedText) }
             )
         }
         + suggestions.staticSuggestions.map { category in
             TipsSection(
-                id: category.ID ?? Self.temporaryAssignTipSectionID(),
+                id: category.id,
+                icon: category.ID ?? .random,
                 title: category.title,
                 cards: category.texts.map { TextCard(id: $0.id, text: $0.linkedText) }
             )
@@ -90,7 +82,7 @@ extension TravelTipsView {
             VStack(alignment: .leading, spacing: 12) {
                 // ---------- Header ----------
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(section.id.iconName)
+                    Image(section.icon.iconName)
                         .resizable()
                         .renderingMode(.template)
                         .scaledToFit()
@@ -173,7 +165,8 @@ struct TextCardWithOriginalID: Identifiable, Hashable {
 /// A section in the tips screen: header (icon + title) + horizontally-scrolling
 /// carousel of `TextCard`s.
 public struct TipsSection: Identifiable, Hashable {
-    public let id: Trip.Suggestions.TipSectionID
+    public let id: UUID
+    let icon: Trip.Suggestions.TipSectionID
     let title: String
     let cards: [TextCard]
 }
@@ -181,18 +174,18 @@ public struct TipsSection: Identifiable, Hashable {
 // Sample sections to preview / demo
 extension TipsSection {
     @MainActor public static let sample: [TipsSection] = [
-        .init(id: .cafes,
+        .init(id: UUID(), icon: .cafes,
               title: "Cafés & Restaurants with a view",
               cards: TextCard.sample),
-        .init(id: .couples,
+        .init(id: UUID(), icon: .couples,
               title: "What couples love in Barcelona",
               cards: TextCard.sample),
-        .init(id: .month,
+        .init(id: UUID(), icon: .month,
               title: "June in Barcelona",
               cards: [
                   TextCard(text: "Catch the Sant Joan Festival — beach bonfires, fireworks, and all-night energy in late June.")
               ]),
-        .init(id: .avoid,
+        .init(id: UUID(), icon: .avoid,
               title: "What to avoid",
               cards: TextCard.sample)
     ]

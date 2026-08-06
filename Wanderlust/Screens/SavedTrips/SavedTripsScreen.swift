@@ -324,8 +324,12 @@ struct SavedTripsScreen: View {
         )
         // The traveller's own trip: their decisions and their paid-for deep
         // dives come back with it. Anything missing on an older file is simply
-        // absent, never regenerated.
-        state.worthItItems = trip.worthItItems
+        // absent, never regenerated — `.initial` here means "there are none",
+        // and with no `generationRequest` on a saved trip nothing will go and
+        // charge for them.
+        state.worthItResponse = trip.worthItItems.map(AsyncValue.loaded) ?? .initial
+        state.whereToStayResponse = trip.whereToStay.map(AsyncValue.loaded) ?? .initial
+        state.interestPrompts = trip.interestPrompts ?? []
         state.worthItDecisions = trip.worthItDecisions ?? [:]
         state.deepDives = trip.deepDives
 
@@ -360,7 +364,9 @@ struct SavedTripsScreen: View {
         // recipient's decisions, restored. The *sender's* never arrive: the
         // share payload carries content only, and the recipient gets the cards
         // undecided the first time — deciding is the point.
-        state.worthItItems = trip.worthItItems
+        state.worthItResponse = trip.worthItItems.map(AsyncValue.loaded) ?? .initial
+        state.whereToStayResponse = trip.whereToStay.map(AsyncValue.loaded) ?? .initial
+        state.interestPrompts = trip.interestPrompts ?? []
         state.worthItDecisions = trip.worthItDecisions ?? [:]
         state.deepDives = trip.deepDives
 

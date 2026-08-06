@@ -88,13 +88,75 @@ function category(ids: string[]): unknown {
   ]);
 }
 
-export const SUGGESTIONS_SCHEMA = obj(
+/**
+ * One Worth-it/Skip card (D7). Mirrors `Trip.WorthItItem` in CoreModels.
+ *
+ * One `locations` array per card rather than one per prose field: the link
+ * substrings are matched against all three fields on the device, so a per-field
+ * array would store the same places three times.
+ *
+ * "Exactly four" is NOT expressible here — strict Structured Outputs ignores
+ * `minItems`/`maxItems`. The count is asked for in the prompt and enforced after
+ * decode in `validation.ts`, which is the §3 rule for every conditional
+ * constraint: schema what you can, validate the rest in application code.
+ */
+export const WORTH_IT_ITEM = obj(
   {
+    place: str,
+    theCase: str,
+    theCatch: str,
+    verdict: str,
+    locations: arr(LOCATION),
+  },
+  ["place", "theCase", "theCatch", "verdict", "locations"],
+);
+
+/** One neighbourhood in the where-to-stay guide (D10). */
+export const STAY_AREA = obj(
+  {
+    area: str,
+    theCase: str,
+    bestFor: str,
+    watchOut: str,
+    locations: arr(LOCATION),
+  },
+  ["area", "theCase", "bestFor", "watchOut", "locations"],
+);
+
+/** Three model-picked interest labels; the app adds three fixed ones (D8). */
+const INTEREST_PROMPTS = arr(str);
+
+export const WORTH_IT_SCHEMA = obj({ items: arr(WORTH_IT_ITEM) }, ["items"]);
+
+export const WHERE_TO_STAY_SCHEMA = obj({ areas: arr(STAY_AREA) }, ["areas"]);
+
+/**
+ * The suggestions schema, which is the subject of the D15 experiment.
+ *
+ * `extras: false` is the pre-S5 shape — four themed categories and nothing
+ * else. `extras: true` is the enlarged combined call that also carries the
+ * Worth-it/Skip cards and the where-to-stay guide. Which one runs is a
+ * measured decision, not an argued one (see `SUGGESTIONS_VARIANT`).
+ *
+ * `interestPrompts` rides along in BOTH shapes on purpose: three short labels
+ * are not worth a call of their own under any variant, so splitting them was
+ * never one of the options being weighed.
+ */
+export function suggestionsSchema(opts: {
+  extras: boolean;
+  interestPrompts: boolean;
+}): unknown {
+  const properties: Record<string, unknown> = {
     dynamicSuggestions: arr(category(DYNAMIC_CATEGORY_IDS)),
     staticSuggestions: arr(category(STATIC_CATEGORY_IDS)),
-  },
-  ["dynamicSuggestions", "staticSuggestions"],
-);
+  };
+  if (opts.interestPrompts) properties.interestPrompts = INTEREST_PROMPTS;
+  if (opts.extras) {
+    properties.worthIt = arr(WORTH_IT_ITEM);
+    properties.whereToStay = arr(STAY_AREA);
+  }
+  return obj(properties, Object.keys(properties));
+}
 
 /**
  * An interest deep dive is one extra category appended to the feed. It carries

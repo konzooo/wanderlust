@@ -89,7 +89,11 @@ enum DesignPlayground {
                     )
                     state.itineraryResponse = .loaded(.mock)
                     state.suggestionsResponse = .loaded(.mock)
-                    state.worthItItems = Trip.WorthItItem.mockSet
+                    state.worthItResponse = .loaded(Trip.WorthItItem.mockSet)
+                    state.whereToStayResponse = .loaded(Trip.StayArea.mockSet)
+                    state.interestPrompts = [
+                        "Natural wine bars", "Rooftop sunsets", "Modernista rooftops"
+                    ]
                     return state
                 }()
             )

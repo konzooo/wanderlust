@@ -25,4 +25,23 @@ enum OutputFeatureFlags {
     /// part of the shell being reviewed, and it says plainly that its content is
     /// still coming rather than pretending to be empty.
     static let knowBeforeYouGoEnabled = true
+
+    /// The interest chips are generated and persisted, but tapping one starts a
+    /// deep dive — and that is S8's work. Until then a visible chip would be a
+    /// control that does nothing, which is worse than no chip.
+    static let interestChipsEnabled = false
+
+    /// Where to stay lives behind "Don't have a place booked yet?" on the Near
+    /// You tab (§7), so it is gated with it. The content is generated, saved
+    /// and shared now so that S10 has real data to ground against rather than
+    /// having to add a call at the same time as the MapKit work.
+    static var whereToStayEnabled: Bool { nearYouEnabled }
+
+    /// Which arm of the D15 experiment this build runs.
+    ///
+    /// Must match `SUGGESTIONS_VARIANT` in
+    /// `ConvexBackend/convex/lib/components.ts` — the value is sent with every
+    /// request and the two are one decision, recorded twice. See
+    /// `ConvexBackend/docs/d15-decision.md` for the measurement behind it.
+    static let suggestionsVariant: SuggestionsVariant = .split
 }

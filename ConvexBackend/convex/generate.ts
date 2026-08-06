@@ -11,8 +11,14 @@ import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { tokenMatchesHash } from "./lib/tokens";
 import { MIN_MEMBERS_TO_GENERATE } from "./lib/validators";
-import { COMPONENTS, generationComponent, runComponent } from "./lib/components";
-import { OpenAIError, type OpenAIResult } from "./lib/openai";
+import {
+  COMPONENTS,
+  generationComponent,
+  runComponent,
+  type ComponentResult,
+} from "./lib/components";
+import { OpenAIError } from "./lib/openai";
+import { ValidationError } from "./lib/validation";
 import type { GroupTripInput, Component } from "./lib/prompts";
 
 async function collectMembers(
@@ -386,15 +392,28 @@ export function componentsNeedingRetry(group: Doc<"groups">): GroupComponent[] {
   });
 }
 
-/** Runs one group component and records its cost/latency either way. */
+/**
+ * Runs one group component and records its cost/latency either way.
+ *
+ * Always the `split` variant, which for the two components a group generates
+ * means "the suggestions call, unenlarged". A group trip has no personal layer
+ * (§4), so Worth-it/Skip has nothing to record a decision in and where-to-stay
+ * has no Near You to feed — generating either would be paying for content no
+ * member can reach. Group output is therefore byte-identical to what it was
+ * before the S5 content landed, deliberately.
+ */
 async function callGroupComponent(
   ctx: { runMutation: (ref: any, args: any) => Promise<any> },
   component: Component,
   input: GroupTripInput,
-): Promise<OpenAIResult> {
+): Promise<ComponentResult> {
   const startedAt = Date.now();
   try {
-    const result = await runComponent({ component, input: { mode: "group", group: input } });
+    const result = await runComponent({
+      component,
+      input: { mode: "group", group: input },
+      variant: "split",
+    });
     await ctx.runMutation(internal.quota.recordTelemetry, {
       component,
       mode: "group" as const,
@@ -402,17 +421,24 @@ async function callGroupComponent(
       cachedInputTokens: result.usage.cachedInputTokens,
       outputTokens: result.usage.outputTokens,
       durationMs: result.durationMs,
+      variant: "split" as const,
+      maxOutputTokens: result.maxOutputTokens,
+      repairs: result.validation.repairs,
     });
     return result;
   } catch (error) {
+    const usage = error instanceof OpenAIError ? error.usage : undefined;
     await ctx.runMutation(internal.quota.recordTelemetry, {
       component,
       mode: "group" as const,
-      inputTokens: 0,
-      cachedInputTokens: 0,
-      outputTokens: 0,
-      durationMs: Date.now() - startedAt,
-      errorCode: error instanceof OpenAIError ? error.code : "generation_failed",
+      inputTokens: usage?.inputTokens ?? 0,
+      cachedInputTokens: usage?.cachedInputTokens ?? 0,
+      outputTokens: usage?.outputTokens ?? 0,
+      durationMs:
+        (error instanceof OpenAIError ? error.durationMs : undefined) ??
+        Date.now() - startedAt,
+      errorCode: errorCode(error),
+      variant: "split" as const,
     });
     throw error;
   }
@@ -420,6 +446,7 @@ async function callGroupComponent(
 
 function errorCode(e: unknown): string {
   if (e instanceof OpenAIError) return e.code;
+  if (e instanceof ValidationError) return `validation_${e.code}`;
   const msg = e instanceof Error ? e.message : String(e);
   return msg.slice(0, 200);
 }

@@ -117,6 +117,8 @@ const LANES_BLOCK = `STAY IN YOUR LANE
 Other parts of this app cover other ground, so do not do their job:
 - The sample itinerary owns the day-by-day plan and its rhythm.
 - The suggestions feed owns themed lists of places, including what to avoid.
+- Worth it or skip owns the honest verdict on the handful of big-name things a visitor has already half decided to do. The suggestions feed does not argue with itself; that is this section's job.
+- Where to stay owns neighbourhoods to sleep in. Nothing else recommends where to stay, and this section recommends nothing to do.
 - The month section covers what is ON during the month; what the month is LIKE to travel in belongs elsewhere.
 Places recurring across components is fine and expected. Repeating whole sentences is not.`;
 
@@ -124,7 +126,10 @@ const STYLE_BLOCK = `STYLE AND ACCURACY
 - Never use exclamation marks. Let the specifics carry the enthusiasm.
 - Write plain text. No markdown, no asterisks, no bold: the app styles place names itself.
 - Do not invent temporary events, opening hours, prices, or unsupported claims.
-- LOCATIONS: every place you name in the text gets an entry in that item's locations array. This is what makes the name tappable in the app, so a named place with no entry is a bug. linkSubstring is the name exactly as it appears in the text. placeName is what someone would type into a maps app to find it, including the city or region — for example "Brunch & Cake, Barcelona" or "Nine Arch Bridge, Ella, Sri Lanka".
+- LOCATIONS: every place you name in the text gets an entry in that item's locations array. This is what makes the name tappable in the app, so a named place with no entry is a bug.
+- The two location name fields are NOT the same string and must not be copied from one another:
+  - linkSubstring is copied character for character out of your own text. The app finds it by searching that exact text, so anything not literally present there produces no link at all. Never append the city, region or country to it: if your sentence says "Chök", linkSubstring is "Chök", not "Chök, Barcelona".
+  - placeName is the full searchable name INCLUDING the city or region — "Chök, Barcelona", "Nine Arch Bridge, Ella, Sri Lanka". This is what a maps app is given.
 - Coordinates are optional. Include latitude and longitude when you know them; otherwise set both to null, which is completely normal and expected — the app then links to a maps search by name. Never guess coordinates, and never let missing coordinates stop you from adding the entry. Set placeID to null unless certain.
 - Use an empty locations array when no place should be linked.
 
@@ -141,11 +146,62 @@ function roleBlock(component: Component, mode: TripMode): string {
       return `You create genuinely useful, highly personalized ${party}travel suggestions for the Wanderlust mobile app. Write like a well-informed local friend: specific, vivid, concise, and never generic or overhyped.`;
     case "deepDive":
       return `You answer one specific interest a ${mode === "group" ? "group" : "traveller"} asked about, for the Wanderlust mobile app, the way a well-informed local friend who happens to be into that thing would answer it.`;
+    case "worthIt":
+      return `You settle the arguments a traveller is already having with themselves, for the Wanderlust mobile app. A local friend who will tell you plainly that the famous thing is worth the queue, or that it is not, and why — never a guidebook hedging both ways.`;
+    case "whereToStay":
+      return `You advise a traveller on which neighbourhood to sleep in, for the Wanderlust mobile app, the way a friend who lives in the city would: what each area is actually like to wake up in, and what the trade-off is.`;
   }
 }
 
-function taskBlock(component: Component, mode: TripMode): string {
+/**
+ * The Worth-it/Skip cards (D7). Shared by the split-arm component and the
+ * combined suggestions call, so the two arms differ only in how the content is
+ * requested — never in what is asked for. Anything else and the D15 measurement
+ * would be comparing two different products.
+ */
+const WORTH_IT_TASK = `WORTH IT OR SKIP
+Four things a visitor to this destination has already half decided to do — the big names they would ask a local friend about, not obscure alternatives. Argue each honestly both ways so they can decide for themselves.
+- place: the place or activity, named the way people name it.
+- theCase: why it might genuinely be worth their time. 120 to 200 characters.
+- theCatch: the honest catch — the queue, the cost, the hours it eats, the version of it that disappoints. 120 to 200 characters.
+- verdict: your actual call, one sentence. "Worth it, but…", "Half worth it…", "Skip it unless…" are all good. A verdict that decides nothing is not a verdict.
+- Return exactly four items, chosen for this particular traveller and season.
+- At least one should come out clearly positive and at least one clearly negative. Four hedges is not a set of decisions.
+- locations: one array per card, covering every place named anywhere in that card's three fields.`;
+
+/** The where-to-stay guide (D10). Same sharing rule as WORTH_IT_TASK. */
+const WHERE_TO_STAY_TASK = `WHERE TO STAY
+The neighbourhood guide for someone who has not booked anywhere yet. Four to six areas, compared honestly.
+- area: the neighbourhood as both locals and booking sites name it.
+- theCase: what it is actually like to stay there. 120 to 200 characters.
+- bestFor: the traveller it suits, one short phrase. Specific — "everyone" is not an answer.
+- watchOut: the real trade-off — noise, distance, price, dead after dark, tourists only. Every area has one; an area presented without a trade-off is not being described honestly.
+- Order them best-fit-first for this traveller.
+- Areas only. Do not name hotels and do not quote prices.
+- locations: one array per area, covering every place named anywhere in that area's three fields.`;
+
+/**
+ * Three model-picked interest labels (D8). The app pairs them with three fixed
+ * client-side chips — named here so the model doesn't spend one of its three
+ * slots duplicating a chip the traveller can already see.
+ */
+const INTEREST_PROMPTS_TASK = `INTEREST PROMPTS
+Return exactly three short interest labels this traveller would plausibly want a whole list about in this destination — things the sections above can only gesture at in one line.
+- At most 28 characters each, phrased as a topic and not a question: "Natural wine bars", "Sunrise viewpoints", "Post-war architecture".
+- Specific to this destination AND this traveller. A label that would fit any city is wasted.
+- Do not restate a category title you already returned above.
+- The app already offers Running routes, Remote-work cafés and Climbing gyms. Do not return those or near-synonyms of them.`;
+
+function taskBlock(
+  component: Component,
+  mode: TripMode,
+  opts: PromptOptions,
+): string {
   switch (component) {
+    case "worthIt":
+      return WORTH_IT_TASK;
+    case "whereToStay":
+      return WHERE_TO_STAY_TASK;
     case "itinerary":
       return `ITINERARY
 - Give the trip a fun, personalized, movie-like but descriptive title of at most 50 characters.
@@ -184,7 +240,9 @@ ${partyCategory}
 LENGTH
 - Each suggestion is 100 to 150 characters and no more than two sentences. Aim for the upper half of that range: a suggestion that stops at 80 characters is wasting the card.
 - Maximize useful detail in the available space and make the experience easy to picture.
-- Name a specific, findable place in most suggestions — a venue, a beach, a neighborhood, a viewpoint. General advice is fine where it genuinely is the advice, but a set where nothing is findable on a map is too vague.`;
+- Name a specific, findable place in most suggestions — a venue, a beach, a neighborhood, a viewpoint. General advice is fine where it genuinely is the advice, but a set where nothing is findable on a map is too vague.${
+        opts.interestPrompts ? `\n\n${INTEREST_PROMPTS_TASK}` : ""
+      }${opts.extras ? `\n\n${WORTH_IT_TASK}\n\n${WHERE_TO_STAY_TASK}` : ""}`;
     }
 
     case "deepDive":
@@ -199,15 +257,44 @@ The traveller asked about one specific interest, given at the end of the summary
 
 // MARK: - Assembly -------------------------------------------------------------
 
-export type Component = "itinerary" | "suggestions" | "deepDive";
+export type Component =
+  | "itinerary"
+  | "suggestions"
+  | "deepDive"
+  | "worthIt"
+  | "whereToStay";
 
-export function buildSystemPrompt(component: Component, mode: TripMode): string {
+/**
+ * What the suggestions call is being asked to carry this run.
+ *
+ * Only the suggestions component reads these; every other component ignores
+ * them. They exist because D15 — combined call or focused parallel calls — is a
+ * question about this one prompt, and the honest way to answer it is to be able
+ * to build both and measure them, not to argue about call counts.
+ */
+export type PromptOptions = {
+  /** Worth-it/Skip and where-to-stay ride on the suggestions call. */
+  extras: boolean;
+  /** The three model-picked interest chips ride along. Both variants. */
+  interestPrompts: boolean;
+};
+
+export const DEFAULT_PROMPT_OPTIONS: PromptOptions = {
+  extras: false,
+  interestPrompts: false,
+};
+
+export function buildSystemPrompt(
+  component: Component,
+  mode: TripMode,
+  opts: PromptOptions = DEFAULT_PROMPT_OPTIONS,
+): string {
   return [
     roleBlock(component, mode),
     INJECTION_BLOCK,
     VOICE_BLOCK,
     mode === "group" ? INPUT_GROUP : INPUT_SOLO,
-    taskBlock(component, mode),
+    taskBlock(component, mode, opts),
     LANES_BLOCK,
     STYLE_BLOCK,
   ].join("\n\n");

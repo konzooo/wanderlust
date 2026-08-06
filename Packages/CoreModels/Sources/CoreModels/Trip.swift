@@ -23,7 +23,15 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// - 1: itinerary + optional `suggestions` + favourites (+ later `shareCode`).
     /// - 2: components carry explicit ``ComponentState``; adds `tripKey`,
     ///   `deepDives`, `worthItDecisions` and `accommodation`.
-    public static let currentSchemaVersion = 2
+    /// - 3: the rest of the generated content — `whereToStay` and
+    ///   `interestPrompts` here, `knowBeforeYouGo` on the S9 branch.
+    ///
+    /// **On rebasing S5–S7 onto S9:** both branches bump to 3 and both add
+    /// optional, `decodeIfPresent` fields. Resolve by merging the two field
+    /// lists under a single v3 rather than by inventing a v4 — the version
+    /// number documents what a file may contain, and neither shape has shipped,
+    /// so no reader exists that can tell them apart.
+    public static let currentSchemaVersion = 3
 
     public let id = UUID()
     public let schemaVersion: Int
@@ -50,6 +58,19 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// The traveller's Worth-it/Skip decisions. An absent entry is *undecided*,
     /// which is a real and common state — see ``WorthItDecision``.
     public var worthItDecisions: [UUID: WorthItDecision]?
+
+    /// The where-to-stay guide (D10). Shared content; not heartable (§9).
+    public var whereToStay: [StayArea]?
+
+    /// The three model-picked interest chip labels (D8).
+    ///
+    /// Only the model's three are stored. The three fixed chips — Running
+    /// routes, Remote-work cafés, Climbing gyms — are a client-side constant
+    /// and are deliberately not persisted: writing them into every trip file
+    /// would mean an old saved trip could never pick up a change to the fixed
+    /// set, and the plan's own migration note (§4) is that the fixed three
+    /// still render when this is missing.
+    public var interestPrompts: [String]?
 
     /// Coarse, personal, and never shared. See ``CoarseAccommodation``.
     public var accommodation: CoarseAccommodation?
@@ -83,6 +104,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         deepDives: [Suggestions.Category]? = nil,
         worthItItems: [WorthItItem]? = nil,
         worthItDecisions: [UUID: WorthItDecision]? = nil,
+        whereToStay: [StayArea]? = nil,
+        interestPrompts: [String]? = nil,
         accommodation: CoarseAccommodation? = nil,
         favorites: Favorites = .init(),
         shareCode: String? = nil,
@@ -96,6 +119,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.deepDives = deepDives
         self.worthItItems = worthItItems
         self.worthItDecisions = worthItDecisions
+        self.whereToStay = whereToStay
+        self.interestPrompts = interestPrompts
         self.accommodation = accommodation
         self.favorites = favorites
         self.shareCode = shareCode
@@ -140,6 +165,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         case deepDives
         case worthItItems
         case worthItDecisions
+        case whereToStay
+        case interestPrompts
         case accommodation
         case favorites
         case shareCode
@@ -171,6 +198,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         worthItDecisions = try container.decodeIfPresent(
             [UUID: WorthItDecision].self, forKey: .worthItDecisions
         )
+        whereToStay = try container.decodeIfPresent([StayArea].self, forKey: .whereToStay)
+        interestPrompts = try container.decodeIfPresent([String].self, forKey: .interestPrompts)
         accommodation = try container.decodeIfPresent(
             CoarseAccommodation.self, forKey: .accommodation
         )
@@ -188,6 +217,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         try container.encodeIfPresent(deepDives, forKey: .deepDives)
         try container.encodeIfPresent(worthItItems, forKey: .worthItItems)
         try container.encodeIfPresent(worthItDecisions, forKey: .worthItDecisions)
+        try container.encodeIfPresent(whereToStay, forKey: .whereToStay)
+        try container.encodeIfPresent(interestPrompts, forKey: .interestPrompts)
         try container.encodeIfPresent(accommodation, forKey: .accommodation)
         try container.encode(favorites, forKey: .favorites)
         try container.encodeIfPresent(shareCode, forKey: .shareCode)
@@ -217,6 +248,8 @@ public extension Trip {
             deepDives: deepDives ?? stored.deepDives,
             worthItItems: worthItItems ?? stored.worthItItems,
             worthItDecisions: worthItDecisions ?? stored.worthItDecisions,
+            whereToStay: whereToStay ?? stored.whereToStay,
+            interestPrompts: interestPrompts ?? stored.interestPrompts,
             accommodation: accommodation ?? stored.accommodation,
             favorites: favorites,
             shareCode: shareCode ?? stored.shareCode,

@@ -190,7 +190,12 @@ final class TripGenerationCoordinatorTests: XCTestCase {
             ),
             imageService: StubImageService(),
             itineraryService: itinerary,
-            suggestionsService: suggestions
+            suggestionsService: suggestions,
+            // The split variant starts these two alongside the other pair, so
+            // they must be injected: an omitted service here would fall
+            // through to the live backend and put a unit test on the network.
+            worthItService: MockWorthItService(),
+            whereToStayService: MockWhereToStayService()
         )
     }
 
@@ -243,11 +248,14 @@ private final class CountingSuggestionsService: SuggestionsGenerating {
 
     init(failing: Bool = false) { self.failing = failing }
 
-    func generate(_ request: TripGenerationRequest) async throws -> Trip.Suggestions {
+    func generate(
+        _ request: TripGenerationRequest,
+        alreadyRecommended: [String]
+    ) async throws -> SuggestionsPayload {
         callCount += 1
         await gate.wait()
         if failing { throw TripGenerationError.transport }
-        return .mock
+        return SuggestionsPayload(suggestions: .mock)
     }
 
     func release() async { await gate.open() }

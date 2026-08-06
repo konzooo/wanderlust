@@ -9,6 +9,8 @@ enum TripComponent: String, CaseIterable, Sendable {
     case itinerary
     case suggestions
     case deepDive
+    case worthIt
+    case whereToStay
 
     /// A required component's failure fails the whole generation; everything
     /// else is best-effort and the trip still opens without it. The split is
@@ -16,9 +18,36 @@ enum TripComponent: String, CaseIterable, Sendable {
     var isRequired: Bool { self == .itinerary }
 
     /// The components a trip screen generates on its own when it opens.
-    /// A deep dive is only ever generated because the traveller asked for one,
-    /// so it is deliberately absent.
-    static let automatic: [TripComponent] = [.itinerary, .suggestions]
+    ///
+    /// A deep dive is deliberately absent: one is only ever generated because
+    /// the traveller tapped a chip. The rest depends on which arm of the D15
+    /// experiment is running — under ``SuggestionsVariant/combined`` the
+    /// Worth-it cards and the where-to-stay guide ride on the suggestions call
+    /// rather than being requested separately.
+    static func automatic(
+        variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
+    ) -> [TripComponent] {
+        switch variant {
+        case .combined: [.itinerary, .suggestions]
+        case .split: [.itinerary, .suggestions, .worthIt, .whereToStay]
+        }
+    }
+}
+
+/// Which shape the suggestions call takes — D15, as the client sees it.
+///
+/// Mirrors `SuggestionsVariant` in `ConvexBackend/convex/lib/components.ts` and
+/// is sent explicitly with every request. The client has to be the one that
+/// decides: it is the only side that knows what else it is about to ask for,
+/// and asking for the enlarged shape *and* calling `worthIt` separately would
+/// generate — and bill for — the same four cards twice.
+enum SuggestionsVariant: String, Sendable {
+    /// One enlarged suggestions call carrying the Worth-it cards and the
+    /// where-to-stay guide alongside the themed categories.
+    case combined
+    /// The pre-S5 suggestions call, with the two new sections as their own
+    /// focused calls running in parallel.
+    case split
 }
 
 /// One trip's generation inputs plus the key its server-side caps are scoped to.
@@ -97,13 +126,15 @@ final class TripGenerationService {
         _ component: TripComponent,
         for request: TripGenerationRequest,
         interest: String? = nil,
-        alreadyRecommended: [String]? = nil
+        alreadyRecommended: [String]? = nil,
+        variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) async throws -> T {
         var args: [String: ConvexEncodable?] = [
             "installToken": InstallIdentity.token(),
             "tripKey": request.tripKey,
             "component": component.rawValue,
-            "input": request.input
+            "input": request.input,
+            "variant": variant.rawValue
         ]
         // Only send the optional arguments that apply — a `nil` value in this
         // dictionary is transmitted as JSON `null`, not as an absent key.

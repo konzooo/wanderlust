@@ -89,6 +89,17 @@ extension Trip {
             LocationLinkableText(text: prose(field), locations: locations, id: id)
         }
 
+        /// The card's headline, linkable.
+        ///
+        /// A card about Sagrada Família names it here and often nowhere else —
+        /// the three prose fields say "it", "the queue", "the nave". Rendering
+        /// the title as plain text meant the one place the card is actually
+        /// about was the one place you could not tap. The §13 matrix measured
+        /// the cost of that: 9% of this section's location entries resolved.
+        public var linkableTitle: LocationLinkableText {
+            LocationLinkableText(text: place, locations: locations, id: id)
+        }
+
         public enum Field: CaseIterable, Sendable {
             case theCase, theCatch, verdict
 

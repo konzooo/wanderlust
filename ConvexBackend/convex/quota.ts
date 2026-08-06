@@ -2,7 +2,12 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { hashToken } from "./lib/tokens";
-import { COMPONENTS, generationComponent, tripMode } from "./lib/components";
+import {
+  COMPONENTS,
+  generationComponent,
+  suggestionsVariant,
+  tripMode,
+} from "./lib/components";
 import type { Component } from "./lib/prompts";
 
 /**
@@ -141,6 +146,9 @@ export const recordTelemetry = internalMutation({
     outputTokens: v.number(),
     durationMs: v.number(),
     errorCode: v.optional(v.string()),
+    variant: v.optional(suggestionsVariant),
+    maxOutputTokens: v.optional(v.number()),
+    repairs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("generationTelemetry", { ...args, createdAt: Date.now() });

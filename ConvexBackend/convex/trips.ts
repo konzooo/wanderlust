@@ -1,9 +1,16 @@
 import { ConvexError, v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { generationComponent, runComponent } from "./lib/components";
+import {
+  generationComponent,
+  runComponent,
+  suggestionsVariant,
+  SUGGESTIONS_VARIANT,
+  type SuggestionsVariant,
+} from "./lib/components";
 import type { Component, SoloTripInput } from "./lib/prompts";
 import { OpenAIError } from "./lib/openai";
+import { ValidationError } from "./lib/validation";
 import type { Reservation } from "./quota";
 import {
   MAX_ALREADY_RECOMMENDED_ITEMS,
@@ -47,6 +54,16 @@ export const generateComponent = action({
      * in the trip changed.
      */
     alreadyRecommended: v.optional(v.union(v.array(v.string()), v.null())),
+    /**
+     * Which arm of the D15 experiment to run (see `SUGGESTIONS_VARIANT`).
+     *
+     * The caller decides, because only the caller knows what else it is about
+     * to request: asking for the enlarged suggestions shape and then also
+     * calling `worthIt` would generate the same cards twice. The server's own
+     * constant is the default for a client that doesn't say, which is what an
+     * older build sends.
+     */
+    variant: v.optional(v.union(suggestionsVariant, v.null())),
   },
   handler: async (ctx, args): Promise<unknown> => {
     const component = args.component as Component;
@@ -80,6 +97,7 @@ export const generateComponent = action({
       label: interest,
     });
 
+    const variant: SuggestionsVariant = args.variant ?? SUGGESTIONS_VARIANT;
     const startedAt = Date.now();
     try {
       const result = await runComponent({
@@ -87,6 +105,7 @@ export const generateComponent = action({
         input: { mode: "solo", solo: input },
         interest,
         alreadyRecommended,
+        variant,
       });
 
       await ctx.runMutation(internal.quota.recordTelemetry, {
@@ -96,6 +115,9 @@ export const generateComponent = action({
         cachedInputTokens: result.usage.cachedInputTokens,
         outputTokens: result.usage.outputTokens,
         durationMs: result.durationMs,
+        variant,
+        maxOutputTokens: result.maxOutputTokens,
+        repairs: result.validation.repairs,
       });
       if (reservation.slotId) {
         await ctx.runMutation(internal.quota.commitReservation, {
@@ -104,15 +126,22 @@ export const generateComponent = action({
       }
       return result.data;
     } catch (error) {
-      const code = error instanceof OpenAIError ? error.code : "generation_failed";
+      const code = failureCode(error);
+      // A truncation still burned every one of the output tokens it produced,
+      // and that count is the whole basis for re-deriving the ceiling — so a
+      // failed call records what it actually cost, not zeros.
+      const usage = error instanceof OpenAIError ? error.usage : undefined;
       await ctx.runMutation(internal.quota.recordTelemetry, {
         component: args.component,
         mode: "solo" as const,
-        inputTokens: 0,
-        cachedInputTokens: 0,
-        outputTokens: 0,
-        durationMs: Date.now() - startedAt,
+        inputTokens: usage?.inputTokens ?? 0,
+        cachedInputTokens: usage?.cachedInputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        durationMs:
+          (error instanceof OpenAIError ? error.durationMs : undefined) ??
+          Date.now() - startedAt,
         errorCode: code,
+        variant,
       });
       // The traveller never received this, so it must not consume a cap.
       if (reservation.slotId) {
@@ -124,3 +153,17 @@ export const generateComponent = action({
     }
   },
 });
+
+/**
+ * Both failure families produce a stable code the client can map to copy.
+ *
+ * A `ValidationError` is deliberately distinct from an `OpenAIError`: the call
+ * succeeded and was billed, and what failed was the content. Collapsing the two
+ * into `generation_failed` would hide exactly the signal the D15 evaluation is
+ * looking for.
+ */
+function failureCode(error: unknown): string {
+  if (error instanceof OpenAIError) return error.code;
+  if (error instanceof ValidationError) return `validation_${error.code}`;
+  return "generation_failed";
+}

@@ -146,11 +146,13 @@ final class WorthItDecisionTests: XCTestCase {
         var state = TripOutputStore.State(details: .mock, mode: mode)
         state.itineraryResponse = .loaded(.mock)
         state.suggestionsResponse = .loaded(.mock)
-        state.worthItItems = items
+        state.worthItResponse = items.map(AsyncValue.loaded) ?? .initial
         return TripOutputStore(
             initialState: state,
             itineraryService: MockItineraryService(),
-            suggestionsService: MockSuggestionsService()
+            suggestionsService: MockSuggestionsService(),
+            worthItService: MockWorthItService(),
+            whereToStayService: MockWhereToStayService()
         )
     }
 }

@@ -56,7 +56,12 @@ final class SharedTripStore: ObservableObject {
                         month: Month(rawValue: dto.startMonth) ?? .january
                     ),
                     itinerary: dto.itinerary,
-                    suggestions: dto.suggestions,
+                    suggestionsState: dto.suggestions.map(ComponentState.ready) ?? .absent,
+                    // Content arrives; the sender's decisions deliberately do
+                    // not (§4), so this local copy starts every card undecided.
+                    worthItItems: dto.worthItItems,
+                    whereToStay: dto.whereToStay,
+                    interestPrompts: dto.interestPrompts,
                     favorites: dto.favorites ?? .init(),
                     shareCode: code
                 )
@@ -102,7 +107,9 @@ final class SharedTripStore: ObservableObject {
         }
         // Shared content carries over; the personal layer is the recipient's own
         // — theirs if this local copy already has some, undecided if not.
-        output.worthItItems = trip.worthItItems
+        output.worthItResponse = trip.worthItItems.map(AsyncValue.loaded) ?? .initial
+        output.whereToStayResponse = trip.whereToStay.map(AsyncValue.loaded) ?? .initial
+        output.interestPrompts = trip.interestPrompts ?? []
         output.worthItDecisions = trip.worthItDecisions ?? [:]
         output.deepDives = trip.deepDives
         return output

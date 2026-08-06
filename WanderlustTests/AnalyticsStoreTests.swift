@@ -86,7 +86,9 @@ final class AnalyticsStoreTests: XCTestCase {
             ),
             imageService: StubImageService(),
             itineraryService: itinerary,
-            suggestionsService: SuccessfulSuggestionsGenerator()
+            suggestionsService: SuccessfulSuggestionsGenerator(),
+            worthItService: MockWorthItService(),
+            whereToStayService: MockWhereToStayService()
         )
     }
 
@@ -128,8 +130,11 @@ private struct FailingItineraryGenerator: ItineraryGenerating {
 }
 
 private struct SuccessfulSuggestionsGenerator: SuggestionsGenerating {
-    func generate(_ request: TripGenerationRequest) async throws -> Trip.Suggestions {
-        .mock
+    func generate(
+        _ request: TripGenerationRequest,
+        alreadyRecommended: [String]
+    ) async throws -> SuggestionsPayload {
+        SuggestionsPayload(suggestions: .mock)
     }
 }
 

@@ -38,6 +38,9 @@ final class SharedTripService {
         itinerary: Trip.Itinerary,
         suggestions: Trip.Suggestions?,
         favorites: Trip.Favorites,
+        worthItItems: [Trip.WorthItItem]?,
+        whereToStay: [Trip.StayArea]?,
+        interestPrompts: [String],
         imageUrl: String?
     ) async throws -> String {
         // Convex `v.number()` is float64; Swift's native `Int` would encode as
@@ -54,6 +57,19 @@ final class SharedTripService {
         ]
         if let suggestions {
             args["suggestions"] = suggestions
+        }
+        // Content travels in a share; the sender's decisions never do (§4).
+        // `worthItDecisions` is absent here by design, not by omission — a
+        // recipient who receives the cards pre-skipped has been handed a
+        // verdict instead of the question the section exists to ask.
+        if let worthItItems, !worthItItems.isEmpty {
+            args["worthItItems"] = worthItItems as [(any ConvexEncodable)?]
+        }
+        if let whereToStay, !whereToStay.isEmpty {
+            args["whereToStay"] = whereToStay as [(any ConvexEncodable)?]
+        }
+        if !interestPrompts.isEmpty {
+            args["interestPrompts"] = interestPrompts as [(any ConvexEncodable)?]
         }
         let result: PublishedTrip = try await client.mutation("sharedTrips:publishTrip", with: args)
         return result.code
@@ -98,13 +114,22 @@ struct SharedTripDTO: Decodable, Equatable {
     let itinerary: Trip.Itinerary
     let suggestions: Trip.Suggestions?
     let favorites: Trip.Favorites?
+    /// Shared content. The sender's `worthItDecisions` are never published, so
+    /// there is nothing here to receive them into — the recipient decides.
+    let worthItItems: [Trip.WorthItItem]?
+    let whereToStay: [Trip.StayArea]?
+    let interestPrompts: [String]?
     let imageUrl: String?
 
     private let durationDaysRaw: Double
     var durationDays: Int { Int(durationDaysRaw) }
 
-    enum CodingKeys: String, CodingKey {
-        case code, title, destination, startMonth, groupType, itinerary, suggestions, favorites, imageUrl
+    /// `CaseIterable` so a test can assert on the whole set of keys. The rule
+    /// worth guarding is a negative one — that no decision field ever appears
+    /// here — and a negative is only testable against an enumerable list.
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case code, title, destination, startMonth, groupType, itinerary, suggestions, favorites
+        case worthItItems, whereToStay, interestPrompts, imageUrl
         case durationDaysRaw = "durationDays"
     }
 
@@ -120,6 +145,14 @@ struct SharedTripDTO: Decodable, Equatable {
         imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
         suggestions = try? container.decodeIfPresent(Trip.Suggestions.self, forKey: .suggestions)
         favorites = try? container.decodeIfPresent(Trip.Favorites.self, forKey: .favorites)
+        // Same degrade-don't-throw rule as the two above: a section this build
+        // doesn't recognise must cost the recipient that section, never the
+        // whole trip.
+        worthItItems = try? container.decodeIfPresent(
+            [Trip.WorthItItem].self, forKey: .worthItItems
+        )
+        whereToStay = try? container.decodeIfPresent([Trip.StayArea].self, forKey: .whereToStay)
+        interestPrompts = try? container.decodeIfPresent([String].self, forKey: .interestPrompts)
     }
 }
 
@@ -128,3 +161,5 @@ struct SharedTripDTO: Decodable, Equatable {
 extension Trip.Itinerary: @retroactive ConvexEncodable {}
 extension Trip.Suggestions: @retroactive ConvexEncodable {}
 extension Trip.Favorites: @retroactive ConvexEncodable {}
+extension Trip.WorthItItem: @retroactive ConvexEncodable {}
+extension Trip.StayArea: @retroactive ConvexEncodable {}

@@ -142,9 +142,15 @@ struct TripOutputScreen: View {
                 discoverTab
 
             case .nearYou:
-                // Gated off until the MapKit grounding exists. Reachable only if
-                // the flag is flipped, and then it is honest about what it is.
-                KnowBeforeYouGoPlaceholder(destination: store.fullDestinationString)
+                // Gated off until the MapKit grounding exists (§7). What the
+                // tab can already do honestly is the un-grounded half: a
+                // traveller with nowhere booked has no address to ground
+                // against, and the where-to-stay guide is the answer to that.
+                WhereToStayView(
+                    areas: store.state.whereToStayResponse,
+                    destination: store.fullDestinationString,
+                    onRetry: canRetry ? { store.send(.retryComponent(.whereToStay)) } : nil
+                )
 
             case .knowBeforeYouGo:
                 KnowBeforeYouGoPlaceholder(destination: store.fullDestinationString)
@@ -172,11 +178,18 @@ struct TripOutputScreen: View {
             )
             .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
 
+            // Below the feed rather than inside it, so the row stays put while
+            // the carousels move. Gated until the tap does something (S8).
+            if OutputFeatureFlags.interestChipsEnabled && !store.state.mode.isReadOnly {
+                InterestChipsRow(chips: store.interestChips, onTap: nil)
+            }
+
         case .worthIt:
             WorthItSkipView(
-                items: store.worthItCards,
+                items: store.worthItValue,
                 decision: { store.worthItDecision(for: $0) },
-                onDecide: { store.send(.decideWorthIt($0, $1)) }
+                onDecide: { store.send(.decideWorthIt($0, $1)) },
+                onRetry: canRetry ? { store.send(.retryComponent(.worthIt)) } : nil
             )
             .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
 
@@ -415,21 +428,23 @@ extension View {
 }
 
 #Preview {
-    NavigationStack {
-        TripOutputScreen(
-            initialState: .init(
-                generationRequest: .init(input: .mock),
-                details: .mock,
-                selectedContentTab: .discover,
-                mode: .newTrip,
-                itineraryResponse: .loaded(.mock),
-                suggestionsResponse: .loaded(.mock),
-                imageUrlResponse: .loaded(URL(
-                    string: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1080&q=80")!
-                ),
-                worthItItems: Trip.WorthItItem.mockSet
-            )
+    var state = TripOutputStore.State(
+        generationRequest: .init(input: .mock),
+        details: .mock,
+        selectedContentTab: .discover,
+        mode: .newTrip,
+        itineraryResponse: .loaded(.mock),
+        suggestionsResponse: .loaded(.mock),
+        imageUrlResponse: .loaded(URL(
+            string: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=1080&q=80")!
         )
+    )
+    state.worthItResponse = .loaded(Trip.WorthItItem.mockSet)
+    state.whereToStayResponse = .loaded(Trip.StayArea.mockSet)
+    state.interestPrompts = ["Natural wine bars", "Rooftop sunsets", "Modernista rooftops"]
+
+    return NavigationStack {
+        TripOutputScreen(initialState: state)
     }
     .environmentObject(NavigationRouter())
 }

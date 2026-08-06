@@ -23,6 +23,17 @@ export const publishTrip = mutation({
     itinerary: v.any(),
     suggestions: v.optional(v.any()),
     favorites: v.optional(v.any()),
+    /**
+     * Worth-it/Skip **content** travels; the sender's **decisions** never do
+     * (§4). The recipient gets the four cards undecided, because deciding is
+     * the point of the section — a card that arrives pre-skipped is just a card
+     * with a stranger's opinion stamped on it.
+     */
+    worthItItems: v.optional(v.any()),
+    /** The where-to-stay guide. Shared content, no personal layer in it. */
+    whereToStay: v.optional(v.any()),
+    /** The model-picked interest chips, so a recipient sees the same three. */
+    interestPrompts: v.optional(v.any()),
     // The Swift client's ConvexEncodable dictionary sends a `nil` value as
     // JSON `null` (an absent Swift Optional, not an absent key) — so this
     // must accept `null`, not just "key omitted", or a real user sharing a
@@ -59,6 +70,9 @@ export const publishTrip = mutation({
       itinerary: args.itinerary,
       suggestions: args.suggestions,
       favorites: args.favorites,
+      worthItItems: args.worthItItems,
+      whereToStay: args.whereToStay,
+      interestPrompts: args.interestPrompts,
       imageUrl: args.imageUrl ?? undefined,
       createdAt: Date.now(),
     });

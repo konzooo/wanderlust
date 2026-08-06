@@ -34,7 +34,20 @@ export type OpenAIResult = {
  * shown to users through a lookup table on the client.
  */
 export class OpenAIError extends Error {
-  constructor(public readonly code: string) {
+  /**
+   * What the failed call still consumed, when the provider told us.
+   *
+   * A truncation is the case that matters: `incomplete_max_output_tokens`
+   * arrives with a full usage block, and its `outputTokens` is exactly the
+   * ceiling that was too low. Throwing that away and recording zeros — which is
+   * what happened before — would leave the one measurement V13 asks for
+   * missing from precisely the runs that needed it.
+   */
+  constructor(
+    public readonly code: string,
+    public readonly usage?: OpenAIUsage,
+    public readonly durationMs?: number,
+  ) {
     super(code);
     this.name = "OpenAIError";
   }
@@ -89,22 +102,25 @@ export async function callOpenAI(args: {
   const usage = extractUsage(json);
 
   if (json.status === "incomplete") {
-    // Almost always `max_output_tokens`. Surfacing it distinctly is what lets
-    // the token ceiling be re-derived from measurement rather than guesswork.
+    // Almost always `max_output_tokens`. Surfacing it distinctly — with the
+    // usage block attached — is what lets the token ceiling be re-derived from
+    // measurement rather than guesswork.
     const reason = (json.incomplete_details as Record<string, unknown> | undefined)?.reason;
     throw new OpenAIError(
       typeof reason === "string" ? `incomplete_${reason}` : "output_incomplete",
+      usage,
+      durationMs,
     );
   }
 
   const text = extractOutputText(json);
-  if (!text) throw new OpenAIError("missing_text_content");
+  if (!text) throw new OpenAIError("missing_text_content", usage, durationMs);
 
   let data: unknown;
   try {
     data = JSON.parse(text);
   } catch {
-    throw new OpenAIError("schema_decode_failed");
+    throw new OpenAIError("schema_decode_failed", usage, durationMs);
   }
 
   return { data, usage, durationMs };

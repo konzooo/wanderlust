@@ -7,7 +7,11 @@ import {
   memberRole,
   memberStatus,
 } from "./lib/validators";
-import { generationComponent, tripMode } from "./lib/components";
+import {
+  generationComponent,
+  suggestionsVariant,
+  tripMode,
+} from "./lib/components";
 
 /**
  * Group Trips data model.
@@ -103,6 +107,17 @@ export default defineSchema({
     suggestions: v.optional(v.any()),
     /** `Trip.Favorites` — shown read-only-but-editable on the recipient's local copy. */
     favorites: v.optional(v.any()),
+    /**
+     * Worth-it/Skip cards. CONTENT ONLY — `worthItDecisions` is deliberately
+     * not a column here and never will be. Whether the sender skipped Park
+     * Güell is their business, and a recipient who receives it pre-decided has
+     * been handed a verdict instead of a question (§4).
+     */
+    worthItItems: v.optional(v.any()),
+    /** The where-to-stay guide (D10). */
+    whereToStay: v.optional(v.any()),
+    /** Model-picked interest chip labels (D8). */
+    interestPrompts: v.optional(v.any()),
     /** The destination photo the app already resolved while generating. */
     imageUrl: v.optional(v.string()),
     /** OG-card-sized (1200x630) photo, cached by the /t endpoint. */
@@ -180,6 +195,23 @@ export default defineSchema({
     durationMs: v.number(),
     /** Absent on success; a stable `OpenAIError` code otherwise. */
     errorCode: v.optional(v.string()),
+    /**
+     * Which arm of the D15 experiment produced this row. Optional because rows
+     * written before the experiment existed have no answer — and inventing one
+     * for them would corrupt the very comparison this column exists to make.
+     */
+    variant: v.optional(suggestionsVariant),
+    /**
+     * The ceiling this call ran under. Recorded next to `outputTokens` because
+     * neither number means anything alone: "3,900 tokens" is comfortable under
+     * 8,192 and a truncation waiting to happen under 4,096.
+     */
+    maxOutputTokens: v.optional(v.number()),
+    /**
+     * Post-decode repairs applied (§3). A rising repair rate is how a prompt
+     * that has quietly stopped obeying its own counts becomes visible.
+     */
+    repairs: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_component", ["component", "createdAt"]),
 });

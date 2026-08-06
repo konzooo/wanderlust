@@ -10,11 +10,15 @@
 		AA6000010000000000000001 /* OutputFeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6000020000000000000002 /* OutputFeatureFlags.swift */; };
 		AA6100010000000000000001 /* DiscoverSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6100020000000000000002 /* DiscoverSegment.swift */; };
 		AA6200010000000000000001 /* WorthItSkipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6200020000000000000002 /* WorthItSkipView.swift */; };
+		AA7200010000000000000001 /* WhereToStayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7200020000000000000002 /* WhereToStayView.swift */; };
+		AA7100010000000000000001 /* InterestChipsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7100020000000000000002 /* InterestChipsRow.swift */; };
 		AA6300010000000000000001 /* KnowBeforeYouGoPlaceholder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6300020000000000000002 /* KnowBeforeYouGoPlaceholder.swift */; };
 		AA6400010000000000000001 /* ComponentStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6400020000000000000002 /* ComponentStateView.swift */; };
 		AA6500010000000000000001 /* FavouritesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6500020000000000000002 /* FavouritesSheet.swift */; };
 		AA6600010000000000000001 /* WorthItDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6600020000000000000002 /* WorthItDecisionTests.swift */; };
 		AA6700010000000000000001 /* FavouritesPlumbingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6700020000000000000002 /* FavouritesPlumbingTests.swift */; };
+		AA7300010000000000000001 /* AlreadyRecommendedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7300020000000000000002 /* AlreadyRecommendedTests.swift */; };
+		AA7400010000000000000001 /* DiscoverContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7400020000000000000002 /* DiscoverContentTests.swift */; };
 		AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000020000000000000002 /* AnalyticsStoreTests.swift */; };
 		AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3000020000000000000002 /* TripPersistenceTests.swift */; };
 		AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */; };
@@ -148,11 +152,15 @@
 		AA6000020000000000000002 /* OutputFeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputFeatureFlags.swift; sourceTree = "<group>"; };
 		AA6100020000000000000002 /* DiscoverSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverSegment.swift; sourceTree = "<group>"; };
 		AA6200020000000000000002 /* WorthItSkipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorthItSkipView.swift; sourceTree = "<group>"; };
+		AA7200020000000000000002 /* WhereToStayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhereToStayView.swift; sourceTree = "<group>"; };
+		AA7100020000000000000002 /* InterestChipsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterestChipsRow.swift; sourceTree = "<group>"; };
 		AA6300020000000000000002 /* KnowBeforeYouGoPlaceholder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowBeforeYouGoPlaceholder.swift; sourceTree = "<group>"; };
 		AA6400020000000000000002 /* ComponentStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComponentStateView.swift; sourceTree = "<group>"; };
 		AA6500020000000000000002 /* FavouritesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavouritesSheet.swift; sourceTree = "<group>"; };
 		AA6600020000000000000002 /* WorthItDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorthItDecisionTests.swift; sourceTree = "<group>"; };
 		AA6700020000000000000002 /* FavouritesPlumbingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavouritesPlumbingTests.swift; sourceTree = "<group>"; };
+		AA7300020000000000000002 /* AlreadyRecommendedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyRecommendedTests.swift; sourceTree = "<group>"; };
+		AA7400020000000000000002 /* DiscoverContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverContentTests.swift; sourceTree = "<group>"; };
 		AA1000020000000000000002 /* AnalyticsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsStoreTests.swift; sourceTree = "<group>"; };
 		AA3000020000000000000002 /* TripPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPersistenceTests.swift; sourceTree = "<group>"; };
 		AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -301,6 +309,7 @@
 			isa = PBXGroup;
 			children = (
 				AA6100020000000000000002 /* DiscoverSegment.swift */,
+				AA7100020000000000000002 /* InterestChipsRow.swift */,
 			);
 			path = Discover;
 			sourceTree = "<group>";
@@ -311,6 +320,14 @@
 				AA6200020000000000000002 /* WorthItSkipView.swift */,
 			);
 			path = WorthIt;
+			sourceTree = "<group>";
+		};
+		AA6D00000000000000000001 /* WhereToStay */ = {
+			isa = PBXGroup;
+			children = (
+				AA7200020000000000000002 /* WhereToStayView.swift */,
+			);
+			path = WhereToStay;
 			sourceTree = "<group>";
 		};
 		AA6C00000000000000000001 /* KnowBeforeYouGo */ = {
@@ -441,6 +458,7 @@
 				619B3D372E2704AF00B33648 /* Favorites */,
 				AA6A00000000000000000001 /* Discover */,
 				AA6B00000000000000000001 /* WorthIt */,
+				AA6D00000000000000000001 /* WhereToStay */,
 				AA6C00000000000000000001 /* KnowBeforeYouGo */,
 				AA6000020000000000000002 /* OutputFeatureFlags.swift */,
 				6199854A2E1BF8B5003A8A61 /* TripStore.swift */,
@@ -511,6 +529,8 @@
 				AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */,
 				AA6600020000000000000002 /* WorthItDecisionTests.swift */,
 				AA6700020000000000000002 /* FavouritesPlumbingTests.swift */,
+				AA7300020000000000000002 /* AlreadyRecommendedTests.swift */,
+				AA7400020000000000000002 /* DiscoverContentTests.swift */,
 				5D4EFFC52CB05B0F007E3FF2 /* WanderlustTests.swift */,
 			);
 			path = WanderlustTests;
@@ -928,6 +948,8 @@
 				AA6000010000000000000001 /* OutputFeatureFlags.swift in Sources */,
 				AA6100010000000000000001 /* DiscoverSegment.swift in Sources */,
 				AA6200010000000000000001 /* WorthItSkipView.swift in Sources */,
+				AA7200010000000000000001 /* WhereToStayView.swift in Sources */,
+				AA7100010000000000000001 /* InterestChipsRow.swift in Sources */,
 				AA6300010000000000000001 /* KnowBeforeYouGoPlaceholder.swift in Sources */,
 				AA6400010000000000000001 /* ComponentStateView.swift in Sources */,
 				AA6500010000000000000001 /* FavouritesSheet.swift in Sources */,
@@ -980,6 +1002,8 @@
 				AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */,
 				AA6600010000000000000001 /* WorthItDecisionTests.swift in Sources */,
 				AA6700010000000000000001 /* FavouritesPlumbingTests.swift in Sources */,
+				AA7300010000000000000001 /* AlreadyRecommendedTests.swift in Sources */,
+				AA7400010000000000000001 /* DiscoverContentTests.swift in Sources */,
 				5D4EFFC62CB05B0F007E3FF2 /* WanderlustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

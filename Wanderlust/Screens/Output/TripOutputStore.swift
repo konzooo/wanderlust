@@ -34,8 +34,15 @@ class TripOutputStore: ObservableStore {
     
     private let itineraryService: any ItineraryGenerating
     private let suggestionsService: any SuggestionsGenerating
+    private let worthItService: any WorthItGenerating
+    private let whereToStayService: any WhereToStayGenerating
 
     private let imageService: ImageService
+
+    /// Which arm of the D15 experiment this store runs. Injectable so a test
+    /// can exercise both without rebuilding, and so the eventual removal of the
+    /// losing arm is a change in one constant rather than a hunt through here.
+    private let variant: SuggestionsVariant
 
     /// Owns every in-flight generation task for this screen. See
     /// `TripGenerationCoordinator` for why nothing may bypass it.
@@ -45,30 +52,20 @@ class TripOutputStore: ObservableStore {
         initialState: State,
         imageService: ImageService = UnsplashService(),
         itineraryService: (any ItineraryGenerating)? = nil,
-        suggestionsService: (any SuggestionsGenerating)? = nil
+        suggestionsService: (any SuggestionsGenerating)? = nil,
+        worthItService: (any WorthItGenerating)? = nil,
+        whereToStayService: (any WhereToStayGenerating)? = nil,
+        variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
         state = initialState
         self.imageService = imageService
-        self.itineraryService = itineraryService ?? Self.makeItineraryService()
-        self.suggestionsService = suggestionsService ?? Self.makeSuggestionsService()
+        self.variant = variant
+        self.itineraryService = itineraryService ?? TripPlanningServices.itinerary()
+        self.suggestionsService = suggestionsService ?? TripPlanningServices.suggestions()
+        self.worthItService = worthItService ?? TripPlanningServices.worthIt()
+        self.whereToStayService = whereToStayService ?? TripPlanningServices.whereToStay()
     }
 
-    /// Builds the itinerary service, substituting mock data when the debug flag is on.
-    private static func makeItineraryService() -> any ItineraryGenerating {
-        if DebugSettings.useMockTripData {
-            return MockItineraryService()
-        }
-        return TripPlanningServices.itinerary()
-    }
-
-    /// Builds the suggestions service, substituting mock data when the debug flag is on.
-    private static func makeSuggestionsService() -> any SuggestionsGenerating {
-        if DebugSettings.useMockTripData {
-            return MockSuggestionsService()
-        }
-        return TripPlanningServices.suggestions()
-    }
-    
     func setRouter(_ router: NavigationRouter) {
         self.router = router
     }
@@ -96,7 +93,7 @@ class TripOutputStore: ObservableStore {
             // component that FAILED is left alone on purpose: re-generating it
             // silently on every re-appear would spend the traveller's quota
             // without them asking. Recovery is `.retry`.
-            for component in TripComponent.automatic {
+            for component in TripComponent.automatic(variant: variant) {
                 generate(component)
             }
 
@@ -108,7 +105,8 @@ class TripOutputStore: ObservableStore {
             // Re-runs exactly the components that need it. Previously this
             // re-ran the itinerary only, so a suggestions failure was
             // unrecoverable without regenerating the entire trip.
-            for component in TripComponent.automatic where response(for: component).needsRetry {
+            for component in TripComponent.automatic(variant: variant)
+            where response(for: component).needsRetry {
                 generate(component, restart: true)
             }
             fetchDestinationImage()
@@ -202,10 +200,25 @@ extension TripOutputStore {
         var imageUrlResponse: AsyncValue<URL> = .initial
         var didLogResultViewed = false
 
-        /// The Worth-it/Skip cards. `nil` until something generates them — the
-        /// segment isn't offered while it is nil, rather than showing an empty
-        /// one.
-        var worthItItems: [Trip.WorthItItem]? = nil
+        /// The Worth-it/Skip cards, as their own component state.
+        ///
+        /// Its own `AsyncValue` even under the combined variant, where these
+        /// arrive on the suggestions call: the segment needs to be able to say
+        /// "still writing" and "that didn't come through" on its own, and the
+        /// UI must not be able to tell which arm of the D15 experiment ran.
+        var worthItResponse: AsyncValue<[Trip.WorthItItem]> = .initial
+
+        /// The where-to-stay guide (D10).
+        var whereToStayResponse: AsyncValue<[Trip.StayArea]> = .initial
+
+        /// The three model-picked interest labels. The three fixed ones are a
+        /// client-side constant and are added at the point of display.
+        var interestPrompts: [String] = []
+
+        /// The cards themselves, for the many read sites that only want the
+        /// content. `nil` covers "not asked", "still running" and "failed"
+        /// alike — the states the section itself distinguishes.
+        var worthItItems: [Trip.WorthItItem]? { worthItResponse.data }
 
         /// The traveller's calls on those cards. An id with no entry is
         /// *undecided*, which is where every card starts and where Undo returns
@@ -288,9 +301,30 @@ extension TripOutputStore {
     /// record the decision in.
     var discoverSegments: [DiscoverSegment] {
         var segments: [DiscoverSegment] = [.suggestions]
-        if worthItCards.isEmpty == false { segments.append(.worthIt) }
+        if showsWorthItSegment { segments.append(.worthIt) }
         segments.append(.itinerary)
         return segments
+    }
+
+    /// Whether Worth-it/Skip gets a pill at all.
+    ///
+    /// It earns one the moment its call starts, not when the content lands, so
+    /// the segment can show its own "still writing" and "that didn't come
+    /// through" states rather than materialising out of nowhere partway through
+    /// generation. A trip that never asked for cards — an old saved file — has
+    /// no pill, and a call that came back genuinely empty loses it again.
+    private var showsWorthItSegment: Bool {
+        guard state.mode != .groupTrip else { return false }
+        switch state.worthItResponse {
+        case .initial: return false
+        case .loading, .error: return true
+        case .loaded(let items): return !items.isEmpty
+        }
+    }
+
+    /// The Worth-it/Skip section's state, already filtered by mode.
+    var worthItValue: AsyncValue<[Trip.WorthItItem]> {
+        state.mode == .groupTrip ? .loaded([]) : state.worthItResponse
     }
 
     /// The Worth-it/Skip cards to render, already filtered by mode.
@@ -301,6 +335,34 @@ extension TripOutputStore {
 
     func worthItDecision(for id: UUID) -> WorthItDecision? {
         state.worthItDecisions[id]
+    }
+
+    /// The chips offered under the suggestions feed (D8).
+    ///
+    /// Three from the model plus three fixed ones the app always offers. The
+    /// fixed three are appended rather than interleaved so their position is
+    /// stable across trips, and a model label that duplicates one of them is
+    /// dropped — the backend already filters these, but a shared trip from an
+    /// older build can carry a duplicate, and a chip row with "Climbing gyms"
+    /// twice is a bug the traveller can see.
+    static let fixedInterestChips = ["Running routes", "Remote-work cafés", "Climbing gyms"]
+
+    var interestChips: [String] {
+        var seen = Set<String>()
+        return (state.interestPrompts + Self.fixedInterestChips).filter {
+            seen.insert(Self.chipKey($0)).inserted
+        }
+    }
+
+    /// Folds case, accents and punctuation, so "Remote-work cafés" and
+    /// "Remote work cafes" are one chip. Mirrors `normaliseChip` in the
+    /// backend's `validation.ts`.
+    private static func chipKey(_ label: String) -> String {
+        label
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
     }
 }
 
@@ -319,8 +381,10 @@ extension TripOutputStore {
             itinerary: itinerary,
             suggestionsState: state.suggestionsResponse.persisted,
             deepDives: state.deepDives,
-            worthItItems: state.worthItItems,
+            worthItItems: state.worthItResponse.persistedContent,
             worthItDecisions: state.worthItDecisions,
+            whereToStay: state.whereToStayResponse.persistedContent,
+            interestPrompts: state.interestPrompts.isEmpty ? nil : state.interestPrompts,
             favorites: state.favorites
         )
     }
@@ -381,9 +445,17 @@ extension TripOutputStore {
     /// reason navigating back onto this screen mid-generation no longer buys a
     /// second copy of everything. `restart: true` is the explicit retry path: it
     /// cancels whatever is outstanding and supersedes it.
-    func generate(_ component: TripComponent, restart: Bool = false) {
+    func generate(_ requested: TripComponent, restart: Bool = false) {
+        let component = owningComponent(requested)
         guard let request = state.generationRequest else { return }
         guard restart || response(for: component).isUnstarted else { return }
+
+        // Derived at call time, from what this trip currently holds (§11).
+        // Never persisted: a stored copy goes stale the moment a component is
+        // retried or a deep dive lands, and a stale list still looks like a
+        // list. Computed here rather than inside the task so it reflects the
+        // state at the moment the call was decided on.
+        let context = alreadyRecommended()
 
         let startedAt = Date()
         let attempt = coordinator.begin(component, restart: restart) { [weak self] attempt in
@@ -399,9 +471,23 @@ extension TripOutputStore {
                     logResultViewedIfNeeded()
 
                 case .suggestions:
-                    let suggestions = try await suggestionsService.generate(request)
+                    let payload = try await suggestionsService.generate(
+                        request, alreadyRecommended: context
+                    )
                     guard coordinator.isCurrent(component, attempt: attempt) else { return }
-                    state.suggestionsResponse = .loaded(suggestions)
+                    apply(payload)
+
+                case .worthIt:
+                    let items = try await worthItService.generate(
+                        request, alreadyRecommended: context
+                    )
+                    guard coordinator.isCurrent(component, attempt: attempt) else { return }
+                    state.worthItResponse = .loaded(items)
+
+                case .whereToStay:
+                    let areas = try await whereToStayService.generate(request)
+                    guard coordinator.isCurrent(component, attempt: attempt) else { return }
+                    state.whereToStayResponse = .loaded(areas)
 
                 case .deepDive:
                     // Interest deep dives have no client entry point yet; the
@@ -442,14 +528,56 @@ extension TripOutputStore {
         )
     }
 
+    /// Which call actually produces a section, in this build's variant.
+    ///
+    /// Under `combined` the Worth-it cards and the where-to-stay guide have no
+    /// call of their own — they arrive on the suggestions response. Every entry
+    /// point routes through here so that "retry the Worth-it cards" means the
+    /// same thing to the coordinator, to single-flight and to the retry
+    /// affordance, whichever arm is running.
+    private func owningComponent(_ component: TripComponent) -> TripComponent {
+        guard variant == .combined else { return component }
+        return component == .worthIt || component == .whereToStay ? .suggestions : component
+    }
+
+    /// Everything the suggestions call brought back, fanned out.
+    ///
+    /// Under the split variant this is only the categories and the chips; the
+    /// two sections keep whatever their own calls produced. Under the combined
+    /// variant it carries all four, and a section the backend had to drop
+    /// lands as a genuinely-empty `.loaded([])` — not as `.initial`, which
+    /// would claim it was never asked for.
+    private func apply(_ payload: SuggestionsPayload) {
+        state.suggestionsResponse = .loaded(payload.suggestions)
+        if !payload.interestPrompts.isEmpty {
+            state.interestPrompts = payload.interestPrompts
+        }
+        guard variant == .combined else { return }
+        state.worthItResponse = .loaded(payload.worthIt ?? [])
+        state.whereToStayResponse = .loaded(payload.whereToStay ?? [])
+    }
+
     /// This screen's live state for one component, flattened so the coordinator
     /// logic can reason about every component without caring what it holds.
     func response(for component: TripComponent) -> ComponentResponse {
         switch component {
         case .itinerary: ComponentResponse(state.itineraryResponse)
         case .suggestions: ComponentResponse(state.suggestionsResponse)
+        case .worthIt: ComponentResponse(state.worthItResponse)
+        case .whereToStay: ComponentResponse(state.whereToStayResponse)
         case .deepDive: ComponentResponse(AsyncValue<Trip.Suggestions>.initial)
         }
+    }
+
+    /// Places this trip has already put in front of the traveller (§11).
+    ///
+    /// Built from live screen state, not from disk, so a component that landed
+    /// seconds ago counts and a component that was just retried contributes its
+    /// new places rather than its old ones. Empty until the itinerary arrives,
+    /// which is correct: the parallel calls that start alongside it genuinely
+    /// have nothing to avoid yet.
+    func alreadyRecommended() -> [String] {
+        favouritesSourceTrip?.alreadyRecommended ?? []
     }
 
     struct ComponentResponse: Equatable {
@@ -471,7 +599,19 @@ extension TripOutputStore {
     private func setLoading(_ component: TripComponent) {
         switch component {
         case .itinerary: state.itineraryResponse = .loading
-        case .suggestions: state.suggestionsResponse = .loading
+        case .suggestions:
+            state.suggestionsResponse = .loading
+            // Under the combined variant these three share one call, so they
+            // share its states too — including its failure. That coupling is
+            // not an implementation detail to hide; it is precisely the cost
+            // D15 weighs, and burying it would make the arm look better than
+            // it is.
+            if variant == .combined {
+                state.worthItResponse = .loading
+                state.whereToStayResponse = .loading
+            }
+        case .worthIt: state.worthItResponse = .loading
+        case .whereToStay: state.whereToStayResponse = .loading
         case .deepDive: break
         }
     }
@@ -479,7 +619,14 @@ extension TripOutputStore {
     private func setFailure(_ component: TripComponent, _ error: Error) {
         switch component {
         case .itinerary: state.itineraryResponse = .error(error)
-        case .suggestions: state.suggestionsResponse = .error(error)
+        case .suggestions:
+            state.suggestionsResponse = .error(error)
+            if variant == .combined {
+                state.worthItResponse = .error(error)
+                state.whereToStayResponse = .error(error)
+            }
+        case .worthIt: state.worthItResponse = .error(error)
+        case .whereToStay: state.whereToStayResponse = .error(error)
         case .deepDive: break
         }
     }
@@ -564,12 +711,14 @@ extension TripOutputStore {
             itinerary: itinerary,
             suggestionsState: state.suggestionsResponse.persisted,
             deepDives: state.deepDives,
-            worthItItems: state.worthItItems,
+            worthItItems: state.worthItResponse.persistedContent,
             // Always written, never `nil`: the personal layer is a live edit, so
             // "the traveller undid every decision" has to reach disk as an empty
             // map rather than as "I don't know", which `merged(over:)` would
             // resolve back to the stored decisions.
             worthItDecisions: state.worthItDecisions,
+            whereToStay: state.whereToStayResponse.persistedContent,
+            interestPrompts: state.interestPrompts.isEmpty ? nil : state.interestPrompts,
             favorites: state.favorites,
             shareCode: state.shareCode,
             tripKey: state.generationRequest?.tripKey
@@ -706,6 +855,13 @@ extension TripOutputStore {
                     itinerary: itinerary,
                     suggestions: state.suggestionsResponse.data,
                     favorites: state.favorites,
+                    // Content travels; decisions do not (§4). The recipient
+                    // gets the four cards undecided, because deciding is the
+                    // point of the section — there is deliberately no argument
+                    // here to pass `worthItDecisions` through.
+                    worthItItems: state.worthItResponse.data,
+                    whereToStay: state.whereToStayResponse.data,
+                    interestPrompts: state.interestPrompts,
                     imageUrl: state.imageUrlResponse.data?.absoluteString
                 )
                 state.shareCode = code

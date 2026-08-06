@@ -75,6 +75,10 @@ export type SharedTripDTO = {
   itinerary: unknown;
   suggestions: unknown | null;
   favorites: unknown | null;
+  /** Content only — see the `sharedTrips` schema on why decisions are absent. */
+  worthItItems: unknown | null;
+  whereToStay: unknown | null;
+  interestPrompts: unknown | null;
   imageUrl: string | null;
 };
 
@@ -90,6 +94,9 @@ export function toSharedTripDTO(doc: Doc<"sharedTrips">): SharedTripDTO {
     itinerary: doc.itinerary,
     suggestions: doc.suggestions ?? null,
     favorites: doc.favorites ?? null,
+    worthItItems: doc.worthItItems ?? null,
+    whereToStay: doc.whereToStay ?? null,
+    interestPrompts: doc.interestPrompts ?? null,
     imageUrl: doc.imageUrl ?? null,
   };
 }

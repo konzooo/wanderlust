@@ -5,6 +5,7 @@
 //  The four things you already half-decided to do, argued both ways.
 //
 
+import CoreArchitecture
 import CoreModels
 import DesignSystem
 import SwiftUI
@@ -15,25 +16,36 @@ import SwiftUI
 /// complete, and a "1 of 4" turns a nice argument with a friend into homework.
 /// Undecided is a perfectly good place to leave a card.
 struct WorthItSkipView: View {
-    let items: [Trip.WorthItItem]
+    /// The section's own state. Its own call under the split variant, and a
+    /// share of the suggestions call's under the combined one — either way the
+    /// segment shows its own progress and its own way back.
+    let items: AsyncValue<[Trip.WorthItItem]>
     /// `nil` for an undecided card.
     let decision: (UUID) -> WorthItDecision?
     /// `nil` undoes, returning the card to undecided.
     let onDecide: (UUID, WorthItDecision?) -> Void
+    /// `nil` in read-only modes, where there is nothing to re-request.
+    let onRetry: (() -> Void)?
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: .Padding.sm3) {
-                ForEach(items) { item in
-                    WorthItCard(
-                        item: item,
-                        decision: decision(item.id),
-                        onDecide: { onDecide(item.id, $0) }
-                    )
+        ComponentStateView(
+            value: items,
+            subject: "the calls worth arguing about",
+            onRetry: onRetry
+        ) { cards in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: .Padding.sm3) {
+                    ForEach(cards) { item in
+                        WorthItCard(
+                            item: item,
+                            decision: decision(item.id),
+                            onDecide: { onDecide(item.id, $0) }
+                        )
+                    }
                 }
+                .padding(.horizontal, .Padding.sm3)
+                .padding(.vertical, .Padding.md)
             }
-            .padding(.horizontal, .Padding.sm3)
-            .padding(.vertical, .Padding.md)
         }
     }
 }
@@ -45,7 +57,7 @@ private struct WorthItCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: .Spacing.medium) {
-            Text(item.place)
+            Text(item.linkableTitle.linkedText)
                 .font(DS.Typography.generatedTitle)
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -154,9 +166,10 @@ private struct WorthItActionStyle: ButtonStyle {
 #Preview {
     @Previewable @State var decisions: [UUID: WorthItDecision] = [:]
     return WorthItSkipView(
-        items: Trip.WorthItItem.mockSet,
+        items: .loaded(Trip.WorthItItem.mockSet),
         decision: { decisions[$0] },
-        onDecide: { decisions[$0] = $1 }
+        onDecide: { decisions[$0] = $1 },
+        onRetry: nil
     )
     .gradientBackground()
 }

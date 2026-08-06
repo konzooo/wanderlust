@@ -20,6 +20,10 @@
 		AA7300010000000000000001 /* AlreadyRecommendedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7300020000000000000002 /* AlreadyRecommendedTests.swift */; };
 		AA7400010000000000000001 /* DiscoverContentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7400020000000000000002 /* DiscoverContentTests.swift */; };
 		AA6800010000000000000001 /* KnowBeforeYouGoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6800020000000000000002 /* KnowBeforeYouGoTests.swift */; };
+		AA7700010000000000000001 /* NearYouMapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7700020000000000000002 /* NearYouMapService.swift */; };
+		AA7800010000000000000001 /* NearYouGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7800020000000000000002 /* NearYouGenerationService.swift */; };
+		AA7900010000000000000001 /* NearYouView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7900020000000000000002 /* NearYouView.swift */; };
+		AA7A00010000000000000001 /* NearYouTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7A00020000000000000002 /* NearYouTests.swift */; };
 		AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000020000000000000002 /* AnalyticsStoreTests.swift */; };
 		AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA3000020000000000000002 /* TripPersistenceTests.swift */; };
 		AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */; };
@@ -165,6 +169,10 @@
 		AA7300020000000000000002 /* AlreadyRecommendedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlreadyRecommendedTests.swift; sourceTree = "<group>"; };
 		AA7400020000000000000002 /* DiscoverContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverContentTests.swift; sourceTree = "<group>"; };
 		AA6800020000000000000002 /* KnowBeforeYouGoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowBeforeYouGoTests.swift; sourceTree = "<group>"; };
+		AA7700020000000000000002 /* NearYouMapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouMapService.swift; sourceTree = "<group>"; };
+		AA7800020000000000000002 /* NearYouGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouGenerationService.swift; sourceTree = "<group>"; };
+		AA7900020000000000000002 /* NearYouView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouView.swift; sourceTree = "<group>"; };
+		AA7A00020000000000000002 /* NearYouTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouTests.swift; sourceTree = "<group>"; };
 		AA1000020000000000000002 /* AnalyticsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsStoreTests.swift; sourceTree = "<group>"; };
 		AA3000020000000000000002 /* TripPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripPersistenceTests.swift; sourceTree = "<group>"; };
 		AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripGenerationCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -344,6 +352,16 @@
 			path = KnowBeforeYouGo;
 			sourceTree = "<group>";
 		};
+		AA7600000000000000000001 /* NearYou */ = {
+			isa = PBXGroup;
+			children = (
+				AA7700020000000000000002 /* NearYouMapService.swift */,
+				AA7800020000000000000002 /* NearYouGenerationService.swift */,
+				AA7900020000000000000002 /* NearYouView.swift */,
+			);
+			path = NearYou;
+			sourceTree = "<group>";
+		};
 		332E555BE7A79746BC21D315 /* GroupTrips */ = {
 			isa = PBXGroup;
 			children = (
@@ -465,6 +483,7 @@
 				AA6A00000000000000000001 /* Discover */,
 				AA6B00000000000000000001 /* WorthIt */,
 				AA6D00000000000000000001 /* WhereToStay */,
+				AA7600000000000000000001 /* NearYou */,
 				AA6C00000000000000000001 /* KnowBeforeYouGo */,
 				AA6000020000000000000002 /* OutputFeatureFlags.swift */,
 				6199854A2E1BF8B5003A8A61 /* TripStore.swift */,
@@ -538,6 +557,7 @@
 				AA7300020000000000000002 /* AlreadyRecommendedTests.swift */,
 				AA7400020000000000000002 /* DiscoverContentTests.swift */,
 				AA6800020000000000000002 /* KnowBeforeYouGoTests.swift */,
+				AA7A00020000000000000002 /* NearYouTests.swift */,
 				5D4EFFC52CB05B0F007E3FF2 /* WanderlustTests.swift */,
 			);
 			path = WanderlustTests;
@@ -962,6 +982,9 @@
 				AA7200010000000000000001 /* WhereToStayView.swift in Sources */,
 				AA7100010000000000000001 /* InterestChipsRow.swift in Sources */,
 				AA6300010000000000000001 /* KnowBeforeYouGoView.swift in Sources */,
+				AA7700010000000000000001 /* NearYouMapService.swift in Sources */,
+				AA7800010000000000000001 /* NearYouGenerationService.swift in Sources */,
+				AA7900010000000000000001 /* NearYouView.swift in Sources */,
 				AA6400010000000000000001 /* ComponentStateView.swift in Sources */,
 				AA6500010000000000000001 /* FavouritesSheet.swift in Sources */,
 				619B3D392E2704B500B33648 /* FavouritesListView.swift in Sources */,
@@ -1016,6 +1039,7 @@
 				AA7300010000000000000001 /* AlreadyRecommendedTests.swift in Sources */,
 				AA7400010000000000000001 /* DiscoverContentTests.swift in Sources */,
 				AA6800010000000000000001 /* KnowBeforeYouGoTests.swift in Sources */,
+				AA7A00010000000000000001 /* NearYouTests.swift in Sources */,
 				5D4EFFC62CB05B0F007E3FF2 /* WanderlustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

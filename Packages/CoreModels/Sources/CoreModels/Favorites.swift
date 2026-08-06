@@ -142,6 +142,19 @@ extension Trip {
             )
         }
 
+        // Near You's editorial layer is heartable. The deterministic practical
+        // layer is deliberately absent: transport, grocery and pharmacy are
+        // reference facts, not editorial recommendations.
+        for pick in nearYou?.editorialPicks ?? [] {
+            result.append(
+                .init(
+                    id: pick.id,
+                    text: pick.candidate.favouriteText(explanation: pick.explanation),
+                    context: "Near you"
+                )
+            )
+        }
+
         return result
     }
 

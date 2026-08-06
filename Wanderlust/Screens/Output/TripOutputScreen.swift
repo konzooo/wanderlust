@@ -142,14 +142,22 @@ struct TripOutputScreen: View {
                 discoverTab
 
             case .nearYou:
-                // Gated off until the MapKit grounding exists (§7). What the
-                // tab can already do honestly is the un-grounded half: a
-                // traveller with nowhere booked has no address to ground
-                // against, and the where-to-stay guide is the answer to that.
-                WhereToStayView(
-                    areas: store.state.whereToStayResponse,
+                NearYouView(
+                    accommodation: store.state.accommodation,
+                    result: store.state.nearYouResponse,
+                    addressResolution: store.state.nearYouAddressResolution,
+                    whereToStay: store.state.whereToStayResponse,
                     destination: store.fullDestinationString,
-                    onRetry: canRetry ? { store.send(.retryComponent(.whereToStay)) } : nil
+                    favorites: $store.state.favorites,
+                    onSearchAddress: { store.send(.resolveNearYouAddress($0)) },
+                    onChooseResolution: { store.send(.chooseNearYouResolution($0)) },
+                    onChooseArea: { store.send(.chooseNearYouArea($0)) },
+                    onRetryWhereToStay: canRetry
+                        ? { store.send(.retryComponent(.whereToStay)) }
+                        : nil,
+                    onRetryNearYou: { store.send(.retryNearYou) },
+                    onRegenerate: { store.send(.regenerateNearYou) },
+                    onChangeStay: { store.send(.changeNearYouStay) }
                 )
 
             case .knowBeforeYouGo:
@@ -297,48 +305,6 @@ struct TripOutputScreen: View {
 
     private var backButtonTitle: String {
         store.state.mode == .groupTrip ? "Dashboard" : "Trips"
-    }
-}
-
-/// What the Near You tab says while it is flag-gated.
-///
-/// It lives here rather than in its own file because it is scaffolding with a
-/// known removal date: the grounded Near You (MapKit resolution, real walking
-/// distances, the device-side address boundary) replaces it wholesale. Until
-/// then the tab is not offered at all — this is only reachable by flipping
-/// `OutputFeatureFlags.nearYouEnabled`, and it says plainly what it is.
-private struct NearYouPlaceholder: View {
-    let destination: String
-
-    var body: some View {
-        VStack(spacing: .Spacing.medium) {
-            Image(systemName: "location")
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(Color.appTint)
-                .padding(.top, .Padding.lg)
-
-            Text("Near You")
-                .font(DS.Typography.sectionHeader)
-                .foregroundStyle(.primary)
-
-            Text("Once you tell us where you're staying in \(destination), this is what's actually around you — walking distances from the map, not guesses.")
-                .font(.kanit(15))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Text("Not built yet")
-                .font(DS.Typography.eyebrow)
-                .foregroundStyle(Color.appTint)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.appTint.opacity(0.07)))
-                .overlay(Capsule().stroke(Color.appTint.opacity(0.18), lineWidth: 1))
-                .padding(.top, .Padding.sm)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, .Padding.md2)
     }
 }
 

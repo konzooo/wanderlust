@@ -258,6 +258,22 @@ extension AsyncValue where Value: Codable & Hashable {
     }
 }
 
+extension ComponentState {
+    /// Restores a persisted component into the screen's independent live state.
+    /// No work is started here: `.absent` remains `.initial` and `.failed`
+    /// remains an explicit retryable error until the traveller acts.
+    var asyncValue: AsyncValue<Value> {
+        switch self {
+        case .absent:
+            return .initial
+        case .failed(let code):
+            return .error(TripGenerationError(code: code))
+        case .ready(let value):
+            return .loaded(value)
+        }
+    }
+}
+
 extension AsyncValue {
     /// The content to persist for a section stored as a plain optional array.
     ///

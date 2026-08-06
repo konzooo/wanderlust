@@ -333,6 +333,13 @@ struct SavedTripsScreen: View {
         state.interestPrompts = trip.interestPrompts ?? []
         state.worthItDecisions = trip.worthItDecisions ?? [:]
         state.deepDives = trip.deepDives
+        state.accommodation = trip.accommodation
+        state.nearYouResponse = trip.nearYouState.asyncValue
+        state.nearYouGenerationRequest = TripGenerationRequest(
+            tripKey: trip.tripKey ?? TripKey.mint(),
+            input: trip.generationInput
+                ?? TripGenerationInput(details: trip.details, answers: [])
+        )
 
         router.goToItineraryResult(state, resetStack: false)
     }
@@ -371,6 +378,11 @@ struct SavedTripsScreen: View {
         state.interestPrompts = trip.interestPrompts ?? []
         state.worthItDecisions = trip.worthItDecisions ?? [:]
         state.deepDives = trip.deepDives
+        // Accommodation and Near You are a solo owner's personal layer. A
+        // received share never carries either, even if a future payload grows
+        // fields with similar names.
+        state.accommodation = nil
+        state.nearYouResponse = .initial
 
         router.goToItineraryResult(state, resetStack: false)
     }

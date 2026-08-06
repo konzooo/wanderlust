@@ -19,7 +19,7 @@ enum OutputFeatureFlags {
     /// device-side privacy boundary before it means anything. Until then the
     /// tab is not offered at all — a "Near You" that guesses distances is worse
     /// than no Near You.
-    static let nearYouEnabled = false
+    static let nearYouEnabled = true
 
     /// Know Before You Go now has real content behind it — its own component,
     /// prompt, schema, persistence and retry — so the tab is live rather than a

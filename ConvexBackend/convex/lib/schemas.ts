@@ -222,3 +222,29 @@ export const DEEP_DIVE_SCHEMA = obj({ title: str, texts: arr(LINKABLE_TEXT) }, [
   "title",
   "texts",
 ]);
+
+/**
+ * Grounded Near You selection (§7).
+ *
+ * There is deliberately no venue name, category, coordinate, distance, time or
+ * map-link field in model output. The model can only return an opaque candidate
+ * ID the client supplied and prose explaining why it fits. The client then
+ * reattaches that ID to its original MapKit value.
+ */
+const NEAR_YOU_PICK = obj({ candidateID: str, explanation: str }, [
+  "candidateID",
+  "explanation",
+]);
+
+const NEAR_YOU_SECTION = obj({ title: str, picks: arr(NEAR_YOU_PICK) }, [
+  "title",
+  "picks",
+]);
+
+export const NEAR_YOU_SCHEMA = obj(
+  {
+    sections: arr(NEAR_YOU_SECTION),
+    sparseMessage: nullableStr,
+  },
+  ["sections", "sparseMessage"],
+);

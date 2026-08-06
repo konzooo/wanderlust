@@ -1,0 +1,486 @@
+import CoreArchitecture
+import CoreModels
+import MapKit
+import Networking
+import XCTest
+@testable import Wanderlust
+
+@MainActor
+final class NearYouTests: XCTestCase {
+    func testBackendCandidatePayloadCannotContainExactAccommodation() throws {
+        let exactAddress = "Carrer de Mallorca 166, 2A"
+        let data = try JSONEncoder().encode(NearYouBackendCandidate(candidate: candidate()))
+        let json = String(decoding: data, as: UTF8.self)
+
+        XCTAssertFalse(json.contains(exactAddress))
+        XCTAssertFalse(json.contains("latitude"))
+        XCTAssertFalse(json.contains("longitude"))
+        XCTAssertFalse(json.contains("mapURL"))
+        XCTAssertTrue(json.contains("distanceMetres"))
+        XCTAssertTrue(json.contains("walkingMinutes"))
+    }
+
+    func testUnknownModelCandidateIDCannotMaterialize() {
+        let unknown = UUID()
+        let payload = NearYouSelectionPayload(
+            sections: [
+                .init(
+                    title: "Your kind of morning",
+                    picks: [.init(candidateID: unknown, explanation: "A good fit.")]
+                )
+            ],
+            sparseMessage: nil
+        )
+
+        XCTAssertThrowsError(try payload.materialize(discovery: discovery())) { error in
+            XCTAssertEqual(error as? NearYouSelectionError, .unknownCandidateID(unknown))
+        }
+    }
+
+    func testDisplayedDistanceAndTimeComeFromMapKitCandidate() {
+        let candidate = candidate(distance: 1_240, minutes: 17)
+        let exact = NearYouWalkingFacts.make(candidate: candidate, precision: .address)
+        let approximate = NearYouWalkingFacts.make(
+            candidate: candidate,
+            precision: .neighbourhood
+        )
+
+        XCTAssertEqual(exact.distance, "1.2 km")
+        XCTAssertEqual(exact.duration, "17 min walk")
+        XCTAssertFalse(exact.isApproximate)
+        XCTAssertEqual(approximate.distance, "≈ 1.2 km")
+        XCTAssertEqual(approximate.duration, "≈ 17 min walk")
+        XCTAssertTrue(approximate.isApproximate)
+    }
+
+    func testMapKitVenueIdentityIsStableAndAccommodationIsCoarse() {
+        let coordinate = CLLocationCoordinate2D(latitude: 41.385_123, longitude: 2.173_987)
+        let first = MapKitNearYouService.stableVenueID(
+            name: "Café Grounded",
+            coordinate: coordinate
+        )
+        let second = MapKitNearYouService.stableVenueID(
+            name: "CAFÉ GROUNDED",
+            coordinate: coordinate
+        )
+        let accommodation = CoarseAccommodation(
+            label: "Hotel Example",
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            precision: .address
+        )
+
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(accommodation.latitude, 41.385)
+        XCTAssertEqual(accommodation.longitude, 2.174)
+    }
+
+    func testAddressLevelPathResolvesLocallyAndGenerates() async {
+        let map = StubNearYouMapService()
+        map.addressResult = .resolved(.init(
+            title: "Hotel Example",
+            subtitle: "Carrer de Mallorca",
+            centre: centre(precision: .address)
+        ))
+        let model = StubNearYouGenerator()
+        let store = makeStore(map: map, model: model)
+
+        store.send(.resolveNearYouAddress("Carrer de Mallorca 166"))
+        await settle()
+
+        XCTAssertEqual(map.addressInputs, ["Carrer de Mallorca 166"])
+        XCTAssertEqual(model.callCount, 1)
+        XCTAssertEqual(store.state.accommodation?.precision, .address)
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+        XCTAssertEqual(store.state.nearYouResponse.data?.editorialPicks.first?.id, candidate().id)
+    }
+
+    func testWhereToStayPathUsesNeighbourhoodCentre() async {
+        let map = StubNearYouMapService()
+        map.neighbourhoodCentre = centre(precision: .neighbourhood)
+        let model = StubNearYouGenerator()
+        let store = makeStore(map: map, model: model)
+
+        store.send(.chooseNearYouArea(Trip.StayArea.mockSet[0]))
+        await settle()
+
+        XCTAssertEqual(map.neighbourhoodInputs, [Trip.StayArea.mockSet[0].area])
+        XCTAssertEqual(store.state.accommodation?.precision, .neighbourhood)
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+    }
+
+    func testAmbiguousAddressWaitsForExplicitChoice() async {
+        let map = StubNearYouMapService()
+        let first = NearYouResolutionChoice(
+            title: "First",
+            subtitle: nil,
+            centre: centre(precision: .address)
+        )
+        let second = NearYouResolutionChoice(
+            title: "Second",
+            subtitle: nil,
+            centre: centre(precision: .address, latitude: 41.40)
+        )
+        map.addressResult = .ambiguous([first, second])
+        let model = StubNearYouGenerator()
+        let store = makeStore(map: map, model: model)
+
+        store.send(.resolveNearYouAddress("Ambiguous Hotel"))
+        await settle()
+        XCTAssertEqual(model.callCount, 0)
+        XCTAssertEqual(store.state.nearYouAddressResolution.data, .ambiguous([first, second]))
+
+        store.send(.chooseNearYouResolution(second))
+        await settle()
+        XCTAssertEqual(model.callCount, 1)
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+    }
+
+    func testMissingCoordinatesProducesIndependentAddressFailure() async {
+        let map = StubNearYouMapService()
+        map.addressError = NearYouMapError.missingCoordinates
+        let model = StubNearYouGenerator()
+        let store = makeStore(map: map, model: model)
+
+        store.send(.resolveNearYouAddress("Missing coordinates"))
+        await settle()
+
+        XCTAssertNotNil(store.state.nearYouAddressResolution.error)
+        XCTAssertEqual(model.callCount, 0)
+        XCTAssertTrue(store.state.suggestionsResponse.isLoaded)
+    }
+
+    func testSparseDiscoveryDoesNotPadCandidates() async {
+        let sparseCandidate = candidate()
+        let map = StubNearYouMapService()
+        map.discovery = NearYouDiscovery(
+            editorialCandidates: [sparseCandidate],
+            practical: [],
+            unavailablePracticalKinds: Set(Trip.NearYouPracticalKind.allCases)
+        )
+        let model = StubNearYouGenerator()
+        model.payload = NearYouSelectionPayload(
+            sections: [
+                .init(
+                    title: "One real fit",
+                    picks: [.init(candidateID: sparseCandidate.id, explanation: "Fits your pace.")]
+                )
+            ],
+            sparseMessage: nil
+        )
+        let store = makeStore(map: map, model: model)
+
+        store.send(.chooseNearYouResolution(.init(
+            title: "Stay",
+            subtitle: nil,
+            centre: centre(precision: .address)
+        )))
+        await settle()
+
+        XCTAssertEqual(store.state.nearYouResponse.data?.editorialPicks.count, 1)
+        XCTAssertNotNil(store.state.nearYouResponse.data?.sparseMessage)
+    }
+
+    func testPartialFailureDoesNotRetryUntilExplicitAction() async {
+        let map = StubNearYouMapService()
+        let model = StubNearYouGenerator()
+        model.failuresRemaining = 1
+        let store = makeStore(map: map, model: model)
+
+        store.send(.chooseNearYouResolution(.init(
+            title: "Stay",
+            subtitle: nil,
+            centre: centre(precision: .address)
+        )))
+        await settle()
+        XCTAssertNotNil(store.state.nearYouResponse.error)
+        XCTAssertEqual(model.callCount, 1)
+        XCTAssertTrue(store.state.suggestionsResponse.isLoaded)
+
+        store.send(.onAppear)
+        await settle()
+        XCTAssertEqual(model.callCount, 1, "Reappearing must not spend another call")
+
+        store.send(.retryNearYou)
+        await settle()
+        XCTAssertEqual(model.callCount, 2)
+        XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+        XCTAssertEqual(map.discoveryCallCount, 1, "Backend-only retry reuses grounded candidates")
+    }
+
+    func testSavedResultReopensWithoutRegenerationAndKeepsFavouriteIdentity() async throws {
+        let grounded = nearYou()
+        var trip = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestionsState: .ready(.mock),
+            accommodation: centre(precision: .address).accommodation,
+            nearYouState: .ready(grounded),
+            generationInput: .mock,
+            favorites: .init(liked: [candidate().id]),
+            tripKey: "near-you-trip"
+        )
+        trip = try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
+        let model = StubNearYouGenerator()
+        var state = TripOutputStore.State(
+            nearYouGenerationRequest: .init(
+                tripKey: trip.tripKey!,
+                input: trip.generationInput!
+            ),
+            details: trip.details,
+            favorites: trip.favorites,
+            saved: true,
+            mode: .savedTrip,
+            itineraryResponse: .loaded(trip.itinerary),
+            suggestionsResponse: .loaded(trip.suggestions!),
+            nearYouResponse: trip.nearYouState.asyncValue,
+            accommodation: trip.accommodation
+        )
+        state.whereToStayResponse = .loaded([])
+        let store = TripOutputStore(
+            initialState: state,
+            imageService: StubImageService(),
+            nearYouMapService: StubNearYouMapService(),
+            nearYouService: model
+        )
+
+        store.send(.onAppear)
+        await settle()
+
+        XCTAssertEqual(model.callCount, 0)
+        XCTAssertEqual(trip.nearYou?.editorialPicks.first?.id, candidate().id)
+        XCTAssertTrue(trip.favorites.contains(candidate().id))
+        XCTAssertEqual(trip.favouriteCandidates.last?.context, "Near you")
+    }
+
+    func testNearYouJoinsAlreadyRecommendedButPracticalDoesNot() {
+        let editorial = candidate(name: "Editorial Place")
+        let practical = candidate(id: UUID(), name: "Practical Pharmacy")
+        var trip = Trip(details: .mock, itinerary: .mock, suggestions: nil)
+        trip.nearYouState = .ready(Trip.NearYou(
+            sections: [
+                .init(
+                    title: "For you",
+                    picks: [.init(candidate: editorial, explanation: "Fits your taste.")]
+                )
+            ],
+            practical: [.init(kind: .pharmacy, candidate: practical)]
+        ))
+
+        XCTAssertTrue(trip.alreadyRecommended.contains("Editorial Place"))
+        XCTAssertFalse(trip.alreadyRecommended.contains("Practical Pharmacy"))
+    }
+
+    func testSoloShareContractHasNoAccommodationOrNearYouKeys() {
+        let keys = Set(SharedTripDTO.CodingKeys.allCases.map(\.rawValue))
+        XCTAssertFalse(keys.contains("accommodation"))
+        XCTAssertFalse(keys.contains("nearYou"))
+        XCTAssertFalse(keys.contains("nearYouState"))
+    }
+
+    func testOldTripDecodesWithNearYouAbsent() throws {
+        let legacy = try JSONSerialization.data(withJSONObject: [
+            "details": try object(Trip.Details.mock),
+            "itinerary": try object(Trip.Itinerary.mock),
+            "favorites": ["liked": []]
+        ])
+        let trip = try JSONDecoder().decode(Trip.self, from: legacy)
+
+        XCTAssertTrue(trip.nearYouState.isAbsent)
+        XCTAssertNil(trip.generationInput)
+        XCTAssertNil(trip.accommodation)
+    }
+
+    // MARK: - Helpers
+
+    private func makeStore(
+        map: StubNearYouMapService,
+        model: StubNearYouGenerator
+    ) -> TripOutputStore {
+        var state = TripOutputStore.State(
+            generationRequest: .init(input: .mock),
+            details: .mock,
+            mode: .newTrip,
+            itineraryResponse: .loaded(.mock),
+            suggestionsResponse: .loaded(.mock),
+            knowBeforeYouGoResponse: .loaded(.mock)
+        )
+        state.whereToStayResponse = .loaded(Trip.StayArea.mockSet)
+        state.worthItResponse = .loaded([])
+        return TripOutputStore(
+            initialState: state,
+            imageService: StubImageService(),
+            nearYouMapService: map,
+            nearYouService: model
+        )
+    }
+
+    private func candidate(
+        id: UUID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+        name: String = "Grounded Cafe",
+        distance: Int = 430,
+        minutes: Int = 6
+    ) -> Trip.NearYouCandidate {
+        Trip.NearYouCandidate(
+            id: id,
+            name: name,
+            category: "Café",
+            latitude: 41.385,
+            longitude: 2.173,
+            distanceMetres: distance,
+            walkingMinutes: minutes,
+            mapURL: URL(string: "https://maps.apple.com/?q=Grounded%20Cafe")!
+        )
+    }
+
+    private func discovery() -> NearYouDiscovery {
+        NearYouDiscovery(
+            editorialCandidates: [candidate()],
+            practical: [],
+            unavailablePracticalKinds: []
+        )
+    }
+
+    private func nearYou() -> Trip.NearYou {
+        Trip.NearYou(
+            sections: [
+                .init(
+                    title: "Your kind of morning",
+                    picks: [.init(candidate: candidate(), explanation: "Fits your taste.")]
+                )
+            ],
+            practical: []
+        )
+    }
+
+    private func centre(
+        precision: CoarseAccommodation.Precision,
+        latitude: Double = 41.385
+    ) -> NearYouSearchCentre {
+        NearYouSearchCentre(
+            accommodation: CoarseAccommodation(
+                label: precision == .address ? "Hotel Example" : "El Born, Barcelona",
+                latitude: latitude,
+                longitude: 2.173,
+                precision: precision
+            ),
+            latitude: latitude,
+            longitude: 2.173
+        )
+    }
+
+    private func object<T: Encodable>(_ value: T) throws -> Any {
+        try JSONSerialization.jsonObject(with: JSONEncoder().encode(value))
+    }
+
+    private func settle() async {
+        for _ in 0..<30 { await Task.yield() }
+    }
+}
+
+@MainActor
+private final class StubNearYouMapService: NearYouMapServicing {
+    var addressResult: NearYouAddressResolution?
+    var addressError: Error?
+    var neighbourhoodCentre: NearYouSearchCentre?
+    var discovery: NearYouDiscovery
+    private(set) var addressInputs: [String] = []
+    private(set) var neighbourhoodInputs: [String] = []
+    private(set) var discoveryCallCount = 0
+
+    init() {
+        let candidate = Trip.NearYouCandidate(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            name: "Grounded Cafe",
+            category: "Café",
+            latitude: 41.385,
+            longitude: 2.173,
+            distanceMetres: 430,
+            walkingMinutes: 6,
+            mapURL: URL(string: "https://maps.apple.com/?q=Grounded%20Cafe")!
+        )
+        discovery = NearYouDiscovery(
+            editorialCandidates: [candidate],
+            practical: [],
+            unavailablePracticalKinds: []
+        )
+    }
+
+    func resolveAddress(
+        _ input: String,
+        destination: String
+    ) async throws -> NearYouAddressResolution {
+        addressInputs.append(input)
+        if let addressError { throw addressError }
+        return addressResult ?? .resolved(.init(
+            title: "Hotel Example",
+            subtitle: nil,
+            centre: neighbourhoodCentre ?? defaultCentre(.address)
+        ))
+    }
+
+    func resolveNeighbourhood(
+        _ area: String,
+        destination: String
+    ) async throws -> NearYouSearchCentre {
+        neighbourhoodInputs.append(area)
+        return neighbourhoodCentre ?? defaultCentre(.neighbourhood)
+    }
+
+    func discover(around centre: NearYouSearchCentre) async throws -> NearYouDiscovery {
+        discoveryCallCount += 1
+        return discovery
+    }
+
+    private func defaultCentre(
+        _ precision: CoarseAccommodation.Precision
+    ) -> NearYouSearchCentre {
+        NearYouSearchCentre(
+            accommodation: CoarseAccommodation(
+                label: precision == .address ? "Hotel Example" : "El Born, Barcelona",
+                latitude: 41.385,
+                longitude: 2.173,
+                precision: precision
+            ),
+            latitude: 41.385,
+            longitude: 2.173
+        )
+    }
+}
+
+@MainActor
+private final class StubNearYouGenerator: NearYouGenerating {
+    private(set) var callCount = 0
+    var failuresRemaining = 0
+    var payload: NearYouSelectionPayload?
+
+    func generate(
+        _ request: TripGenerationRequest,
+        candidates: [Trip.NearYouCandidate],
+        alreadyRecommended: [String]
+    ) async throws -> NearYouSelectionPayload {
+        callCount += 1
+        if failuresRemaining > 0 {
+            failuresRemaining -= 1
+            throw TripGenerationError.transport
+        }
+        if let payload { return payload }
+        return NearYouSelectionPayload(
+            sections: [
+                .init(
+                    title: "Your kind of morning",
+                    picks: candidates.prefix(1).map {
+                        .init(candidateID: $0.id, explanation: "Fits your taste.")
+                    }
+                )
+            ],
+            sparseMessage: candidates.count < 4 ? "A short, grounded list." : nil
+        )
+    }
+}
+
+private struct StubImageService: ImageService {
+    func fetchImageURL(for query: String) async throws -> URL {
+        URL(string: "https://example.invalid/image.jpg")!
+    }
+}

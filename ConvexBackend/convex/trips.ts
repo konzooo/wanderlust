@@ -8,7 +8,7 @@ import {
   SUGGESTIONS_VARIANT,
   type SuggestionsVariant,
 } from "./lib/components";
-import type { Component, SoloTripInput } from "./lib/prompts";
+import type { Component, NearYouCandidate, SoloTripInput } from "./lib/prompts";
 import { OpenAIError } from "./lib/openai";
 import { ValidationError } from "./lib/validation";
 import type { Reservation } from "./quota";
@@ -17,6 +17,8 @@ import {
   MAX_CUSTOMIZATIONS_LENGTH,
   MAX_DESTINATION_INPUT_LENGTH,
   MAX_INTEREST_LENGTH,
+  MAX_NEAR_YOU_CANDIDATES,
+  nearYouCandidate,
   soloTripInput,
 } from "./lib/validators";
 
@@ -55,6 +57,13 @@ export const generateComponent = action({
      */
     alreadyRecommended: v.optional(v.union(v.array(v.string()), v.null())),
     /**
+     * Near You only. MapKit-grounded facts with no accommodation input,
+     * coordinates or map URLs. The model may return only these candidate IDs.
+     */
+    nearYouCandidates: v.optional(
+      v.union(v.array(nearYouCandidate), v.null()),
+    ),
+    /**
      * Which arm of the D15 experiment to run (see `SUGGESTIONS_VARIANT`).
      *
      * The caller decides, because only the caller knows what else it is about
@@ -88,6 +97,13 @@ export const generateComponent = action({
     }
     const alreadyRecommended =
       args.alreadyRecommended?.slice(0, MAX_ALREADY_RECOMMENDED_ITEMS) ?? undefined;
+    const nearYouCandidates = args.nearYouCandidates
+      ?.slice(0, MAX_NEAR_YOU_CANDIDATES) as NearYouCandidate[] | undefined;
+    if (component === "nearYou") {
+      if (!nearYouCandidates?.length || !validNearYouCandidates(nearYouCandidates)) {
+        throw new ConvexError("invalid_near_you_candidates");
+      }
+    }
 
     // Throws a ConvexError carrying a QuotaCode when a limit is hit.
     const reservation: Reservation = await ctx.runMutation(internal.quota.reserve, {
@@ -105,6 +121,7 @@ export const generateComponent = action({
         input: { mode: "solo", solo: input },
         interest,
         alreadyRecommended,
+        nearYouCandidates: component === "nearYou" ? nearYouCandidates : undefined,
         variant,
       });
 
@@ -153,6 +170,26 @@ export const generateComponent = action({
     }
   },
 });
+
+function validNearYouCandidates(candidates: NearYouCandidate[]): boolean {
+  const ids = new Set<string>();
+  return candidates.every((candidate) => {
+    if (
+      candidate.id.trim().length === 0 ||
+      candidate.name.trim().length === 0 ||
+      candidate.category.trim().length === 0 ||
+      !Number.isFinite(candidate.distanceMetres) ||
+      candidate.distanceMetres < 0 ||
+      !Number.isFinite(candidate.walkingMinutes) ||
+      candidate.walkingMinutes < 1 ||
+      ids.has(candidate.id)
+    ) {
+      return false;
+    }
+    ids.add(candidate.id);
+    return true;
+  });
+}
 
 /**
  * Both failure families produce a stable code the client can map to copy.

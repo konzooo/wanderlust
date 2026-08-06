@@ -3,6 +3,7 @@ import {
   DEEP_DIVE_SCHEMA,
   ITINERARY_SCHEMA,
   KNOW_BEFORE_YOU_GO_SCHEMA,
+  NEAR_YOU_SCHEMA,
   WHERE_TO_STAY_SCHEMA,
   WORTH_IT_SCHEMA,
   suggestionsSchema,
@@ -11,6 +12,7 @@ import {
   buildSystemPrompt,
   buildUserMessage,
   type Component,
+  type NearYouCandidate,
   type PromptOptions,
   type TripInput,
 } from "./prompts";
@@ -19,6 +21,7 @@ import {
   emptyReport,
   validateDeepDive,
   validateItinerary,
+  validateNearYou,
   validateSuggestions,
   validateWhereToStayResponse,
   validateWorthItResponse,
@@ -35,6 +38,7 @@ export const generationComponent = v.union(
   v.literal("knowBeforeYouGo"),
   v.literal("worthIt"),
   v.literal("whereToStay"),
+  v.literal("nearYou"),
 );
 
 export const tripMode = v.union(v.literal("solo"), v.literal("group"));
@@ -179,6 +183,13 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
     required: false,
     perTripCap: null,
   },
+  nearYou: {
+    schema: NEAR_YOU_SCHEMA,
+    schemaName: "grounded_near_you_schema",
+    maxOutputTokens: 2_048,
+    required: false,
+    perTripCap: null,
+  },
 };
 
 /** Resolves the schema, ceiling and prompt options for one run. */
@@ -221,6 +232,7 @@ export async function runComponent(args: {
   input: TripInput;
   interest?: string;
   alreadyRecommended?: string[];
+  nearYouCandidates?: NearYouCandidate[];
   variant?: SuggestionsVariant;
 }): Promise<ComponentResult> {
   const variant = args.variant ?? SUGGESTIONS_VARIANT;
@@ -235,6 +247,7 @@ export async function runComponent(args: {
     userPrompt: buildUserMessage(args.input, {
       interest: args.interest,
       alreadyRecommended: args.alreadyRecommended,
+      nearYouCandidates: args.nearYouCandidates,
     }),
     schema: spec.schema,
     schemaName: spec.schemaName,
@@ -242,7 +255,12 @@ export async function runComponent(args: {
   });
 
   const validation = emptyReport();
-  const data = validate(args.component, result.data, validation);
+  const data = validate(
+    args.component,
+    result.data,
+    validation,
+    args.nearYouCandidates,
+  );
   return { ...result, data, validation, maxOutputTokens: spec.maxOutputTokens };
 }
 
@@ -250,6 +268,7 @@ function validate(
   component: Component,
   data: unknown,
   report: ValidationReport,
+  nearYouCandidates?: NearYouCandidate[],
 ): unknown {
   switch (component) {
     case "itinerary":
@@ -266,5 +285,7 @@ function validate(
       return validateWorthItResponse(data, report);
     case "whereToStay":
       return validateWhereToStayResponse(data, report);
+    case "nearYou":
+      return validateNearYou(data, report, nearYouCandidates ?? []);
   }
 }

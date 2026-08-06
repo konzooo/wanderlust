@@ -12,6 +12,8 @@ enum TripComponent: String, CaseIterable, Sendable {
     case deepDive
     case worthIt
     case whereToStay
+    /// Manual, solo-only. Never part of `automatic` or group generation.
+    case nearYou
 
     /// A required component's failure fails the whole generation; everything
     /// else is best-effort and the trip still opens without it. The split is
@@ -130,6 +132,7 @@ final class TripGenerationService {
         for request: TripGenerationRequest,
         interest: String? = nil,
         alreadyRecommended: [String]? = nil,
+        nearYouCandidates: [NearYouBackendCandidate]? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) async throws -> T {
         var args: [String: ConvexEncodable?] = [
@@ -144,6 +147,11 @@ final class TripGenerationService {
         if let interest { args["interest"] = interest }
         if let alreadyRecommended, !alreadyRecommended.isEmpty {
             args["alreadyRecommended"] = alreadyRecommended as [(any ConvexEncodable)?]
+        }
+        if let nearYouCandidates {
+            args["nearYouCandidates"] = nearYouCandidates.map {
+                $0 as (any ConvexEncodable)?
+            }
         }
 
         do {

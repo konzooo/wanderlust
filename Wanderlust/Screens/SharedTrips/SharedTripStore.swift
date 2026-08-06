@@ -117,6 +117,15 @@ final class SharedTripStore: ObservableObject {
         output.interestPrompts = trip.interestPrompts ?? []
         output.worthItDecisions = trip.worthItDecisions ?? [:]
         output.deepDives = trip.deepDives
+        if mode == .savedTrip {
+            output.accommodation = trip.accommodation
+            output.nearYouResponse = trip.nearYouState.asyncValue
+            output.nearYouGenerationRequest = TripGenerationRequest(
+                tripKey: trip.tripKey ?? TripKey.mint(),
+                input: trip.generationInput
+                    ?? TripGenerationInput(details: trip.details, answers: [])
+            )
+        }
         return output
     }
 }

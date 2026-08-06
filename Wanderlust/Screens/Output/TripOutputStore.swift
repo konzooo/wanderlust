@@ -48,6 +48,24 @@ class TripOutputStore: ObservableStore {
     private let whereToStayService: any WhereToStayGenerating
     private let knowBeforeYouGoService: any KnowBeforeYouGoGenerating
     private let deepDiveService: any DeepDiveGenerating
+    private let nearYouMapService: any NearYouMapServicing
+    private let nearYouService: any NearYouGenerating
+
+    /// Near You is manual and has its own two-stage task (MapKit, then model),
+    /// independent from the eager component coordinator. The last grounded
+    /// discovery is kept only in memory so a backend-only retry does not repeat
+    /// MapKit work; persisted results remain the sole reopen source.
+    private var nearYouTask: Task<Void, Never>?
+    private var lastNearYouDiscovery: NearYouDiscovery?
+    /// Exact while this screen lives, coarse after reopen. Keeping the resolved
+    /// centre here lets an in-session retry route from the same point without
+    /// ever putting that point into persisted state.
+    private var lastNearYouCentre: NearYouSearchCentre?
+    /// A replacement is atomic on disk: until a new grounded result succeeds,
+    /// keep the last matching accommodation/output pair. Otherwise a failed
+    /// regeneration could persist a new stay alongside the old venue list.
+    private var lastCompletedNearYou: Trip.NearYou?
+    private var lastCompletedNearYouAccommodation: CoarseAccommodation?
 
     private let imageService: ImageService
 
@@ -69,6 +87,8 @@ class TripOutputStore: ObservableStore {
         whereToStayService: (any WhereToStayGenerating)? = nil,
         knowBeforeYouGoService: (any KnowBeforeYouGoGenerating)? = nil,
         deepDiveService: (any DeepDiveGenerating)? = nil,
+        nearYouMapService: (any NearYouMapServicing)? = nil,
+        nearYouService: (any NearYouGenerating)? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) {
         state = initialState
@@ -80,6 +100,15 @@ class TripOutputStore: ObservableStore {
         self.whereToStayService = whereToStayService ?? TripPlanningServices.whereToStay()
         self.knowBeforeYouGoService = knowBeforeYouGoService ?? TripPlanningServices.knowBeforeYouGo()
         self.deepDiveService = deepDiveService ?? TripPlanningServices.deepDive()
+        self.nearYouMapService = nearYouMapService ?? NearYouServices.map()
+        self.nearYouService = nearYouService ?? NearYouServices.generation()
+        if let accommodation = initialState.accommodation {
+            lastNearYouCentre = NearYouSearchCentre(persisted: accommodation)
+            if let result = initialState.nearYouResponse.data {
+                lastCompletedNearYou = result
+                lastCompletedNearYouAccommodation = accommodation
+            }
+        }
     }
 
     func setRouter(_ router: NavigationRouter) {
@@ -132,13 +161,42 @@ class TripOutputStore: ObservableStore {
             // screen-level retry, so it still cancels and supersedes rather than
             // racing whatever was outstanding.
             retryCount += 1
-            generate(component, restart: true)
+            if component == .nearYou {
+                retryNearYou(reuseDiscovery: true)
+            } else {
+                generate(component, restart: true)
+            }
 
         case .decideWorthIt(let id, let decision):
             applyWorthIt(decision, to: id)
 
         case .generateDeepDive(let interest):
             generate(.deepDive, interest: interest)
+
+        case .resolveNearYouAddress(let address):
+            resolveNearYouAddress(address)
+
+        case .chooseNearYouResolution(let choice):
+            beginNearYou(around: choice.centre, discovery: nil)
+
+        case .chooseNearYouArea(let area):
+            resolveNearYouArea(area)
+
+        case .retryNearYou:
+            retryCount += 1
+            retryNearYou(reuseDiscovery: true)
+
+        case .regenerateNearYou:
+            retryCount += 1
+            retryNearYou(reuseDiscovery: false)
+
+        case .changeNearYouStay:
+            nearYouTask?.cancel()
+            lastNearYouDiscovery = nil
+            lastNearYouCentre = nil
+            state.accommodation = nil
+            state.nearYouResponse = .initial
+            state.nearYouAddressResolution = .initial
 
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
@@ -203,6 +261,10 @@ extension TripOutputStore {
         /// for, and the absence is what makes that structurally true rather
         /// than a runtime guard someone can forget.
         var generationRequest: TripGenerationRequest? = nil
+        /// Manual-generation context restored for a saved trip. Kept separate
+        /// from `generationRequest` so `onAppear` can never mistake a reopened
+        /// trip for a new one and regenerate its eager components.
+        var nearYouGenerationRequest: TripGenerationRequest? = nil
         var details: Trip.Details
         var selectedContentTab: OutputTab = .discover
         var discoverSegment: DiscoverSegment = .suggestions
@@ -217,6 +279,9 @@ extension TripOutputStore {
         var itineraryResponse: AsyncValue<Trip.Itinerary> = .initial
         var suggestionsResponse: AsyncValue<Trip.Suggestions> = .initial
         var knowBeforeYouGoResponse: AsyncValue<Trip.KnowBeforeYouGo> = .initial
+        var nearYouResponse: AsyncValue<Trip.NearYou> = .initial
+        var nearYouAddressResolution: AsyncValue<NearYouAddressResolution> = .initial
+        var accommodation: CoarseAccommodation? = nil
         var imageUrlResponse: AsyncValue<URL> = .initial
         var didLogResultViewed = false
 
@@ -273,6 +338,14 @@ extension TripOutputStore {
         case decideWorthIt(UUID, WorthItDecision?)
         /// Generate one append-only category for the tapped interest chip.
         case generateDeepDive(String)
+        /// Exact input is a transient action value. It is never stored on
+        /// `State`, encoded in `Trip`, or accepted by the backend contract.
+        case resolveNearYouAddress(String)
+        case chooseNearYouResolution(NearYouResolutionChoice)
+        case chooseNearYouArea(Trip.StayArea)
+        case retryNearYou
+        case regenerateNearYou
+        case changeNearYouStay
         case saveTrip(confirmOverride: Bool = false)
         case shareTrip
         /// Confirmation is the presenter's job — the favourites sheet owns its
@@ -438,6 +511,160 @@ extension TripOutputStore {
     }
 }
 
+// MARK: - Grounded Near You
+
+extension TripOutputStore {
+    private var effectiveNearYouRequest: TripGenerationRequest? {
+        state.generationRequest ?? state.nearYouGenerationRequest
+    }
+
+    private func resolveNearYouAddress(_ rawAddress: String) {
+        guard !state.mode.isReadOnly else { return }
+        nearYouTask?.cancel()
+        state.nearYouAddressResolution = .loading
+        let destination = state.fullDestinationString
+        nearYouTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let resolution = try await nearYouMapService.resolveAddress(
+                    rawAddress,
+                    destination: destination
+                )
+                try Task.checkCancellation()
+                switch resolution {
+                case .resolved(let choice):
+                    beginNearYou(around: choice.centre, discovery: nil)
+                case .ambiguous:
+                    state.nearYouAddressResolution = .loaded(resolution)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                state.nearYouAddressResolution = .error(error)
+            }
+        }
+    }
+
+    private func resolveNearYouArea(_ area: Trip.StayArea) {
+        guard !state.mode.isReadOnly else { return }
+        nearYouTask?.cancel()
+        state.nearYouAddressResolution = .loading
+        let destination = state.fullDestinationString
+        nearYouTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let centre = try await nearYouMapService.resolveNeighbourhood(
+                    area.area,
+                    destination: destination
+                )
+                try Task.checkCancellation()
+                beginNearYou(around: centre, discovery: nil)
+            } catch is CancellationError {
+                return
+            } catch {
+                state.nearYouAddressResolution = .error(error)
+            }
+        }
+    }
+
+    private func retryNearYou(reuseDiscovery: Bool) {
+        guard let accommodation = state.accommodation else { return }
+        beginNearYou(
+            around: lastNearYouCentre ?? NearYouSearchCentre(persisted: accommodation),
+            discovery: reuseDiscovery ? lastNearYouDiscovery : nil
+        )
+    }
+
+    private func beginNearYou(
+        around centre: NearYouSearchCentre,
+        discovery existingDiscovery: NearYouDiscovery?
+    ) {
+        guard !state.mode.isReadOnly, let request = effectiveNearYouRequest else {
+            state.nearYouResponse = .error(
+                TripGenerationError.backend(code: "missing_trip_context")
+            )
+            return
+        }
+
+        nearYouTask?.cancel()
+        lastNearYouCentre = centre
+        state.accommodation = centre.accommodation
+        state.nearYouAddressResolution = .initial
+        state.nearYouResponse = .loading
+        let context = alreadyRecommended()
+        let startedAt = Date()
+        let attempt = retryCount + 1
+        logGeneration(.tripGenerationStarted, component: "nearYou", attempt: attempt)
+
+        nearYouTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let discovery: NearYouDiscovery
+                if let existingDiscovery {
+                    discovery = existingDiscovery
+                } else {
+                    discovery = try await nearYouMapService.discover(around: centre)
+                }
+                try Task.checkCancellation()
+                lastNearYouDiscovery = discovery
+
+                let output: Trip.NearYou
+                if discovery.editorialCandidates.isEmpty {
+                    // Nothing exists for the model to select. Do not spend a
+                    // call asking it to decorate an empty list.
+                    output = Trip.NearYou(
+                        sections: [],
+                        practical: discovery.practical,
+                        unavailablePracticalKinds: discovery.unavailablePracticalKinds,
+                        sparseMessage: "MapKit found no editorial places here with a verified walking route."
+                    )
+                } else {
+                    let payload = try await nearYouService.generate(
+                        request,
+                        candidates: discovery.editorialCandidates,
+                        alreadyRecommended: context
+                    )
+                    try Task.checkCancellation()
+                    let grounded = try payload.materialize(discovery: discovery)
+                    if discovery.isSparse && grounded.sparseMessage == nil {
+                        output = Trip.NearYou(
+                            sections: grounded.sections,
+                            practical: grounded.practical,
+                            unavailablePracticalKinds: grounded.unavailablePracticalKinds,
+                            sparseMessage: "Only a few real places here have a verified walking route, so this list is intentionally short."
+                        )
+                    } else {
+                        output = grounded
+                    }
+                }
+
+                state.nearYouResponse = .loaded(output)
+                lastCompletedNearYou = output
+                lastCompletedNearYouAccommodation = centre.accommodation
+                if state.saved { reSaveTrip() }
+                logGeneration(
+                    .tripGenerationSucceeded,
+                    component: "nearYou",
+                    attempt: attempt,
+                    duration: startedAt
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                state.nearYouResponse = .error(error)
+                if state.saved { reSaveTrip() }
+                logGeneration(
+                    .tripGenerationFailed,
+                    component: "nearYou",
+                    attempt: attempt,
+                    duration: startedAt,
+                    error: error
+                )
+            }
+        }
+    }
+}
+
 // MARK: - Favourites
 
 extension TripOutputStore {
@@ -458,6 +685,9 @@ extension TripOutputStore {
             worthItDecisions: state.worthItDecisions,
             whereToStay: state.whereToStayResponse.persistedContent,
             interestPrompts: state.interestPrompts.isEmpty ? nil : state.interestPrompts,
+            accommodation: state.accommodation,
+            nearYouState: state.nearYouResponse.persisted,
+            generationInput: effectiveNearYouRequest?.input,
             favorites: state.favorites
         )
     }
@@ -603,6 +833,10 @@ extension TripOutputStore {
                     )
                     state.deepDives = (state.deepDives ?? []) + [persisted]
                     if state.saved { reSaveTrip() }
+
+                case .nearYou:
+                    // Manual MapKit → backend flow; never generated here.
+                    return
                 }
                 logGeneration(
                     .tripGenerationSucceeded,
@@ -685,6 +919,7 @@ extension TripOutputStore {
         case .worthIt: ComponentResponse(state.worthItResponse)
         case .whereToStay: ComponentResponse(state.whereToStayResponse)
         case .deepDive: ComponentResponse(AsyncValue<Trip.Suggestions>.initial)
+        case .nearYou: ComponentResponse(state.nearYouResponse)
         }
     }
 
@@ -733,6 +968,7 @@ extension TripOutputStore {
         case .whereToStay: state.whereToStayResponse = .loading
         case .knowBeforeYouGo: state.knowBeforeYouGoResponse = .loading
         case .deepDive: break
+        case .nearYou: state.nearYouResponse = .loading
         }
     }
 
@@ -749,6 +985,7 @@ extension TripOutputStore {
         case .whereToStay: state.whereToStayResponse = .error(error)
         case .knowBeforeYouGo: state.knowBeforeYouGoResponse = .error(error)
         case .deepDive: break
+        case .nearYou: state.nearYouResponse = .error(error)
         }
     }
 
@@ -848,6 +1085,7 @@ extension TripOutputStore {
     /// from a genuinely empty one for the rest of the trip's life.
     private func currentTrip() -> Trip? {
         guard case let .loaded(itinerary) = state.itineraryResponse else { return nil }
+        let persistedNearYou = nearYouSnapshotForPersistence
         return Trip(
             details: state.details,
             itinerary: itinerary,
@@ -862,10 +1100,31 @@ extension TripOutputStore {
             worthItDecisions: state.worthItDecisions,
             whereToStay: state.whereToStayResponse.persistedContent,
             interestPrompts: state.interestPrompts.isEmpty ? nil : state.interestPrompts,
+            accommodation: persistedNearYou.accommodation,
+            nearYouState: persistedNearYou.state,
+            generationInput: effectiveNearYouRequest?.input,
             favorites: state.favorites,
             shareCode: state.shareCode,
-            tripKey: state.generationRequest?.tripKey
+            tripKey: effectiveNearYouRequest?.tripKey
         )
+    }
+
+    /// A completed Near You result and its accommodation are one atomic local
+    /// value. A loading or failed replacement remains visible in this session,
+    /// but cannot corrupt or erase the last completed pair on disk.
+    private var nearYouSnapshotForPersistence: (
+        accommodation: CoarseAccommodation?,
+        state: ComponentState<Trip.NearYou>
+    ) {
+        if case let .loaded(result) = state.nearYouResponse,
+           let accommodation = state.accommodation {
+            return (accommodation, .ready(result))
+        }
+        if let result = lastCompletedNearYou,
+           let accommodation = lastCompletedNearYouAccommodation {
+            return (accommodation, .ready(result))
+        }
+        return (state.accommodation, state.nearYouResponse.persisted)
     }
 
     private func saveTrip(confirmOverride: Bool) {

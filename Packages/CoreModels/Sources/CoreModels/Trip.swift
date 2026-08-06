@@ -25,7 +25,9 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     ///   `deepDives`, `worthItDecisions` and `accommodation`.
     /// - 3: the rest of the generated content — `whereToStay` and
     ///   `interestPrompts` and `knowBeforeYouGoState`.
-    public static let currentSchemaVersion = 3
+    /// - 4: grounded `nearYouState` and the generation input needed only for an
+    ///   explicit manual regeneration after reopening a saved trip.
+    public static let currentSchemaVersion = 4
 
     public let id = UUID()
     public let schemaVersion: Int
@@ -77,6 +79,18 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// Coarse, personal, and never shared. See ``CoarseAccommodation``.
     public var accommodation: CoarseAccommodation?
 
+    /// Grounded Near You output, personal to a solo traveller and never shared.
+    /// Explicit state keeps a failed attempt distinct from an old trip that has
+    /// never requested the component. It is never generated automatically.
+    public var nearYouState: ComponentState<NearYou>
+
+    /// The structured preferences used for this trip's model calls.
+    ///
+    /// Optional for backward compatibility. It lets a saved trip explicitly
+    /// regenerate Near You without falling back to destination-only context;
+    /// it is never part of a published share.
+    public var generationInput: TripGenerationInput?
+
     public var favorites: Favorites
 
     /// The share code associated with this trip file. On a trip in `TripStorage`
@@ -102,6 +116,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// ``suggestions``.
     public var knowBeforeYouGo: KnowBeforeYouGo? { knowBeforeYouGoState.value }
 
+    public var nearYou: NearYou? { nearYouState.value }
+
     /// Designated initializer.
     public init(
         details: Details,
@@ -114,6 +130,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         whereToStay: [StayArea]? = nil,
         interestPrompts: [String]? = nil,
         accommodation: CoarseAccommodation? = nil,
+        nearYouState: ComponentState<NearYou> = .absent,
+        generationInput: TripGenerationInput? = nil,
         favorites: Favorites = .init(),
         shareCode: String? = nil,
         tripKey: String? = nil,
@@ -130,6 +148,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.whereToStay = whereToStay
         self.interestPrompts = interestPrompts
         self.accommodation = accommodation
+        self.nearYouState = nearYouState
+        self.generationInput = generationInput
         self.favorites = favorites
         self.shareCode = shareCode
         self.tripKey = tripKey
@@ -179,6 +199,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         case whereToStay
         case interestPrompts
         case accommodation
+        case nearYouState
+        case generationInput
         case favorites
         case shareCode
         case tripKey
@@ -220,6 +242,12 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         accommodation = try container.decodeIfPresent(
             CoarseAccommodation.self, forKey: .accommodation
         )
+        nearYouState = try container.decodeIfPresent(
+            ComponentState<NearYou>.self, forKey: .nearYouState
+        ) ?? .absent
+        generationInput = try container.decodeIfPresent(
+            TripGenerationInput.self, forKey: .generationInput
+        )
         favorites = try container.decodeIfPresent(Favorites.self, forKey: .favorites) ?? .init()
         shareCode = try container.decodeIfPresent(String.self, forKey: .shareCode)
         tripKey = try container.decodeIfPresent(String.self, forKey: .tripKey)
@@ -238,6 +266,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         try container.encodeIfPresent(whereToStay, forKey: .whereToStay)
         try container.encodeIfPresent(interestPrompts, forKey: .interestPrompts)
         try container.encodeIfPresent(accommodation, forKey: .accommodation)
+        try container.encode(nearYouState, forKey: .nearYouState)
+        try container.encodeIfPresent(generationInput, forKey: .generationInput)
         try container.encode(favorites, forKey: .favorites)
         try container.encodeIfPresent(shareCode, forKey: .shareCode)
         try container.encodeIfPresent(tripKey, forKey: .tripKey)
@@ -270,6 +300,8 @@ public extension Trip {
             whereToStay: whereToStay ?? stored.whereToStay,
             interestPrompts: interestPrompts ?? stored.interestPrompts,
             accommodation: accommodation ?? stored.accommodation,
+            nearYouState: nearYouState.merged(over: stored.nearYouState),
+            generationInput: generationInput ?? stored.generationInput,
             favorites: favorites,
             shareCode: shareCode ?? stored.shareCode,
             tripKey: tripKey ?? stored.tripKey

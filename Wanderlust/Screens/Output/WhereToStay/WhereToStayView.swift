@@ -14,10 +14,8 @@ import SwiftUI
 ///
 /// Its home is the Near You tab's un-grounded state (§7): a traveller who has
 /// not booked anywhere yet cannot have an address, so Near You has nothing to
-/// ground against and offers this instead. That tab is gated behind
-/// ``OutputFeatureFlags/nearYouEnabled`` until S10 lands the MapKit work, which
-/// is why this content is generated, saved and shared now but not yet reachable
-/// in a shipping build.
+/// ground against and offers this instead. Choosing "I'm staying here" resolves
+/// the area through MapKit and starts the neighbourhood-level Near You path.
 ///
 /// **No hearts.** §9 files where-to-stay under reference rather than under
 /// things a traveller wants a list of, so these cards are deliberately not
@@ -27,8 +25,7 @@ struct WhereToStayView: View {
     let destination: String
     /// `nil` in read-only modes, where there is nothing to re-request.
     let onRetry: (() -> Void)?
-    /// Picking an area is what hands Near You a coarse search centre (§7). Not
-    /// wired until S10 — absent rather than inert while that is true.
+    /// Picking an area is what hands Near You a coarse search centre (§7).
     var onChoose: ((Trip.StayArea) -> Void)?
 
     var body: some View {

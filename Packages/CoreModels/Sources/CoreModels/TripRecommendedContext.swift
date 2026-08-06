@@ -39,8 +39,9 @@ public extension Trip {
     ///   different axis entirely. Suppressing El Born from the suggestions feed
     ///   because it was offered as a place to stay would remove a real
     ///   recommendation to avoid a repetition that isn't one.
-    /// - **Near You** picks, until §7's grounding exists. The arm goes here when
-    ///   it does; the ordering below is where it belongs.
+    /// - **Where-to-stay** remains excluded; grounded Near You editorial picks
+    ///   are included once they land, while its practical layer is not a
+    ///   recommendation and contributes nothing.
     var alreadyRecommended: [String] {
         var seen = Set<String>()
         var result: [String] = []
@@ -78,6 +79,8 @@ public extension Trip {
         }
 
         for item in worthItItems ?? [] { add(item.locations) }
+
+        for pick in nearYou?.editorialPicks ?? [] { add(pick.candidate.name) }
 
         return Array(result.prefix(Self.maxAlreadyRecommended))
     }

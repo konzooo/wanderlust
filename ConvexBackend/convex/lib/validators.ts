@@ -80,6 +80,19 @@ export const MAX_DESTINATION_INPUT_LENGTH = 160;
 export const MAX_CUSTOMIZATIONS_LENGTH = 2_000;
 export const MAX_INTEREST_LENGTH = 80;
 export const MAX_ALREADY_RECOMMENDED_ITEMS = 200;
+export const MAX_NEAR_YOU_CANDIDATES = 60;
+
+/**
+ * The only MapKit facts the Near You model may receive. Accommodation input,
+ * centre/venue coordinates and map links are structurally impossible here.
+ */
+export const nearYouCandidate = v.object({
+  id: v.string(),
+  name: v.string(),
+  category: v.string(),
+  distanceMetres: v.number(),
+  walkingMinutes: v.number(),
+});
 
 export const TRAVELLER_DNA_VERSIONS: Record<number, readonly string[]> = {
   1: [

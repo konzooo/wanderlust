@@ -20,7 +20,7 @@ final class DiscoverContentTests: XCTestCase {
 
         let decoded = try roundTrip(original)
 
-        XCTAssertEqual(decoded.schemaVersion, 3)
+        XCTAssertEqual(decoded.schemaVersion, Trip.currentSchemaVersion)
         XCTAssertEqual(decoded.worthItItems?.count, 4)
         XCTAssertEqual(decoded.whereToStay?.count, 5)
         XCTAssertEqual(decoded.interestPrompts, ["Natural wine bars", "Rooftop sunsets"])

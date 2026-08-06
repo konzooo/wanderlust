@@ -193,6 +193,7 @@ final class GroupTripService {
                 "unavailablePracticalKinds": payload.unavailablePracticalKinds.map {
                     $0 as (any ConvexEncodable)?
                 },
+                "researchArea": payload.researchArea,
                 "replace": payload.replace
             ])
         } catch let error as ClientError {

@@ -241,10 +241,38 @@ const NEAR_YOU_SECTION = obj({ title: str, picks: arr(NEAR_YOU_PICK) }, [
   "picks",
 ]);
 
+/**
+ * A current, sourced discovery that need not already exist as an Apple Maps
+ * POI. It deliberately has no distance/time field: only MapKit may author
+ * those facts. `accessNote` may summarize sourced access context without
+ * pretending it is a live route calculation.
+ */
+const NEAR_YOU_LIVE_FIND = obj(
+  {
+    name: str,
+    category: str,
+    locationHint: str,
+    explanation: str,
+    accessNote: nullableStr,
+    sourceTitle: str,
+    sourceURL: str,
+  },
+  [
+    "name",
+    "category",
+    "locationHint",
+    "explanation",
+    "accessNote",
+    "sourceTitle",
+    "sourceURL",
+  ],
+);
+
 export const NEAR_YOU_SCHEMA = obj(
   {
     sections: arr(NEAR_YOU_SECTION),
+    liveFinds: arr(NEAR_YOU_LIVE_FIND),
     sparseMessage: nullableStr,
   },
-  ["sections", "sparseMessage"],
+  ["sections", "liveFinds", "sparseMessage"],
 );

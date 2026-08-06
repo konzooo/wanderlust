@@ -81,6 +81,7 @@ public extension Trip {
         for item in worthItItems ?? [] { add(item.locations) }
 
         for pick in nearYou?.editorialPicks ?? [] { add(pick.candidate.name) }
+        for find in nearYou?.liveFinds ?? [] { add(find.name) }
 
         return Array(result.prefix(Self.maxAlreadyRecommended))
     }

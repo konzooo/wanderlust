@@ -133,6 +133,7 @@ final class TripGenerationService {
         interest: String? = nil,
         alreadyRecommended: [String]? = nil,
         nearYouCandidates: [NearYouBackendCandidate]? = nil,
+        nearYouLocation: NearYouLocationContext? = nil,
         variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
     ) async throws -> T {
         var args: [String: ConvexEncodable?] = [
@@ -152,6 +153,9 @@ final class TripGenerationService {
             args["nearYouCandidates"] = nearYouCandidates.map {
                 $0 as (any ConvexEncodable)?
             }
+        }
+        if let nearYouLocation {
+            args["nearYouLocation"] = nearYouLocation
         }
 
         do {

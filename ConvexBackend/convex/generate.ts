@@ -442,6 +442,7 @@ export async function callGroupComponent(
     interest?: string;
     alreadyRecommended?: string[];
     nearYouCandidates?: import("./lib/prompts").NearYouCandidate[];
+    nearYouLocation?: import("./lib/prompts").NearYouLocationContext;
   },
 ): Promise<ComponentResult> {
   const startedAt = Date.now();
@@ -452,6 +453,7 @@ export async function callGroupComponent(
       interest: options?.interest,
       alreadyRecommended: options?.alreadyRecommended,
       nearYouCandidates: options?.nearYouCandidates,
+      nearYouLocation: options?.nearYouLocation,
       variant: "split",
     });
     await ctx.runMutation(internal.quota.recordTelemetry, {
@@ -464,6 +466,7 @@ export async function callGroupComponent(
       variant: "split" as const,
       maxOutputTokens: result.maxOutputTokens,
       repairs: result.validation.repairs,
+      webSearchCalls: result.webSearchCalls,
     });
     return result;
   } catch (error) {
@@ -479,6 +482,7 @@ export async function callGroupComponent(
         Date.now() - startedAt,
       errorCode: errorCode(error),
       variant: "split" as const,
+      webSearchCalls: 0,
     });
     throw error;
   }

@@ -72,8 +72,8 @@ struct NearYouView: View {
                     .foregroundStyle(.primary)
 
                 Text(isGroup
-                     ? "Apple Maps resolves the address or hotel on this device. The exact input is never sent or saved; only the coarse stay and grounded result are shared with the group."
-                     : "Your address or hotel is resolved by Apple Maps on this device. The exact input is never sent or saved.")
+                     ? "Apple Maps resolves the address or hotel on this device. The model searches with only the coarse area; the exact input is never sent or saved. The resulting guide is shared with the group."
+                     : "Apple Maps resolves the address or hotel on this device. The model searches with only the coarse area; the exact input is never sent or saved.")
                     .font(.kanit(14))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -200,7 +200,7 @@ struct NearYouView: View {
         case .loading:
             VStack(spacing: .Spacing.small) {
                 ProgressView()
-                Text("Checking what is genuinely near \(accommodation.label)…")
+                Text("Researching what a well-informed local would suggest around \(accommodation.label)…")
                     .font(DS.Typography.tabLabel)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -284,8 +284,12 @@ private struct NearYouResultsView: View {
                     editorialSection(section)
                 }
 
-                if output.sections.isEmpty {
-                    Text("There aren't enough grounded places here for an editorial list. The practical results below are everything MapKit could verify.")
+                if !output.liveFinds.isEmpty {
+                    liveFindLayer
+                }
+
+                if output.sections.isEmpty && output.liveFinds.isEmpty {
+                    Text("The live search and Apple Maps did not surface enough trustworthy places for an editorial list. The practical results below are everything MapKit could verify.")
                         .font(DS.Typography.generatedBody)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -355,6 +359,26 @@ private struct NearYouResultsView: View {
         }
     }
 
+    private var liveFindLayer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Label("Fresh local finds", systemImage: "sparkle.magnifyingglass")
+                    .font(DS.Typography.sectionHeader)
+                Text("Current web research, chosen for you. These may include temporary places or events that are not Apple Maps POIs.")
+                    .font(.kanit(13))
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(output.liveFinds) { find in
+                NearYouLiveFindCard(
+                    find: find,
+                    isFavorited: favorites.contains(find.id),
+                    onHeart: { favorites.toggle(find.id) }
+                )
+            }
+        }
+    }
+
     private var practicalLayer: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
@@ -397,6 +421,71 @@ private struct NearYouResultsView: View {
                 .stroke(Color.white.opacity(0.35), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.10), radius: 16, y: 8)
+    }
+}
+
+private struct NearYouLiveFindCard: View {
+    let find: Trip.NearYouLiveFind
+    let isFavorited: Bool
+    let onHeart: () -> Void
+
+    private var mapSearchURL: URL {
+        var components = URLComponents(string: "https://maps.apple.com/")!
+        components.queryItems = [
+            URLQueryItem(name: "q", value: "\(find.name), \(find.locationHint)")
+        ]
+        return components.url!
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(find.name)
+                        .font(DS.Typography.generatedTitle)
+                    Text(find.category)
+                        .font(.kanit(12))
+                        .foregroundStyle(Color.appTint)
+                }
+                Spacer(minLength: 8)
+                Button(action: onHeart) {
+                    HeartIcon(size: 18, isFavorited: isFavorited)
+                }
+                .accessibilityLabel(isFavorited ? "Remove from favourites" : "Add to favourites")
+            }
+
+            Text(find.explanation)
+                .font(DS.Typography.generatedBody)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let accessNote = find.accessNote {
+                Label(accessNote, systemImage: "signpost.right.and.left")
+                    .font(.kanit(13))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 14) {
+                Link(destination: find.sourceURL) {
+                    Label(find.sourceTitle, systemImage: "safari")
+                        .lineLimit(1)
+                }
+                Link(destination: mapSearchURL) {
+                    Label("Find in Maps", systemImage: "map")
+                }
+            }
+            .font(.kanitMedium(13))
+            .foregroundStyle(Color.appTint)
+        }
+        .padding(.Padding.sm3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                .fill(Color.appTint.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                .stroke(Color.appTint.opacity(0.18), lineWidth: 1)
+        )
     }
 }
 

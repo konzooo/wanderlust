@@ -149,6 +149,8 @@ export const recordTelemetry = internalMutation({
     variant: v.optional(suggestionsVariant),
     maxOutputTokens: v.optional(v.number()),
     repairs: v.optional(v.number()),
+    /** Paid hosted-search actions reported by the Near You call. */
+    webSearchCalls: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("generationTelemetry", { ...args, createdAt: Date.now() });

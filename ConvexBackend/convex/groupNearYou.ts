@@ -203,7 +203,7 @@ export const commit = internalMutation({
   },
 });
 
-/** Shared grounded Near You. No argument can carry an address or exact input. */
+/** Shared Near You. `researchArea` is client-derived coarse locality, never raw input. */
 export const generate = action({
   args: {
     groupId: v.id("groups"),
@@ -214,10 +214,14 @@ export const generate = action({
     unavailablePracticalKinds: v.array(
       v.union(v.literal("transport"), v.literal("grocery"), v.literal("pharmacy")),
     ),
+    /** Locality/neighbourhood only, derived after local address resolution. */
+    researchArea: v.string(),
     replace: v.boolean(),
   },
   handler: async (ctx, args): Promise<unknown> => {
     validateInput(args.accommodation, args.candidates, args.practical);
+    const researchArea = args.researchArea.trim().slice(0, 160);
+    if (!researchArea) throw new ConvexError("invalid_near_you_location");
     const begun = await ctx.runMutation(internal.groupNearYou.begin, {
       groupId: args.groupId,
       memberToken: args.memberToken,
@@ -225,28 +229,19 @@ export const generate = action({
     });
 
     try {
-      let nearYou: unknown;
-      if (args.candidates.length === 0) {
-        nearYou = {
-          sections: [],
-          practical: args.practical,
-          unavailablePracticalKinds: args.unavailablePracticalKinds,
-          sparseMessage: "MapKit found no editorial places here with a verified walking route.",
-        };
-      } else {
-        await ctx.runMutation(internal.quota.reserveGlobalModelCall, {});
-        const modelCandidates = args.candidates.map(modelCandidate);
-        const result = await callGroupComponent(ctx, "nearYou", begun.input, {
-          alreadyRecommended: begun.alreadyRecommended,
-          nearYouCandidates: modelCandidates,
-        });
-        nearYou = materializeGroupNearYou(
-          result.data,
-          args.candidates,
-          args.practical,
-          args.unavailablePracticalKinds,
-        );
-      }
+      await ctx.runMutation(internal.quota.reserveGlobalModelCall, {});
+      const modelCandidates = args.candidates.map(modelCandidate);
+      const result = await callGroupComponent(ctx, "nearYou", begun.input, {
+        alreadyRecommended: begun.alreadyRecommended,
+        nearYouCandidates: modelCandidates,
+        nearYouLocation: { area: researchArea, city: begun.input.destination },
+      });
+      const nearYou = materializeGroupNearYou(
+        result.data,
+        args.candidates,
+        args.practical,
+        args.unavailablePracticalKinds,
+      );
 
       return await ctx.runMutation(internal.groupNearYou.commit, {
         groupId: args.groupId,
@@ -293,6 +288,16 @@ export function materializeGroupNearYou(
       picks?: Array<{ candidateID?: unknown; explanation?: unknown }>;
     }>;
     sparseMessage?: unknown;
+    liveFinds?: Array<{
+      id?: unknown;
+      name?: unknown;
+      category?: unknown;
+      locationHint?: unknown;
+      explanation?: unknown;
+      accessNote?: unknown;
+      sourceTitle?: unknown;
+      sourceURL?: unknown;
+    }>;
   };
   const byID = new Map(candidates.map((candidate) => [candidate.id, candidate]));
   const used = new Set<string>();
@@ -309,11 +314,32 @@ export function materializeGroupNearYou(
     });
     return picks.length === 0 ? [] : [{ id: makeID(), title: section.title, picks }];
   });
+  const liveFinds = (selection.liveFinds ?? []).flatMap((find) => {
+    if (
+      typeof find.name !== "string" ||
+      typeof find.category !== "string" ||
+      typeof find.locationHint !== "string" ||
+      typeof find.explanation !== "string" ||
+      !(find.accessNote === null || typeof find.accessNote === "string") ||
+      typeof find.sourceTitle !== "string" ||
+      typeof find.sourceURL !== "string"
+    ) return [];
+    return [{
+      id: typeof find.id === "string" && UUID_PATTERN.test(find.id) ? find.id : makeID(),
+      name: find.name,
+      category: find.category,
+      locationHint: find.locationHint,
+      explanation: find.explanation,
+      accessNote: find.accessNote,
+      sourceTitle: find.sourceTitle,
+      sourceURL: find.sourceURL,
+    }];
+  });
   const sparseMessage =
-    candidates.length < 4 && typeof selection.sparseMessage !== "string"
-      ? "Only a few real places here have a verified walking route, so this list is intentionally short."
+    candidates.length + liveFinds.length < 4 && typeof selection.sparseMessage !== "string"
+      ? "Only a few verified local finds surfaced here, so this list is intentionally short."
       : (selection.sparseMessage ?? null);
-  return { sections, practical, unavailablePracticalKinds, sparseMessage };
+  return { sections, liveFinds, practical, unavailablePracticalKinds, sparseMessage };
 }
 
 function validateInput(

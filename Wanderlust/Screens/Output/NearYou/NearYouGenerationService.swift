@@ -32,9 +32,18 @@ struct NearYouBackendCandidate: Codable, Equatable, Hashable, Sendable {
 
 extension NearYouBackendCandidate: ConvexEncodable {}
 
-/// The model may return only client-issued candidate IDs and editorial prose.
-/// There is no venue name, coordinate, distance, duration or map link field for
-/// it to fill in.
+/// Privacy-safe location context for model-led live discovery.
+/// The exact address and centre coordinate are structurally absent.
+struct NearYouLocationContext: Codable, Equatable, Sendable {
+    let area: String
+    let city: String
+}
+
+extension NearYouLocationContext: ConvexEncodable {}
+
+/// Grounded selections may return only client-issued candidate IDs and prose.
+/// Separately, sourced live finds can name a web discovery but have no venue
+/// coordinate, distance, duration or map-link field for the model to fill in.
 struct NearYouSelectionPayload: Decodable, Equatable, Sendable {
     struct Section: Decodable, Equatable, Sendable {
         let title: String
@@ -47,7 +56,31 @@ struct NearYouSelectionPayload: Decodable, Equatable, Sendable {
     }
 
     let sections: [Section]
+    let liveFinds: [Trip.NearYouLiveFind]
     let sparseMessage: String?
+
+    init(
+        sections: [Section],
+        liveFinds: [Trip.NearYouLiveFind] = [],
+        sparseMessage: String?
+    ) {
+        self.sections = sections
+        self.liveFinds = liveFinds
+        self.sparseMessage = sparseMessage
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sections, liveFinds, sparseMessage
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sections = try container.decode([Section].self, forKey: .sections)
+        liveFinds = try container.decodeIfPresent(
+            [Trip.NearYouLiveFind].self, forKey: .liveFinds
+        ) ?? []
+        sparseMessage = try container.decodeIfPresent(String.self, forKey: .sparseMessage)
+    }
 
     /// Reattaches model choices to the original grounded values. Unknown IDs
     /// fail the whole focused component: silently dropping one would disguise a
@@ -75,6 +108,7 @@ struct NearYouSelectionPayload: Decodable, Equatable, Sendable {
 
         return Trip.NearYou(
             sections: groundedSections,
+            liveFinds: liveFinds,
             practical: discovery.practical,
             unavailablePracticalKinds: discovery.unavailablePracticalKinds,
             sparseMessage: sparseMessage
@@ -90,6 +124,7 @@ protocol NearYouGenerating {
     func generate(
         _ request: TripGenerationRequest,
         candidates: [Trip.NearYouCandidate],
+        location: NearYouLocationContext,
         alreadyRecommended: [String]
     ) async throws -> NearYouSelectionPayload
 }
@@ -100,13 +135,15 @@ struct BackendNearYouService: NearYouGenerating {
     func generate(
         _ request: TripGenerationRequest,
         candidates: [Trip.NearYouCandidate],
+        location: NearYouLocationContext,
         alreadyRecommended: [String]
     ) async throws -> NearYouSelectionPayload {
         try await service.generate(
             .nearYou,
             for: request,
             alreadyRecommended: alreadyRecommended,
-            nearYouCandidates: candidates.map(NearYouBackendCandidate.init)
+            nearYouCandidates: candidates.map(NearYouBackendCandidate.init),
+            nearYouLocation: location
         )
     }
 }
@@ -117,6 +154,7 @@ struct MockNearYouService: NearYouGenerating {
     func generate(
         _ request: TripGenerationRequest,
         candidates: [Trip.NearYouCandidate],
+        location: NearYouLocationContext,
         alreadyRecommended: [String]
     ) async throws -> NearYouSelectionPayload {
         try? await Task.sleep(nanoseconds: delayNanoseconds)
@@ -130,6 +168,7 @@ struct MockNearYouService: NearYouGenerating {
             sections: picks.isEmpty
                 ? []
                 : [.init(title: "A good first wander", picks: picks)],
+            liveFinds: [],
             sparseMessage: candidates.count < 4
                 ? "There are only a few genuinely useful places within reach here."
                 : nil
@@ -208,15 +247,22 @@ struct GroupNearYouActionPayload: Codable, Equatable, Sendable {
     let candidates: [GroupNearYouGroundedCandidate]
     let practical: [GroupNearYouPracticalInput]
     let unavailablePracticalKinds: [String]
+    let researchArea: String
     let replace: Bool
 
-    init(accommodation: CoarseAccommodation, discovery: NearYouDiscovery, replace: Bool) {
+    init(
+        accommodation: CoarseAccommodation,
+        discovery: NearYouDiscovery,
+        researchArea: String,
+        replace: Bool
+    ) {
         self.accommodation = GroupNearYouAccommodationInput(accommodation)
         candidates = discovery.editorialCandidates.map(GroupNearYouGroundedCandidate.init)
         practical = discovery.practical.map(GroupNearYouPracticalInput.init)
         unavailablePracticalKinds = discovery.unavailablePracticalKinds
             .map(\.rawValue)
             .sorted()
+        self.researchArea = researchArea
         self.replace = replace
     }
 }

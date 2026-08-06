@@ -81,6 +81,7 @@ export const MAX_CUSTOMIZATIONS_LENGTH = 2_000;
 export const MAX_INTEREST_LENGTH = 80;
 export const MAX_ALREADY_RECOMMENDED_ITEMS = 200;
 export const MAX_NEAR_YOU_CANDIDATES = 60;
+export const MAX_NEAR_YOU_LOCATION_LENGTH = 160;
 
 /**
  * The only MapKit facts the Near You model may receive. Accommodation input,
@@ -92,6 +93,15 @@ export const nearYouCandidate = v.object({
   category: v.string(),
   distanceMetres: v.number(),
   walkingMinutes: v.number(),
+});
+
+/**
+ * Privacy-safe context for live discovery. The client derives `area` from the
+ * resolved locality/neighbourhood, never from the raw accommodation input.
+ */
+export const nearYouLocation = v.object({
+  area: v.string(),
+  city: v.string(),
 });
 
 export const TRAVELLER_DNA_VERSIONS: Record<number, readonly string[]> = {

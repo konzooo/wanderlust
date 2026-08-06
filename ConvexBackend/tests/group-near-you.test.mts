@@ -32,6 +32,15 @@ test("group materialization uses supplied grounded facts and stable IDs", () => 
         title: "A good morning",
         picks: [{ candidateID: candidate.id, explanation: "Fits a slow start." }],
       }],
+      liveFinds: [{
+        name: "Temporary Market",
+        category: "Pop-up",
+        locationHint: "Barcelona",
+        explanation: "Fits independent design tastes.",
+        accessNote: null,
+        sourceTitle: "Organizer",
+        sourceURL: "https://events.example/market",
+      }],
       sparseMessage: null,
     },
     [candidate],
@@ -42,6 +51,7 @@ test("group materialization uses supplied grounded facts and stable IDs", () => 
   assert.equal(output.sections[0].id, "22222222-2222-4222-8222-222222222222");
   assert.equal(output.sections[0].picks[0].candidate.distanceMetres, 430);
   assert.equal(output.sections[0].picks[0].candidate.walkingMinutes, 6);
+  assert.equal(output.liveFinds[0].id, "22222222-2222-4222-8222-222222222222");
   assert.match(output.sparseMessage, /intentionally short/);
 });
 

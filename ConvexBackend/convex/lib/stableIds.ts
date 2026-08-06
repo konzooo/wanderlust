@@ -69,6 +69,13 @@ function isIdentifiedGeneratedItem(record: JSONRecord): boolean {
     return true;
   }
 
+  // NearYou.LiveFind: web-sourced editorial content without MapKit identity.
+  if (
+    hasStrings(record, "name", "category", "locationHint", "explanation", "sourceURL")
+  ) {
+    return true;
+  }
+
   // NearYou editorial sections. Candidate/place IDs are already grounded IDs.
   return hasStrings(record, "title") && Array.isArray(record.picks);
 }

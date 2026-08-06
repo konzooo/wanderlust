@@ -92,6 +92,59 @@ public extension Trip {
         }
     }
 
+    /// A current web-sourced discovery outside the Apple Maps candidate pool.
+    ///
+    /// This is deliberately a different type from ``NearYouCandidate``: it has
+    /// a visible source but no claimed walking distance or route. A temporary
+    /// market that is absent from Maps can still be useful without pretending
+    /// MapKit verified facts it did not provide.
+    struct NearYouLiveFind: Codable, Equatable, Hashable, Sendable, Identifiable {
+        public let id: UUID
+        public let name: String
+        public let category: String
+        public let locationHint: String
+        public let explanation: String
+        public let accessNote: String?
+        public let sourceTitle: String
+        public let sourceURL: URL
+
+        public init(
+            id: UUID,
+            name: String,
+            category: String,
+            locationHint: String,
+            explanation: String,
+            accessNote: String? = nil,
+            sourceTitle: String,
+            sourceURL: URL
+        ) {
+            self.id = id
+            self.name = name
+            self.category = category
+            self.locationHint = locationHint
+            self.explanation = explanation
+            self.accessNote = accessNote
+            self.sourceTitle = sourceTitle
+            self.sourceURL = sourceURL
+        }
+
+        public var favouriteText: LocationLinkableText {
+            LocationLinkableText(
+                text: "\(name) — \(explanation)",
+                locations: [
+                    Itinerary.Location(
+                        linkSubstring: name,
+                        placeName: "\(name), \(locationHint)",
+                        latitude: nil,
+                        longitude: nil,
+                        placeID: nil
+                    )
+                ],
+                id: id
+            )
+        }
+    }
+
     /// Model-free reference categories rendered apart from editorial picks.
     enum NearYouPracticalKind: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
         case transport
@@ -125,22 +178,55 @@ public extension Trip {
     /// No placeholder candidates are ever added to make the layout look full.
     struct NearYou: Codable, Equatable, Hashable, Sendable {
         public let sections: [NearYouSection]
+        public let liveFinds: [NearYouLiveFind]
         public let practical: [NearYouPracticalPlace]
         public let unavailablePracticalKinds: Set<NearYouPracticalKind>
         public let sparseMessage: String?
 
         public init(
             sections: [NearYouSection],
+            liveFinds: [NearYouLiveFind] = [],
             practical: [NearYouPracticalPlace],
             unavailablePracticalKinds: Set<NearYouPracticalKind> = [],
             sparseMessage: String? = nil
         ) {
             self.sections = sections
+            self.liveFinds = liveFinds
             self.practical = practical
             self.unavailablePracticalKinds = unavailablePracticalKinds
             self.sparseMessage = sparseMessage
         }
 
         public var editorialPicks: [NearYouPick] { sections.flatMap(\.picks) }
+
+        private enum CodingKeys: String, CodingKey {
+            case sections, liveFinds, practical, unavailablePracticalKinds, sparseMessage
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            sections = try container.decode([NearYouSection].self, forKey: .sections)
+            liveFinds = try container.decodeIfPresent(
+                [NearYouLiveFind].self, forKey: .liveFinds
+            ) ?? []
+            practical = try container.decode(
+                [NearYouPracticalPlace].self, forKey: .practical
+            )
+            unavailablePracticalKinds = try container.decodeIfPresent(
+                Set<NearYouPracticalKind>.self, forKey: .unavailablePracticalKinds
+            ) ?? []
+            sparseMessage = try container.decodeIfPresent(
+                String.self, forKey: .sparseMessage
+            )
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(sections, forKey: .sections)
+            try container.encode(liveFinds, forKey: .liveFinds)
+            try container.encode(practical, forKey: .practical)
+            try container.encode(unavailablePracticalKinds, forKey: .unavailablePracticalKinds)
+            try container.encodeIfPresent(sparseMessage, forKey: .sparseMessage)
+        }
     }
 }

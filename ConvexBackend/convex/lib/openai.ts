@@ -12,6 +12,17 @@
 
 /** Single provider/model selection point for the whole backend. */
 export const OPENAI_MODEL = "gpt-4o-mini";
+/**
+ * Near You is the one component where current local discovery is the product,
+ * not merely background knowledge. Luna keeps the search pass inexpensive
+ * while giving it a stronger editorial model than the default mini call.
+ */
+export const NEAR_YOU_MODEL = "gpt-5.6-luna";
+
+export type OpenAIWebSource = {
+  url: string;
+  title: string | null;
+};
 
 export type OpenAIUsage = {
   inputTokens: number;
@@ -26,6 +37,10 @@ export type OpenAIResult = {
   usage: OpenAIUsage;
   /** Wall-clock milliseconds for the provider call itself. */
   durationMs: number;
+  /** Sources consulted by hosted web search, empty for ordinary components. */
+  webSources: OpenAIWebSource[];
+  /** Paid search actions reported by the provider, retained for spend telemetry. */
+  webSearchCalls: number;
 };
 
 /**
@@ -59,6 +74,18 @@ export async function callOpenAI(args: {
   schema: unknown;
   schemaName: string;
   maxOutputTokens: number;
+  model?: string;
+  webSearch?: {
+    /** Requested provider-side ceiling; actual paid actions are measured separately. */
+    maxToolCalls: number;
+    /** City/neighbourhood context only. Never an accommodation address. */
+    approximateLocation?: {
+      city?: string;
+      region?: string;
+      country?: string;
+      timezone?: string;
+    };
+  };
 }): Promise<OpenAIResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new OpenAIError("missing_openai_key");
@@ -72,21 +99,7 @@ export async function callOpenAI(args: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        instructions: args.systemPrompt,
-        input: args.userPrompt,
-        max_output_tokens: args.maxOutputTokens,
-        store: false,
-        text: {
-          format: {
-            type: "json_schema",
-            name: args.schemaName,
-            schema: args.schema,
-            strict: true,
-          },
-        },
-      }),
+      body: JSON.stringify(buildOpenAIRequestBody(args)),
     });
   } catch {
     throw new OpenAIError("network_error");
@@ -123,7 +136,58 @@ export async function callOpenAI(args: {
     throw new OpenAIError("schema_decode_failed", usage, durationMs);
   }
 
-  return { data, usage, durationMs };
+  const webSources = extractWebSources(json);
+  const webSearchCalls = countWebSearchCalls(json);
+  return { data, usage, durationMs, webSources, webSearchCalls };
+}
+
+/** Pure request construction keeps privacy and cost controls regression-testable. */
+export function buildOpenAIRequestBody(args: {
+  systemPrompt: string;
+  userPrompt: string;
+  schema: unknown;
+  schemaName: string;
+  maxOutputTokens: number;
+  model?: string;
+  webSearch?: {
+    maxToolCalls: number;
+    approximateLocation?: {
+      city?: string;
+      region?: string;
+      country?: string;
+      timezone?: string;
+    };
+  };
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: args.model ?? OPENAI_MODEL,
+    instructions: args.systemPrompt,
+    input: args.userPrompt,
+    max_output_tokens: args.maxOutputTokens,
+    store: false,
+    text: {
+      format: {
+        type: "json_schema",
+        name: args.schemaName,
+        schema: args.schema,
+        strict: true,
+      },
+    },
+  };
+  if (args.webSearch) {
+    const userLocation = args.webSearch.approximateLocation;
+    body.tools = [{
+      type: "web_search",
+      search_context_size: "medium",
+      ...(userLocation && Object.values(userLocation).some(Boolean)
+        ? { user_location: { type: "approximate", ...userLocation } }
+        : {}),
+    }];
+    body.tool_choice = "required";
+    body.max_tool_calls = Math.max(1, Math.min(2, args.webSearch.maxToolCalls));
+    body.include = ["web_search_call.action.sources"];
+  }
+  return body;
 }
 
 function extractUsage(json: Record<string, unknown>): OpenAIUsage {
@@ -157,4 +221,57 @@ function extractOutputText(json: Record<string, unknown>): string | null {
     }
   }
   return null;
+}
+
+export function countWebSearchCalls(json: Record<string, unknown>): number {
+  return Array.isArray(json.output)
+    ? json.output.filter(
+      (item) => {
+        const record = item as Record<string, unknown>;
+        const action = record.action as Record<string, unknown> | undefined;
+        // The API also emits web_search_call items for open_page and
+        // find_in_page. Official pricing charges the search action, so spend
+        // telemetry must not count those navigation steps as paid searches.
+        return record.type === "web_search_call" && action?.type === "search";
+      },
+    ).length
+    : 0;
+}
+
+function extractWebSources(json: Record<string, unknown>): OpenAIWebSource[] {
+  const found = new Map<string, OpenAIWebSource>();
+  const add = (value: unknown) => {
+    if (typeof value !== "object" || value === null) return;
+    const record = value as Record<string, unknown>;
+    if (typeof record.url !== "string" || !isHTTPURL(record.url)) return;
+    found.set(record.url, {
+      url: record.url,
+      title: typeof record.title === "string" && record.title.trim()
+        ? record.title.trim()
+        : null,
+    });
+  };
+
+  if (!Array.isArray(json.output)) return [];
+  for (const rawItem of json.output) {
+    const item = rawItem as Record<string, unknown>;
+    const action = item.action as Record<string, unknown> | undefined;
+    if (Array.isArray(action?.sources)) action.sources.forEach(add);
+    if (Array.isArray(item.sources)) item.sources.forEach(add);
+    if (!Array.isArray(item.content)) continue;
+    for (const rawPart of item.content) {
+      const part = rawPart as Record<string, unknown>;
+      if (Array.isArray(part.annotations)) part.annotations.forEach(add);
+    }
+  }
+  return [...found.values()];
+}
+
+function isHTTPURL(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }

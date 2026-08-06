@@ -154,6 +154,11 @@ extension Trip {
                 )
             )
         }
+        for find in nearYou?.liveFinds ?? [] {
+            result.append(
+                .init(id: find.id, text: find.favouriteText, context: "Near you — live finds")
+            )
+        }
 
         return result
     }

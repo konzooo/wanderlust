@@ -14,21 +14,32 @@ import MapKit
 
 struct NearYouSearchCentre: Equatable, Hashable, Sendable {
     let accommodation: CoarseAccommodation
+    /// Coarse locality suitable for live search. Never the entered address.
+    let researchArea: String?
     /// Exact only for the lifetime of the in-memory search. Never persisted.
     let latitude: Double
     let longitude: Double
 
-    init(accommodation: CoarseAccommodation, latitude: Double, longitude: Double) {
+    init(
+        accommodation: CoarseAccommodation,
+        latitude: Double,
+        longitude: Double,
+        researchArea: String? = nil
+    ) {
         self.accommodation = accommodation
         self.latitude = latitude
         self.longitude = longitude
+        self.researchArea = researchArea
     }
 
     init(persisted accommodation: CoarseAccommodation) {
         self.init(
             accommodation: accommodation,
             latitude: accommodation.latitude,
-            longitude: accommodation.longitude
+            longitude: accommodation.longitude,
+            researchArea: accommodation.precision == .neighbourhood
+                ? accommodation.label
+                : nil
         )
     }
 }
@@ -151,7 +162,8 @@ struct MapKitNearYouService: NearYouMapServicing {
             return NearYouSearchCentre(
                 accommodation: accommodation,
                 latitude: coordinate.latitude,
-                longitude: coordinate.longitude
+                longitude: coordinate.longitude,
+                researchArea: label.isEmpty ? destination : label
             )
         }
         throw NearYouMapError.missingCoordinates
@@ -342,7 +354,8 @@ struct MapKitNearYouService: NearYouMapServicing {
             centre: NearYouSearchCentre(
                 accommodation: accommodation,
                 latitude: coordinate.latitude,
-                longitude: coordinate.longitude
+                longitude: coordinate.longitude,
+                researchArea: locality ?? destination
             )
         )
     }

@@ -18,9 +18,12 @@ import {
   MAX_DESTINATION_INPUT_LENGTH,
   MAX_INTEREST_LENGTH,
   MAX_NEAR_YOU_CANDIDATES,
+  MAX_NEAR_YOU_LOCATION_LENGTH,
   nearYouCandidate,
+  nearYouLocation,
   soloTripInput,
 } from "./lib/validators";
+import { stampMissingStableIds } from "./lib/stableIds";
 
 /**
  * Solo trip generation. This is the whole reason the app no longer carries an
@@ -63,6 +66,8 @@ export const generateComponent = action({
     nearYouCandidates: v.optional(
       v.union(v.array(nearYouCandidate), v.null()),
     ),
+    /** Coarse locality/city only; raw address input is structurally absent. */
+    nearYouLocation: v.optional(v.union(nearYouLocation, v.null())),
     /**
      * Which arm of the D15 experiment to run (see `SUGGESTIONS_VARIANT`).
      *
@@ -100,9 +105,21 @@ export const generateComponent = action({
     const nearYouCandidates = args.nearYouCandidates
       ?.slice(0, MAX_NEAR_YOU_CANDIDATES) as NearYouCandidate[] | undefined;
     if (component === "nearYou") {
-      if (!nearYouCandidates?.length || !validNearYouCandidates(nearYouCandidates)) {
+      if (!nearYouCandidates || !validNearYouCandidates(nearYouCandidates)) {
         throw new ConvexError("invalid_near_you_candidates");
       }
+    }
+    const nearYouLocationContext = args.nearYouLocation
+      ? {
+        area: args.nearYouLocation.area.trim().slice(0, MAX_NEAR_YOU_LOCATION_LENGTH),
+        city: args.nearYouLocation.city.trim().slice(0, MAX_NEAR_YOU_LOCATION_LENGTH),
+      }
+      : undefined;
+    if (
+      component === "nearYou" &&
+      (!nearYouLocationContext?.area || !nearYouLocationContext.city)
+    ) {
+      throw new ConvexError("invalid_near_you_location");
     }
 
     // Throws a ConvexError carrying a QuotaCode when a limit is hit.
@@ -122,6 +139,7 @@ export const generateComponent = action({
         interest,
         alreadyRecommended,
         nearYouCandidates: component === "nearYou" ? nearYouCandidates : undefined,
+        nearYouLocation: component === "nearYou" ? nearYouLocationContext : undefined,
         variant,
       });
 
@@ -135,13 +153,16 @@ export const generateComponent = action({
         variant,
         maxOutputTokens: result.maxOutputTokens,
         repairs: result.validation.repairs,
+        webSearchCalls: result.webSearchCalls,
       });
       if (reservation.slotId) {
         await ctx.runMutation(internal.quota.commitReservation, {
           slotId: reservation.slotId,
         });
       }
-      return result.data;
+      return component === "nearYou"
+        ? stampMissingStableIds(result.data)
+        : result.data;
     } catch (error) {
       const code = failureCode(error);
       // A truncation still burned every one of the output tokens it produced,
@@ -159,6 +180,7 @@ export const generateComponent = action({
           Date.now() - startedAt,
         errorCode: code,
         variant,
+        webSearchCalls: 0,
       });
       // The traveller never received this, so it must not consume a cap.
       if (reservation.slotId) {

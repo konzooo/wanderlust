@@ -13,10 +13,11 @@ import {
   buildUserMessage,
   type Component,
   type NearYouCandidate,
+  type NearYouLocationContext,
   type PromptOptions,
   type TripInput,
 } from "./prompts";
-import { callOpenAI, type OpenAIResult } from "./openai";
+import { callOpenAI, NEAR_YOU_MODEL, type OpenAIResult } from "./openai";
 import {
   emptyReport,
   validateDeepDive,
@@ -67,6 +68,9 @@ export const suggestionsVariant = v.union(
 
 /** The measured default. Changing this changes what every new trip generates. */
 export const SUGGESTIONS_VARIANT: SuggestionsVariant = "split";
+
+/** Request one broad hosted search; one action can return many source URLs. */
+export const NEAR_YOU_MAX_SEARCH_CALLS = 1;
 
 /**
  * The components a solo trip generates on open, for a given variant.
@@ -186,7 +190,11 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
   nearYou: {
     schema: NEAR_YOU_SCHEMA,
     schemaName: "grounded_near_you_schema",
-    maxOutputTokens: 2_048,
+    // Live finds add sourced discovery fields to the grounded selection. The
+    // ceiling is deliberately headroom rather than a target; billing follows
+    // tokens produced, while a too-small ceiling turns a useful long result
+    // into an incomplete strict-JSON failure.
+    maxOutputTokens: 4_096,
     required: false,
     perTripCap: null,
   },
@@ -233,6 +241,7 @@ export async function runComponent(args: {
   interest?: string;
   alreadyRecommended?: string[];
   nearYouCandidates?: NearYouCandidate[];
+  nearYouLocation?: NearYouLocationContext;
   variant?: SuggestionsVariant;
 }): Promise<ComponentResult> {
   const variant = args.variant ?? SUGGESTIONS_VARIANT;
@@ -248,10 +257,22 @@ export async function runComponent(args: {
       interest: args.interest,
       alreadyRecommended: args.alreadyRecommended,
       nearYouCandidates: args.nearYouCandidates,
+      nearYouLocation: args.nearYouLocation,
     }),
     schema: spec.schema,
     schemaName: spec.schemaName,
     maxOutputTokens: spec.maxOutputTokens,
+    ...(args.component === "nearYou"
+      ? {
+        model: NEAR_YOU_MODEL,
+        webSearch: {
+          maxToolCalls: NEAR_YOU_MAX_SEARCH_CALLS,
+          approximateLocation: {
+            city: args.nearYouLocation?.city ?? destination(args.input),
+          },
+        },
+      }
+      : {}),
   });
 
   const validation = emptyReport();
@@ -260,6 +281,7 @@ export async function runComponent(args: {
     result.data,
     validation,
     args.nearYouCandidates,
+    result.webSources,
   );
   return { ...result, data, validation, maxOutputTokens: spec.maxOutputTokens };
 }
@@ -269,6 +291,7 @@ function validate(
   data: unknown,
   report: ValidationReport,
   nearYouCandidates?: NearYouCandidate[],
+  webSources: OpenAIResult["webSources"] = [],
 ): unknown {
   switch (component) {
     case "itinerary":
@@ -286,6 +309,10 @@ function validate(
     case "whereToStay":
       return validateWhereToStayResponse(data, report);
     case "nearYou":
-      return validateNearYou(data, report, nearYouCandidates ?? []);
+      return validateNearYou(data, report, nearYouCandidates ?? [], webSources);
   }
+}
+
+function destination(input: TripInput): string {
+  return input.mode === "solo" ? input.solo.destination : input.group.destination;
 }

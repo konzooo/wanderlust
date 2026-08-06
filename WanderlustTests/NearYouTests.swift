@@ -27,6 +27,7 @@ final class NearYouTests: XCTestCase {
         let payload = GroupNearYouActionPayload(
             accommodation: centre(precision: .address).accommodation,
             discovery: discovery(),
+            researchArea: "Eixample, Barcelona",
             replace: false
         )
         let json = String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
@@ -97,7 +98,7 @@ final class NearYouTests: XCTestCase {
         map.addressResult = .resolved(.init(
             title: "Hotel Example",
             subtitle: "Carrer de Mallorca",
-            centre: centre(precision: .address)
+            centre: centre(precision: .address, researchArea: "Eixample")
         ))
         let model = StubNearYouGenerator()
         let store = makeStore(map: map, model: model)
@@ -107,6 +108,8 @@ final class NearYouTests: XCTestCase {
 
         XCTAssertEqual(map.addressInputs, ["Carrer de Mallorca 166"])
         XCTAssertEqual(model.callCount, 1)
+        XCTAssertEqual(model.locations, [.init(area: "Eixample", city: "Destination, Country")])
+        XCTAssertFalse(model.locations.description.contains("Carrer de Mallorca 166"))
         XCTAssertEqual(store.state.accommodation?.precision, .address)
         XCTAssertTrue(store.state.nearYouResponse.isLoaded)
         XCTAssertEqual(store.state.nearYouResponse.data?.editorialPicks.first?.id, candidate().id)
@@ -434,6 +437,7 @@ final class NearYouTests: XCTestCase {
     func testNearYouJoinsAlreadyRecommendedButPracticalDoesNot() {
         let editorial = candidate(name: "Editorial Place")
         let practical = candidate(id: UUID(), name: "Practical Pharmacy")
+        let live = liveFind(name: "One-night Ceramics Market")
         var trip = Trip(details: .mock, itinerary: .mock, suggestions: nil)
         trip.nearYouState = .ready(Trip.NearYou(
             sections: [
@@ -442,11 +446,51 @@ final class NearYouTests: XCTestCase {
                     picks: [.init(candidate: editorial, explanation: "Fits your taste.")]
                 )
             ],
+            liveFinds: [live],
             practical: [.init(kind: .pharmacy, candidate: practical)]
         ))
 
         XCTAssertTrue(trip.alreadyRecommended.contains("Editorial Place"))
+        XCTAssertTrue(trip.alreadyRecommended.contains("One-night Ceramics Market"))
         XCTAssertFalse(trip.alreadyRecommended.contains("Practical Pharmacy"))
+    }
+
+    func testLiveFindSurvivesSaveReopenWithFavouriteIdentityAndSource() throws {
+        let live = liveFind()
+        var trip = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestionsState: .ready(.mock),
+            nearYouState: .ready(Trip.NearYou(
+                sections: [],
+                liveFinds: [live],
+                practical: []
+            )),
+            favorites: .init(liked: [live.id])
+        )
+
+        trip = try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
+
+        XCTAssertEqual(trip.nearYou?.liveFinds.first?.id, live.id)
+        XCTAssertEqual(trip.nearYou?.liveFinds.first?.sourceURL, live.sourceURL)
+        XCTAssertTrue(trip.favorites.contains(live.id))
+        XCTAssertEqual(trip.favouriteCandidates.last?.context, "Near you — live finds")
+    }
+
+    func testOlderNearYouPayloadWithoutLiveFindsStillDecodes() throws {
+        var object = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(nearYou()))
+                as? [String: Any]
+        )
+        object.removeValue(forKey: "liveFinds")
+
+        let decoded = try JSONDecoder().decode(
+            Trip.NearYou.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+
+        XCTAssertTrue(decoded.liveFinds.isEmpty)
+        XCTAssertEqual(decoded.editorialPicks.first?.candidate.id, candidate().id)
     }
 
     func testSoloShareContractHasNoAccommodationOrNearYouKeys() {
@@ -561,9 +605,26 @@ final class NearYouTests: XCTestCase {
         )
     }
 
+    private func liveFind(
+        id: UUID = UUID(uuidString: "11111111-2222-4333-8444-555555555555")!,
+        name: String = "Weekend Makers Market"
+    ) -> Trip.NearYouLiveFind {
+        Trip.NearYouLiveFind(
+            id: id,
+            name: name,
+            category: "Temporary market",
+            locationHint: "Eixample, Barcelona",
+            explanation: "A timely match for your interest in independent craft.",
+            accessNote: "Check the organizer's current directions.",
+            sourceTitle: "Official market programme",
+            sourceURL: URL(string: "https://example.com/market")!
+        )
+    }
+
     private func centre(
         precision: CoarseAccommodation.Precision,
-        latitude: Double = 41.385
+        latitude: Double = 41.385,
+        researchArea: String? = nil
     ) -> NearYouSearchCentre {
         NearYouSearchCentre(
             accommodation: CoarseAccommodation(
@@ -573,7 +634,8 @@ final class NearYouTests: XCTestCase {
                 precision: precision
             ),
             latitude: latitude,
-            longitude: 2.173
+            longitude: 2.173,
+            researchArea: researchArea
         )
     }
 
@@ -686,15 +748,18 @@ private final class StubNearYouMapService: NearYouMapServicing {
 @MainActor
 private final class StubNearYouGenerator: NearYouGenerating {
     private(set) var callCount = 0
+    private(set) var locations: [NearYouLocationContext] = []
     var failuresRemaining = 0
     var payload: NearYouSelectionPayload?
 
     func generate(
         _ request: TripGenerationRequest,
         candidates: [Trip.NearYouCandidate],
+        location: NearYouLocationContext,
         alreadyRecommended: [String]
     ) async throws -> NearYouSelectionPayload {
         callCount += 1
+        locations.append(location)
         if failuresRemaining > 0 {
             failuresRemaining -= 1
             throw TripGenerationError.transport

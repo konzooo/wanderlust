@@ -16,6 +16,7 @@
  * be able to detect.
  */
 
+import type { OpenAIWebSource } from "./openai";
 import type { NearYouCandidate } from "./prompts";
 
 /** How many cards Worth-it/Skip shows (D7). */
@@ -360,6 +361,7 @@ export function validateNearYou(
   data: unknown,
   report: ValidationReport,
   candidates: NearYouCandidate[],
+  webSources: OpenAIWebSource[] = [],
 ): Record<string, unknown> {
   if (!isRecord(data)) throw new ValidationError("invalid_near_you_shape");
 
@@ -375,7 +377,11 @@ export function validateNearYou(
       continue;
     }
     if (containsMapFactClaim(rawSection.title)) {
-      throw new ValidationError("near_you_model_grounding_claim");
+      // Never render model-authored proximity as a grounded fact. Dropping the
+      // noncompliant editorial group preserves independently sourced live finds
+      // and the deterministic MapKit practical layer from the same response.
+      report.repairs += 1;
+      continue;
     }
     const rawPicks = Array.isArray(rawSection.picks) ? rawSection.picks : [];
     const picks: Record<string, unknown>[] = [];
@@ -393,7 +399,8 @@ export function validateNearYou(
         throw new ValidationError("unknown_near_you_candidate");
       }
       if (containsMapFactClaim(rawPick.explanation)) {
-        throw new ValidationError("near_you_model_grounding_claim");
+        report.repairs += 1;
+        continue;
       }
       if (used.has(candidateID) || selectedCount >= 10) {
         report.repairs += 1;
@@ -418,15 +425,86 @@ export function validateNearYou(
       ? data.sparseMessage.trim()
       : null;
   if (sparseMessage && containsMapFactClaim(sparseMessage)) {
-    throw new ValidationError("near_you_model_grounding_claim");
+    sparseMessage = null;
+    report.repairs += 1;
   }
-  if (candidates.length < 4 && sparseMessage === null) {
+  const sourcesByURL = new Map(
+    webSources
+      .map((source) => [canonicalSourceURL(source.url), source] as const)
+      .filter(([url]) => url.length > 0),
+  );
+  const candidateNames = new Set(
+    candidates.map((candidate) => candidate.name.trim().toLocaleLowerCase()),
+  );
+  const seenLiveFinds = new Set<string>();
+  const rawLiveFinds = Array.isArray(data.liveFinds) ? data.liveFinds : [];
+  const liveFinds: Record<string, unknown>[] = [];
+  for (const rawFind of rawLiveFinds) {
+    if (liveFinds.length >= 6) {
+      report.repairs += 1;
+      continue;
+    }
+    if (
+      !isRecord(rawFind) ||
+      !nonEmptyString(rawFind.name) ||
+      !nonEmptyString(rawFind.category) ||
+      !nonEmptyString(rawFind.locationHint) ||
+      !nonEmptyString(rawFind.explanation) ||
+      !nonEmptyString(rawFind.sourceTitle) ||
+      !nonEmptyString(rawFind.sourceURL) ||
+      !(rawFind.accessNote === null || typeof rawFind.accessNote === "string")
+    ) {
+      report.repairs += 1;
+      continue;
+    }
+    const name = rawFind.name.trim().slice(0, 160);
+    const normalizedName = name.toLocaleLowerCase();
+    const sourceURL = rawFind.sourceURL.trim();
+    const consultedSource = sourcesByURL.get(canonicalSourceURL(sourceURL));
+    if (
+      candidateNames.has(normalizedName) ||
+      seenLiveFinds.has(normalizedName) ||
+      !consultedSource
+    ) {
+      report.repairs += 1;
+      continue;
+    }
+    seenLiveFinds.add(normalizedName);
+    liveFinds.push({
+      name,
+      category: rawFind.category.trim().slice(0, 80),
+      locationHint: rawFind.locationHint.trim().slice(0, 200),
+      explanation: rawFind.explanation.trim().slice(0, 600),
+      accessNote:
+        typeof rawFind.accessNote === "string" && rawFind.accessNote.trim()
+          ? rawFind.accessNote.trim().slice(0, 300)
+          : null,
+      sourceTitle: (consultedSource.title ?? rawFind.sourceTitle).trim().slice(0, 200),
+      sourceURL: consultedSource.url,
+    });
+  }
+
+  if (candidates.length + liveFinds.length < 4 && sparseMessage === null) {
     sparseMessage =
-      "The grounded candidate list is limited here, so the result is intentionally short.";
+      "The verified local result is limited here, so the list is intentionally short.";
     report.repairs += 1;
   }
 
-  return { sections, sparseMessage };
+  return { sections, liveFinds, sparseMessage };
+}
+
+function canonicalSourceURL(raw: string): string {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return "";
+    for (const key of [...url.searchParams.keys()]) {
+      if (key.toLowerCase().startsWith("utm_")) url.searchParams.delete(key);
+    }
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
 }
 
 function containsMapFactClaim(value: string): boolean {

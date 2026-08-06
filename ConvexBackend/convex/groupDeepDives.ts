@@ -219,6 +219,12 @@ export function collectAlreadyRecommended(values: unknown[]): string[] {
         typeof record.candidate === "object" && record.candidate !== null) {
       add((record.candidate as Record<string, unknown>).name);
     }
+    if (
+      typeof record.explanation === "string" &&
+      typeof record.sourceURL === "string"
+    ) {
+      add(record.name);
+    }
     Object.values(record).forEach(walk);
   };
   values.forEach(walk);

@@ -696,6 +696,7 @@ extension TripOutputStore {
                         payload: GroupNearYouActionPayload(
                             accommodation: centre.accommodation,
                             discovery: discovery,
+                            researchArea: centre.researchArea ?? state.details.destination.name,
                             replace: replacingGroupNearYou
                         )
                     )
@@ -705,15 +706,6 @@ extension TripOutputStore {
                     state.groupNearYouGenerationCount = result.generationCount
                     replacingGroupNearYou = false
                     output = result.nearYou
-                } else if discovery.editorialCandidates.isEmpty {
-                    // Nothing exists for the model to select. Do not spend a
-                    // call asking it to decorate an empty list.
-                    output = Trip.NearYou(
-                        sections: [],
-                        practical: discovery.practical,
-                        unavailablePracticalKinds: discovery.unavailablePracticalKinds,
-                        sparseMessage: "MapKit found no editorial places here with a verified walking route."
-                    )
                 } else {
                     guard let request else {
                         throw TripGenerationError.backend(code: "missing_trip_context")
@@ -721,13 +713,19 @@ extension TripOutputStore {
                     let payload = try await nearYouService.generate(
                         request,
                         candidates: discovery.editorialCandidates,
+                        location: NearYouLocationContext(
+                            area: centre.researchArea ?? state.details.destination.name,
+                            city: state.details.destination.name
+                        ),
                         alreadyRecommended: context
                     )
                     try Task.checkCancellation()
                     let grounded = try payload.materialize(discovery: discovery)
-                    if discovery.isSparse && grounded.sparseMessage == nil {
+                    if discovery.editorialCandidates.count + grounded.liveFinds.count < 4,
+                       grounded.sparseMessage == nil {
                         output = Trip.NearYou(
                             sections: grounded.sections,
+                            liveFinds: grounded.liveFinds,
                             practical: grounded.practical,
                             unavailablePracticalKinds: grounded.unavailablePracticalKinds,
                             sparseMessage: "Only a few real places here have a verified walking route, so this list is intentionally short."

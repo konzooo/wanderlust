@@ -174,7 +174,6 @@ struct TripOutputScreen: View {
                     favorites: favoritesBinding,
                     onSearchAddress: { store.send(.resolveNearYouAddress($0)) },
                     onChooseResolution: { store.send(.chooseNearYouResolution($0)) },
-                    onChooseArea: { store.send(.chooseNearYouArea($0)) },
                     onRetryWhereToStay: canRetry
                         ? { store.send(.retryComponent(.whereToStay)) }
                         : nil,

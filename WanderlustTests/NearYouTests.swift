@@ -9,6 +9,27 @@ import XCTest
 
 @MainActor
 final class NearYouTests: XCTestCase {
+    func testAddressSuggestionPreservesMapCompletionContext() {
+        let suggestion = NearYouAddressSuggestion(
+            title: "Carrer de Mallorca, 166",
+            subtitle: "Barcelona, Spain"
+        )
+
+        XCTAssertEqual(
+            suggestion.searchText,
+            "Carrer de Mallorca, 166, Barcelona, Spain"
+        )
+    }
+
+    func testAddressSuggestionDoesNotDuplicateContainedSubtitle() {
+        let suggestion = NearYouAddressSuggestion(
+            title: "Hotel Example, Barcelona",
+            subtitle: "Barcelona"
+        )
+
+        XCTAssertEqual(suggestion.searchText, "Hotel Example, Barcelona")
+    }
+
     func testBackendCandidatePayloadCannotContainExactAccommodation() throws {
         let exactAddress = "Carrer de Mallorca 166, 2A"
         let data = try JSONEncoder().encode(NearYouBackendCandidate(candidate: candidate()))

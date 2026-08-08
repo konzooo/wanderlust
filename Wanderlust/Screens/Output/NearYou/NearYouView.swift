@@ -9,7 +9,88 @@
 import CoreArchitecture
 import CoreModels
 import DesignSystem
+import MapKit
 import SwiftUI
+
+struct NearYouAddressSuggestion: Identifiable, Equatable, Sendable {
+    let title: String
+    let subtitle: String
+
+    var id: String { "\(title)|\(subtitle)" }
+
+    /// A completion is still resolved by MapKit after confirmation. Keeping the
+    /// full subtitle here gives that search enough context to preserve the exact
+    /// result the traveller selected from the list.
+    var searchText: String {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSubtitle = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSubtitle.isEmpty,
+              !trimmedTitle.localizedCaseInsensitiveContains(trimmedSubtitle) else {
+            return trimmedTitle
+        }
+        return "\(trimmedTitle), \(trimmedSubtitle)"
+    }
+}
+
+@MainActor
+private final class NearYouAddressCompleter: NSObject, ObservableObject {
+    @Published private(set) var suggestions: [NearYouAddressSuggestion] = []
+    @Published private(set) var isSearching = false
+
+    private let completer = MKLocalSearchCompleter()
+
+    override init() {
+        super.init()
+        completer.delegate = self
+        completer.resultTypes = [.address, .pointOfInterest]
+    }
+
+    func update(query: String, destination: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else {
+            clear()
+            return
+        }
+
+        let destination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+        if destination.isEmpty || trimmed.localizedCaseInsensitiveContains(destination) {
+            completer.queryFragment = trimmed
+        } else {
+            completer.queryFragment = "\(trimmed), \(destination)"
+        }
+        isSearching = true
+    }
+
+    func clear() {
+        completer.queryFragment = ""
+        suggestions = []
+        isSearching = false
+    }
+}
+
+extension NearYouAddressCompleter: MKLocalSearchCompleterDelegate {
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        var seen = Set<String>()
+        let suggestions = completer.results.prefix(8).compactMap { completion in
+            let suggestion = NearYouAddressSuggestion(
+                title: completion.title,
+                subtitle: completion.subtitle
+            )
+            return seen.insert(suggestion.id).inserted ? suggestion : nil
+        }
+        Task { @MainActor [weak self] in
+            self?.suggestions = suggestions
+            self?.isSearching = false
+        }
+    }
+
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        Task { @MainActor [weak self] in
+            self?.suggestions = []
+            self?.isSearching = false
+        }
+    }
+}
 
 struct NearYouWalkingFacts: Equatable {
     let distance: String
@@ -48,73 +129,265 @@ struct NearYouView: View {
     @Binding var favorites: Trip.Favorites
     let onSearchAddress: (String) -> Void
     let onChooseResolution: (NearYouResolutionChoice) -> Void
-    let onChooseArea: (Trip.StayArea) -> Void
     let onRetryWhereToStay: (() -> Void)?
     let onRetryNearYou: () -> Void
     let onRegenerate: () -> Void
     let onChangeStay: () -> Void
 
     @State private var address = ""
+    @State private var selectedSuggestion: NearYouAddressSuggestion?
+    @State private var showsWhereToStay = false
+    @StateObject private var addressCompleter = NearYouAddressCompleter()
+    @FocusState private var isAddressFocused: Bool
 
     var body: some View {
-        if let accommodation {
-            groundedContent(accommodation: accommodation)
-        } else {
-            ungroundedContent
-        }
-    }
-
-    private var ungroundedContent: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: .Spacing.small) {
-                Text("What's around your stay?")
-                    .font(DS.Typography.sectionHeader)
-                    .foregroundStyle(.primary)
-
-                Text(isGroup
-                     ? "Apple Maps resolves the address or hotel on this device. The model searches with only the coarse area; the exact input is never sent or saved. The resulting guide is shared with the group."
-                     : "Apple Maps resolves the address or hotel on this device. The model searches with only the coarse area; the exact input is never sent or saved.")
-                    .font(.kanit(14))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    TextField("Address or hotel", text: $address)
-                        .textContentType(.fullStreetAddress)
-                        .textInputAutocapitalization(.words)
-                        .submitLabel(.search)
-                        .onSubmit(submitAddress)
-                        .padding(.horizontal, 12)
-                        .frame(height: 44)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.secondarySystemBackground))
-                        )
-
-                    Button(action: submitAddress) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.appTint)
-                    .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-
-                resolutionFeedback
+        Group {
+            if let accommodation {
+                groundedContent(accommodation: accommodation)
+            } else {
+                ungroundedContent
             }
-            .padding(.horizontal, .Padding.sm3)
-            .padding(.top, .Padding.md)
-            .padding(.bottom, .Padding.sm3)
-
-            Divider().padding(.horizontal, .Padding.sm3)
-
-            WhereToStayView(
+        }
+        .sheet(isPresented: $showsWhereToStay) {
+            WhereToStaySheet(
                 areas: whereToStay,
                 destination: destination,
                 onRetry: onRetryWhereToStay,
-                onChoose: onChooseArea
+                onClose: { showsWhereToStay = false }
             )
+        }
+    }
+
+    /// The un-grounded state asks for one honest grounding point: an exact
+    /// address selected or confirmed by the traveller.
+    private var ungroundedContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                Spacer(minLength: .Padding.md3)
+
+                VStack(spacing: .Spacing.medium) {
+                    Image(systemName: "location.magnifyingglass")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(Color.appTint)
+
+                    Text("Where you stay decides the trip you have.")
+                        .font(.kanitMedium(25))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(lede)
+                        .font(.kanit(15))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, .Padding.md)
+
+                addressField
+                    .padding(.horizontal, .Padding.md)
+                    .padding(.top, .Padding.md2)
+
+                Button("Confirm this address", action: submitAddress)
+                    .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                    .disabled(trimmedAddress.isEmpty || addressResolution.isLoading)
+                    .opacity(trimmedAddress.isEmpty || addressResolution.isLoading ? 0.35 : 1)
+                    .padding(.horizontal, .Padding.md)
+                    .padding(.top, .Spacing.medium)
+
+                Text("Apple Maps resolves it on this device — only the coarse area is ever sent.")
+                    .font(.kanit(12))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, .Padding.md2)
+                    .padding(.top, .Spacing.small)
+
+                whereToStayPrompt
+                    .padding(.top, .Padding.lg)
+
+                Spacer(minLength: .Padding.md3)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, .Padding.md)
+        }
+        .onDisappear { addressCompleter.clear() }
+    }
+
+    private var lede: String {
+        isGroup
+            ? "It is your first coffee, the walk home at night, and whether you wake up in a neighbourhood or in a postcard. Set where the group is based and we'll map what's genuinely around you."
+            : "It is your first coffee, the walk home at night, and whether you wake up in a neighbourhood or in a postcard. Tell us where you're based and we'll map what's genuinely around you."
+    }
+
+    private var addressField: some View {
+        VStack(alignment: .leading, spacing: .Spacing.small) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                TextField("Street address and number", text: $address)
+                    .textContentType(.fullStreetAddress)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($isAddressFocused)
+                    .onSubmit(handleKeyboardSubmit)
+                    .onChange(of: address) { _, value in
+                        if selectedSuggestion?.searchText != value {
+                            selectedSuggestion = nil
+                            addressCompleter.update(query: value, destination: destination)
+                        }
+                    }
+
+                if addressCompleter.isSearching {
+                    ProgressView().controlSize(.small)
+                } else if !address.isEmpty {
+                    Button {
+                        address = ""
+                        selectedSuggestion = nil
+                        addressCompleter.clear()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear address")
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(
+                        selectedSuggestion == nil
+                            ? Color.black.opacity(0.08)
+                            : Color.appTint.opacity(0.65),
+                        lineWidth: selectedSuggestion == nil ? 1 : 1.5
+                    )
+            )
+            .shadow(color: .black.opacity(0.07), radius: 12, y: 3)
+
+            if isAddressFocused, selectedSuggestion == nil,
+               !addressCompleter.suggestions.isEmpty {
+                suggestionList
+            } else if let selectedSuggestion {
+                Label("Selected in Apple Maps: \(selectedSuggestion.title)", systemImage: "checkmark.circle.fill")
+                    .font(.kanit(13))
+                    .foregroundStyle(Color.appTint)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if addressResolutionIsInitial {
+                Text("Choose a match below, or enter the full street address — including the number — and confirm.")
+                    .font(.kanit(12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            resolutionFeedback
+        }
+    }
+
+    private var suggestionList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(addressCompleter.suggestions.enumerated()), id: \.element.id) { index, suggestion in
+                Button {
+                    selectSuggestion(suggestion)
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appTint)
+                            .padding(.top, 2)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.title)
+                                .font(.kanitMedium(15))
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                            if !suggestion.subtitle.isEmpty {
+                                Text(suggestion.subtitle)
+                                    .font(.kanit(12))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+
+                if index < addressCompleter.suggestions.count - 1 {
+                    Divider().padding(.leading, 38)
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Color(.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.10), radius: 14, y: 5)
+    }
+
+    private var whereToStayPrompt: some View {
+        VStack(spacing: .Spacing.medium) {
+            Divider()
+                .padding(.horizontal, .Padding.md)
+
+            VStack(spacing: 6) {
+                Text("Don't have a place booked yet?")
+                    .font(.kanitMedium(17))
+                    .foregroundStyle(.primary)
+
+                Text("Where you book changes everything else. See which area of \(destination) actually fits the trip you want.")
+                    .font(.kanit(14))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, .Padding.md)
+            .padding(.top, .Spacing.small)
+
+            Button("Explore the best areas for you") { showsWhereToStay = true }
+                .buttonStyle(SecondaryButtonStyle(fullWidth: false, internalPadding: 10))
+        }
+    }
+
+    private var trimmedAddress: String {
+        address.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var addressResolutionIsInitial: Bool {
+        guard case .initial = addressResolution else { return false }
+        return true
+    }
+
+    private func selectSuggestion(_ suggestion: NearYouAddressSuggestion) {
+        selectedSuggestion = suggestion
+        address = suggestion.searchText
+        addressCompleter.clear()
+        isAddressFocused = false
+    }
+
+    /// Return can select an unambiguous visible completion, but it never starts
+    /// generation. The separate confirmation button is the only submit path.
+    private func handleKeyboardSubmit() {
+        if addressCompleter.suggestions.count == 1,
+           let suggestion = addressCompleter.suggestions.first {
+            selectSuggestion(suggestion)
+        } else {
+            isAddressFocused = false
         }
     }
 
@@ -200,7 +473,7 @@ struct NearYouView: View {
         case .loading:
             VStack(spacing: .Spacing.small) {
                 ProgressView()
-                Text("Researching what a well-informed local would suggest around \(accommodation.label)…")
+                Text("Let’s ask your local host, he knows the area very well.")
                     .font(DS.Typography.tabLabel)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -247,9 +520,10 @@ struct NearYouView: View {
     }
 
     private func submitAddress() {
-        let value = address.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { return }
-        onSearchAddress(value)
+        guard !trimmedAddress.isEmpty else { return }
+        isAddressFocused = false
+        addressCompleter.clear()
+        onSearchAddress(trimmedAddress)
     }
 }
 

@@ -394,6 +394,15 @@ extension TripOutputStore {
         /// `State`, encoded in `Trip`, or accepted by the backend contract.
         case resolveNearYouAddress(String)
         case chooseNearYouResolution(NearYouResolutionChoice)
+        /// Grounds Near You on a neighbourhood rather than an address.
+        ///
+        /// **No UI reaches this today, deliberately.** The where-to-stay guide
+        /// used to carry an "I'm staying here" button that sent it; that button
+        /// was removed because a neighbourhood centroid cannot honestly support
+        /// the walking distances Near You renders. The path itself is kept — it
+        /// is the same coarse-resolution machinery the group flow relies on, and
+        /// it stays covered by `NearYouTests` — so restoring an entry point is a
+        /// UI decision rather than a rebuild.
         case chooseNearYouArea(Trip.StayArea)
         case retryNearYou
         case regenerateNearYou

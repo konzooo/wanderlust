@@ -10,23 +10,53 @@ import CoreModels
 import DesignSystem
 import SwiftUI
 
-/// The where-to-stay guide.
+/// The where-to-stay guide, presented from Near You's empty state.
 ///
 /// Its home is the Near You tab's un-grounded state (§7): a traveller who has
 /// not booked anywhere yet cannot have an address, so Near You has nothing to
-/// ground against and offers this instead. Choosing "I'm staying here" resolves
-/// the area through MapKit and starts the neighbourhood-level Near You path.
+/// ground against and offers this to read instead.
+///
+/// **It is reading material, not a way into Near You.** The "I'm staying here"
+/// shortcut this used to carry is deliberately gone: it grounded Near You on a
+/// neighbourhood centroid, and a centroid cannot honestly support "four minutes
+/// from your door". Near You now asks for a real address, and this guide answers
+/// a different question — which area to book in the first place.
 ///
 /// **No hearts.** §9 files where-to-stay under reference rather than under
 /// things a traveller wants a list of, so these cards are deliberately not
 /// heartable and have no arm in `Trip.favouriteCandidates`.
+struct WhereToStaySheet: View {
+    let areas: AsyncValue<[Trip.StayArea]>
+    let destination: String
+    /// `nil` in read-only modes, where there is nothing to re-request.
+    let onRetry: (() -> Void)?
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            WhereToStayView(areas: areas, destination: destination, onRetry: onRetry)
+                .gradientBackground()
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Where to stay")
+                            .font(DS.Typography.sheetTitle)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done", action: onClose)
+                            .font(DS.Typography.tabLabel)
+                    }
+                }
+        }
+    }
+}
+
 struct WhereToStayView: View {
     let areas: AsyncValue<[Trip.StayArea]>
     let destination: String
     /// `nil` in read-only modes, where there is nothing to re-request.
     let onRetry: (() -> Void)?
-    /// Picking an area is what hands Near You a coarse search centre (§7).
-    var onChoose: ((Trip.StayArea) -> Void)?
 
     var body: some View {
         ComponentStateView(
@@ -39,7 +69,7 @@ struct WhereToStayView: View {
                     header
 
                     ForEach(areas) { area in
-                        StayAreaCard(area: area, onChoose: onChoose)
+                        StayAreaCard(area: area)
                     }
                 }
                 .padding(.horizontal, .Padding.sm3)
@@ -50,13 +80,15 @@ struct WhereToStayView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Don't have a place booked yet?")
+            Text("Where to sleep in \(destination)")
                 .font(DS.Typography.sectionHeader)
                 .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Text("Where to sleep in \(destination), best fit for you first.")
+            Text("There is no best one — there is the one that matches what you came for. Best fit for you first.")
                 .font(.kanit(14))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -64,7 +96,6 @@ struct WhereToStayView: View {
 
 private struct StayAreaCard: View {
     let area: Trip.StayArea
-    let onChoose: ((Trip.StayArea) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: .Spacing.medium) {
@@ -87,17 +118,6 @@ private struct StayAreaCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if let onChoose {
-                Divider().opacity(0.4)
-
-                Button {
-                    onChoose(area)
-                } label: {
-                    Label("I'm staying here", systemImage: "mappin.and.ellipse")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
-            }
         }
         .padding(.Padding.sm3)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,7 +133,16 @@ private struct StayAreaCard: View {
     }
 }
 
-#Preview {
+#Preview("Sheet") {
+    WhereToStaySheet(
+        areas: .loaded(Trip.StayArea.mockSet),
+        destination: "Barcelona",
+        onRetry: nil,
+        onClose: {}
+    )
+}
+
+#Preview("Content") {
     WhereToStayView(
         areas: .loaded(Trip.StayArea.mockSet),
         destination: "Barcelona",

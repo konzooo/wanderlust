@@ -15,6 +15,10 @@ public struct TravelTipsView: View {
     @Binding var favorites: Trip.Favorites
     /// `nil` where there is nothing to re-request (read-only trips).
     let onRetry: (() -> Void)?
+    /// Content that belongs after the final suggestion section in the same
+    /// vertical feed. Keeping it inside this view's `ScrollView` prevents a
+    /// tall footer from compressing the suggestions into a separate viewport.
+    private let footer: AnyView?
 
     public init(
         suggestions: AsyncValue<Trip.Suggestions>,
@@ -24,6 +28,19 @@ public struct TravelTipsView: View {
         self.suggestions = suggestions
         self._favorites = favorites
         self.onRetry = onRetry
+        self.footer = nil
+    }
+
+    public init<Footer: View>(
+        suggestions: AsyncValue<Trip.Suggestions>,
+        favorites: Binding<Trip.Favorites>,
+        onRetry: (() -> Void)? = nil,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.suggestions = suggestions
+        self._favorites = favorites
+        self.onRetry = onRetry
+        self.footer = AnyView(footer())
     }
 
     public var body: some View {
@@ -34,20 +51,26 @@ public struct TravelTipsView: View {
         ) { tripSuggestions in
             let sections = Self.mapSections(from: tripSuggestions)
             ScrollView(.vertical, showsIndicators: false) {
-                if sections.isEmpty {
-                    // Reached only when the model genuinely returned nothing —
-                    // a still-running or failed call never gets this far.
-                    Text("No suggestions for this trip.")
-                        .font(.kanit(15))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 30)
-                } else {
-                    VStack(spacing: 22) {
-                        ForEach(sections) { section in
-                            SectionView(section: section, favorites: $favorites)
+                VStack(spacing: 0) {
+                    if sections.isEmpty {
+                        // Reached only when the model genuinely returned nothing —
+                        // a still-running or failed call never gets this far.
+                        Text("No suggestions for this trip.")
+                            .font(.kanit(15))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 30)
+                    } else {
+                        VStack(spacing: 22) {
+                            ForEach(sections) { section in
+                                SectionView(section: section, favorites: $favorites)
+                            }
                         }
+                        .padding(.vertical, 20)
                     }
-                    .padding(.vertical, 20)
+
+                    if let footer {
+                        footer
+                    }
                 }
             }
         }

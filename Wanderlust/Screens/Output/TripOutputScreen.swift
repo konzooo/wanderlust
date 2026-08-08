@@ -210,22 +210,23 @@ struct TripOutputScreen: View {
                 suggestions: store.suggestionsWithDeepDives,
                 favorites: favoritesBinding,
                 onRetry: canRetry ? { store.send(.retryComponent(.suggestions)) } : nil
-            )
-            .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
-
-            // Below the feed rather than inside it, so the row stays put while
-            // the carousels move.
-            if OutputFeatureFlags.interestChipsEnabled && store.state.mode != .sharedTrip {
-                InterestChipsRow(
-                    chips: store.interestChips,
-                    used: store.usedDeepDiveInterests,
-                    loading: store.deepDiveInFlightInterest,
-                    errorMessage: store.deepDiveGuidanceMessage,
-                    onTap: store.canGenerateDeepDive
-                        ? { store.send(.generateDeepDive($0)) }
-                        : nil
-                )
+            ) {
+                // This is the end of the suggestions feed, not a second view
+                // competing with it for screen height. It appears only after
+                // the traveller scrolls past all generated sections.
+                if OutputFeatureFlags.interestChipsEnabled && store.state.mode != .sharedTrip {
+                    InterestChipsRow(
+                        chips: store.interestChips,
+                        used: store.usedDeepDiveInterests,
+                        loading: store.deepDiveInFlightInterest,
+                        errorMessage: store.deepDiveGuidanceMessage,
+                        onTap: store.canGenerateDeepDive
+                            ? { store.send(.generateDeepDive($0)) }
+                            : nil
+                    )
+                }
             }
+            .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
 
         case .worthIt:
             WorthItSkipView(

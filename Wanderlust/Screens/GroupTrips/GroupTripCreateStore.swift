@@ -18,7 +18,7 @@ class GroupTripCreateStore: ObservableStore {
             state.isCreating = true
             state.errorMessage = nil
             var properties: [String: AnalyticsValue] = [
-                "duration_days": .integer(Int(state.duration)),
+                "duration_days": .integer(state.durationDays),
                 "start_month": .string(state.month.rawValue.lowercased()),
                 "has_profile": .boolean(state.selectedProfileID != nil)
             ]
@@ -36,7 +36,7 @@ class GroupTripCreateStore: ObservableStore {
                     let created = try await service.createGroup(
                         name: state.groupName,
                         destination: state.destination,
-                        durationDays: Int(state.duration),
+                        durationDays: state.durationDays,
                         startMonth: state.month.rawValue
                     )
                     state.isCreating = false
@@ -96,10 +96,13 @@ extension GroupTripCreateStore {
 
         var readyToJoin: Bool { !normalizedJoinCode.isEmpty }
 
+        var durationDays: Int {
+            Int(round(duration))
+        }
+
         var durationText: String {
-            let roundedDuration = Int(round(duration))
-            let daysString = roundedDuration == 1 ? "day" : "days"
-            return "\(roundedDuration) \(daysString)"
+            let daysString = durationDays == 1 ? "day" : "days"
+            return "\(durationDays) \(daysString)"
         }
 
         static var currentMonth: Month {

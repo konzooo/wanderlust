@@ -11,6 +11,25 @@ import CoreModels
 
 final class WanderlustTests: XCTestCase {
 
+    @MainActor
+    func testBasicInfoDurationUsesTheValueShownToTheTraveller() {
+        var state = BasicInfoStore.State()
+        state.duration = 1.999
+
+        XCTAssertEqual(state.durationText, "2 days")
+        XCTAssertEqual(state.durationDays, 2)
+        XCTAssertEqual(state.details.duration, 2)
+    }
+
+    @MainActor
+    func testGroupDurationUsesTheValueShownToTheTraveller() {
+        var state = GroupTripCreateStore.State()
+        state.duration = 1.999
+
+        XCTAssertEqual(state.durationText, "2 days")
+        XCTAssertEqual(state.durationDays, 2)
+    }
+
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
     }

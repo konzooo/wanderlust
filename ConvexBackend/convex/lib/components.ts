@@ -282,6 +282,7 @@ export async function runComponent(args: {
     validation,
     args.nearYouCandidates,
     result.webSources,
+    durationDays(args.input),
   );
   return { ...result, data, validation, maxOutputTokens: spec.maxOutputTokens };
 }
@@ -292,10 +293,11 @@ function validate(
   report: ValidationReport,
   nearYouCandidates?: NearYouCandidate[],
   webSources: OpenAIResult["webSources"] = [],
+  expectedDurationDays?: number,
 ): unknown {
   switch (component) {
     case "itinerary":
-      return validateItinerary(data, report);
+      return validateItinerary(data, report, expectedDurationDays);
     case "suggestions":
       return validateSuggestions(data, report);
     case "deepDive":
@@ -315,4 +317,8 @@ function validate(
 
 function destination(input: TripInput): string {
   return input.mode === "solo" ? input.solo.destination : input.group.destination;
+}
+
+function durationDays(input: TripInput): number {
+  return input.mode === "solo" ? input.solo.durationDays : input.group.durationDays;
 }

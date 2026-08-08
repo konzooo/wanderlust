@@ -41,10 +41,15 @@ extension BasicInfoStore {
             !destination.isEmpty && duration > 0
         }
 
+        /// The slider and its label must resolve to the same integer. Truncating
+        /// a floating-point value such as 1.999 displayed "2 days" but sent 1.
+        var durationDays: Int {
+            Int(round(duration))
+        }
+
         var durationText: String {
-            let roundedDuration = Int(round(duration))
-            let daysString = roundedDuration == 1 ? "day" : "days"
-            return "\(roundedDuration) \(daysString)"
+            let daysString = durationDays == 1 ? "day" : "days"
+            return "\(durationDays) \(daysString)"
         }
 
         var specifyGroupText: String {
@@ -61,7 +66,7 @@ extension BasicInfoStore {
             Trip.Details(
                 destination: .init(name: destination),
                 members: groupSpecification,
-                duration: Int(duration),
+                duration: durationDays,
                 month: month
             )
         }

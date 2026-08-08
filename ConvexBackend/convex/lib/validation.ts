@@ -521,6 +521,7 @@ function containsMapFactClaim(value: string): boolean {
 export function validateItinerary(
   data: unknown,
   report: ValidationReport,
+  expectedDurationDays?: number,
 ): Record<string, unknown> {
   if (!isRecord(data)) throw new ValidationError("invalid_itinerary_shape");
   const segments = Array.isArray(data.segments)
@@ -528,6 +529,18 @@ export function validateItinerary(
     : [];
   report.repairs += (Array.isArray(data.segments) ? data.segments.length : 0) - segments.length;
   if (segments.length === 0) throw new ValidationError("empty_itinerary");
+
+  if (expectedDurationDays != null && Number.isFinite(expectedDurationDays)) {
+    const days = Math.max(1, Math.round(expectedDurationDays));
+    const hasCompleteCoverage =
+      days <= 5
+        ? segments.length === days
+        : segments.length >= 2 && segments.length <= 5;
+    if (!hasCompleteCoverage) {
+      throw new ValidationError("incomplete_itinerary");
+    }
+  }
+
   for (const segment of segments) {
     const description = isRecord((segment as Record<string, unknown>).description)
       ? ((segment as Record<string, unknown>).description as Record<string, unknown>)

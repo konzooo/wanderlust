@@ -513,7 +513,6 @@ struct NearYouView: View {
                 setBy: setBy,
                 canReplace: canReplace,
                 favorites: $favorites,
-                onRegenerate: onRegenerate,
                 onChangeStay: onChangeStay
             )
         }
@@ -534,7 +533,6 @@ private struct NearYouResultsView: View {
     let setBy: String?
     let canReplace: Bool
     @Binding var favorites: Trip.Favorites
-    let onRegenerate: () -> Void
     let onChangeStay: () -> Void
 
     var body: some View {
@@ -572,15 +570,11 @@ private struct NearYouResultsView: View {
                 practicalLayer
 
                 if canReplace {
-                    HStack(spacing: 12) {
-                        Button(isGroup ? "Change shared stay" : "Change stay", action: onChangeStay)
-                            .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
-                        Button(isGroup ? "Regenerate once" : "Regenerate", action: onRegenerate)
-                            .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
-                    }
-                    .padding(.top, .Padding.sm)
+                    Button(isGroup ? "Change shared stay" : "Change stay", action: onChangeStay)
+                        .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 8))
+                        .padding(.top, .Padding.sm)
                 } else if isGroup {
-                    Label("The group's one regeneration has been used.", systemImage: "checkmark.seal")
+                    Label("This shared Near You result can no longer be changed.", systemImage: "checkmark.seal")
                         .font(.kanit(14))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)

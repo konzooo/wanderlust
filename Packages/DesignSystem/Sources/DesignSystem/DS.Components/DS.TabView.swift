@@ -108,7 +108,11 @@ extension DS {
                     Text(tab.title)
                         .font(DS.Typography.tabLabel)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        // Keep the chrome at one stable size. Content below the
+                        // bar can change its ideal width (notably the wrapped
+                        // Suggestions footer), but must never make tab labels
+                        // participate in text scaling.
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .foregroundStyle(selection == tab ? accent : Color(.systemGray))
                 .padding(.horizontal, 4)

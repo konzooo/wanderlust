@@ -200,3 +200,25 @@ test("an itinerary with no usable segment fails outright — it is the required 
     (e: unknown) => e instanceof ValidationError && e.code === "empty_itinerary",
   );
 });
+
+test("a short trip cannot silently omit one of its days", () => {
+  assert.throws(
+    () =>
+      validateItinerary(
+        { segments: [{ title: "Day 1" }] },
+        emptyReport(),
+        2,
+      ),
+    (e: unknown) =>
+      e instanceof ValidationError && e.code === "incomplete_itinerary",
+  );
+});
+
+test("a short itinerary passes only with one segment per requested day", () => {
+  const itinerary = validateItinerary(
+    { segments: [{ title: "Day 1" }, { title: "Day 2" }] },
+    emptyReport(),
+    2,
+  );
+  assert.equal((itinerary.segments as unknown[]).length, 2);
+});

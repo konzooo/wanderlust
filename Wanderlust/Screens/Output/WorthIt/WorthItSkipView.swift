@@ -117,48 +117,38 @@ private struct WorthItCard: View {
                     onDecide(.skipped)
                 } label: {
                     Text("Skip it")
+                        .foregroundStyle(Color(.darkGray))
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(WorthItActionStyle(prominent: false))
+                .buttonStyle(WorthItTextActionStyle())
 
                 Button {
                     onDecide(.kept)
                 } label: {
-                    Label("Add to favourites", systemImage: "heart")
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart")
+                            .foregroundStyle(Color.red)
+                        Text("Add to favourites")
+                            .foregroundStyle(Color(.darkGray))
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(WorthItActionStyle(prominent: true))
+                .buttonStyle(WorthItTextActionStyle())
             }
         }
     }
 }
 
-/// Card-scale buttons.
-///
-/// `PrimaryButtonStyle`/`SecondaryButtonStyle` are the screen-level pair — 18–20pt
-/// type and 22pt of horizontal padding — which is right for "Retry" filling the
-/// width of an error screen and far too heavy for two buttons sharing the foot
-/// of a card. Same tokens (`appTint`, `.Radius.control`), one scale down.
-private struct WorthItActionStyle: ButtonStyle {
-    let prominent: Bool
-
+/// Text actions deliberately have no capsule or filled background. The heart's
+/// red outline distinguishes the keep action while both labels stay neutral.
+private struct WorthItTextActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Typography.tabLabel)
-            .foregroundStyle(prominent ? Color.white : Color.appTint)
             .padding(.vertical, .Padding.sm2)
             .padding(.horizontal, .Padding.sm2)
-            .background(
-                RoundedRectangle(cornerRadius: CGFloat.Radius.control, style: .continuous)
-                    .fill(prominent ? AnyShapeStyle(Color.appTint)
-                                    : AnyShapeStyle(Color.appTint.opacity(0.07)))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CGFloat.Radius.control, style: .continuous)
-                    .stroke(prominent ? Color.clear : Color.appTint.opacity(0.18), lineWidth: 1)
-            )
+            .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.75 : 1)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }

@@ -254,7 +254,8 @@ Use the coarse local area, the traveller profile and live web search together. T
       return `ITINERARY
 - Give the trip a fun, personalized, movie-like but descriptive title of at most 50 characters.
 - Return the normalized destination name so the app can use it for display and image search.
-- For trips of five days or fewer, create one segment per day.
+- The input's Number of Days is a hard output requirement, not background context.
+- For trips of five days or fewer, the segments array must contain exactly that many items: one distinct segment for every day from Day 1 through the final day. Never combine or omit a day.
 - For longer trips, group the days logically into no more than five segments and make each title's day range clear.
 - Format segment titles like "🏙️ Day 1: Old Streets, New Flavors" or "🌊 Days 4–6: Coast and Slow Mornings".
 - Every segment has morning, afternoon, and evening sections with exactly two activities in each.

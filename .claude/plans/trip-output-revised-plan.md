@@ -32,11 +32,15 @@ One table. Where this disagrees with any earlier document or the companion doc, 
 | D12 | Near You sections are **adaptive**, not a fixed seven-slot list; a small deterministic practical layer stays separate | Approved |
 | D13 | Exact accommodation address stays device-side; never published or shared by default | Approved |
 | D14 | KBYG ships as **v1** in this build — same taxonomy as designed, explicitly provisional, revisited after real usage + deeper research | Approved (provisional) |
-| D15 | Whether Worth-it/Skip + chips + where-to-stay stay in the suggestions call or split out | **Measure (Session 6)** |
-| D16 | Whether parallel generation actually reduces wall-clock | **Measure (Session 2)** |
-| D17 | `alreadyRecommended` is **derived at call time**, never persisted as the source of truth | Approved |
+| D15 | Whether Worth-it/Skip + chips + where-to-stay stay in the suggestions call or split out | **Decided: SPLIT** (Session 6, 2026-08-05) |
+| D16 | Whether parallel generation actually reduces wall-clock | Partly answered by D15's numbers — split's three parallel calls beat one larger sequential-feeling call by 40% wall-clock. Not formally isolated as its own measurement; not blocking anything |
+| D17 | `alreadyRecommended` is **derived at call time**, never persisted as the source of truth | Approved — implemented Session 7 |
+| D18 | **Group trips get a personal layer after all — but it stays local to each phone, never synced.** Favourites and Worth-it/Skip decisions are per-member, exactly like solo; there is no admin-owned or combined view in this build | Approved (2026-08-05, supersedes §4's original "no personal layer" rule) |
+| D19 | **Group Near You assumes one shared location.** Any member (not admin-only) may set it; first write locks it; it is never auto-regenerated. Stored coarse only (`CoarseAccommodation`), same as solo's neighbourhood-level path — never a street address | Approved (2026-08-05) — Session 12 |
+| D20 | **Worth-it cards, where-to-stay and deep dives generate for group trips too**, as shared read-only content. Deep dives are admin-triggered (they cost money); the cap is 3 **per trip**, not per member | Approved (2026-08-05) — Session 12 |
+| D21 | Changing a group's Near You location once, after it's locked, is **in scope but lowest priority** — the last item of Session 12, explicitly droppable if the session runs long | Approved (2026-08-05) — Session 12 |
 
-**Contradictions from earlier drafts, now resolved:** deep-dive cap is **3** (not 4). Fixed chips include **Climbing gyms**, not Live music. Favourites title is **"Your Favourites in {destination}"**. KBYG ships as v1 with **eager generation by default** (third parallel call, same as everything else) — revisit only if measured latency (D16) argues for lazy-on-open. "What to skip" stays out of any KBYG list. Group generation **is currently sequential** and the plan no longer describes it as parallel. Nothing that adds output tokens is described as "free".
+**Contradictions from earlier drafts, now resolved:** deep-dive cap is **3** (not 4). Fixed chips include **Climbing gyms**, not Live music. Favourites title is **"Your Favourites in {destination}"**. KBYG ships as v1 with **eager generation by default** (third parallel call, same as everything else) — revisit only if measured latency (D16) argues for lazy-on-open. "What to skip" stays out of any KBYG list. Group generation **is currently sequential** and the plan no longer describes it as parallel. Nothing that adds output tokens is described as "free". **§4's "group trips get no personal layer" is superseded by D18** — read §4 in light of it, not as originally written.
 
 ---
 
@@ -59,6 +63,9 @@ Each confirmed by reading the source. These are the reason for the build order.
 | V11 | `Favorites.liked` is a `Set` but `favouriteTexts` documents "in the order they were added" — ordering is not preserved | `Favorites.swift:86-89` |
 | V12 | Dead duplicate `LocationLinkBuilder` in the app target, missing `searchURL` and the encoding fix | `Wanderlust/Screens/Output/Tools/LocationLinkBuilder.swift` |
 | V13 | Suggestions call capped at `maxOutputTokens: 4_096` — the proposed additions push against this | `TripPlanningService.swift:50` |
+| V14 | **Group and shared content carries no server-assigned ids.** The model's JSON has none; each device's `LocationLinkableText`/`WorthItItem`/`StayArea` decode invents a fresh `UUID` at read time (by design, for a saved *local* file re-read on the same device). Harmless today because a group trip has no local file and nothing persists per-member. **Becomes silently favourite-erasing the moment D18 lands**: a member hearts something, reopens the app, the content re-fetches and re-decodes with new ids, and their favourites point at nothing | Found during Session-12 planning, 2026-08-05. Fix in Session 12a, before anything else in that session: stamp ids in once, server-side, in `generate.ts`'s `commitComponent` |
+
+**V13 status:** resolved by measurement in Session 6 — ceilings re-derived from observed maxima (~3× headroom) rather than raised on a hunch; see `ConvexBackend/docs/d15-decision.md`.
 
 **V9 is worth keeping, not discarding.** The existing server behaviour already encodes a useful policy: itinerary failure aborts the generation; suggestions failure ships `null` and the trip still becomes ready. That required/best-effort split should be **formalised and reused**, not replaced.
 
@@ -114,28 +121,33 @@ Arrays that may be empty are **required with `[]`**, never absent. Values that m
 
 Trip contexts: **NS** new solo · **SS** saved solo · **G** group · **PS** published/shared (sender) · **RS** received shared (recipient).
 
+> **The G column below mixes shipped behaviour and target design.** Any cell reading "not yet — target: … (S12x)" describes what Session 12 will build, not what exists today. Check `Status` in §14 before assuming a row is live — as of 2026-08-05, a group trip's ONLY generated content is itinerary + suggestions (+ Know Before You Go once S9 merges); everything else in this table's G column is Session 12 scope.
+
 | Field | Persisted on | NS | SS | G | PS | RS | Personal or shared | Regen on reopen | Missing on old trips | Editable |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Itinerary | `Trip` | ✓ | ✓ | server | ✓ | ✓ | shared | no | no | no |
 | Suggestions | `Trip` | ✓ | ✓ | server | ✓ | ✓ | shared | no | no | no |
 | Know Before You Go (v1) | `Trip` | ✓ | ✓ | server | ✓ | ✓ | shared | no | yes | no |
-| Worth-it/Skip **content** | `Trip` | ✓ | ✓ | server | ✓ | ✓ | shared | no | **yes** | no |
-| Worth-it/Skip **decisions** | `Trip` | ✓ | ✓ | ✗ | **✗** | ✓ (own) | **personal** | no | yes | yes |
+| Worth-it/Skip **content** | `Trip` | ✓ | ✓ | not yet — target: server (D20, S12c) | ✓ | ✓ | shared | no | **yes** | no |
+| Worth-it/Skip **decisions** | `Trip`, or **group-local store** (D18) | ✓ | ✓ | not yet — target: **own, local** (D18, S12b) | **✗** | ✓ (own) | **personal** | no | yes | yes |
 | Interest prompts (chips) | `Trip` | ✓ | ✓ | server | ✗ | ✗ | shared | no | yes (fixed 3 still render) | no |
-| Completed deep dives | `Trip` | ✓ | ✓ | ✗ | ✓ | ✓ (read-only) | shared content, personal act | **no** | yes | no |
-| Where-to-stay | `Trip` | ✓ | ✓ | server | ✓ | ✓ | shared | no | yes | no |
-| Selected accommodation | `Trip`, **coarse only** | ✓ | ✓ | ✗ | **✗** | ✗ | **personal** | no | yes | yes |
-| Near You results | `Trip` | ✓ | ✓ | ✗ | **✗** | ✗ | **personal** | **no** | yes | replaceable |
-| Favourites | `Trip` | ✓ | ✓ | ✗ (discarded) | ✓ (sender's) | ✓ (own copy) | personal | — | no | yes |
+| Completed deep dives | `Trip`, or group's server record | ✓ | ✓ | not yet — target: **server, admin-triggered (D20, S12d)** | ✓ | ✓ (read-only) | shared content, personal act | **no** | yes | no |
+| Where-to-stay | `Trip` | ✓ | ✓ | not yet — target: server (D20, S12c) | ✓ | ✓ | shared | no | yes | no |
+| Selected accommodation | `Trip`, **coarse only**, solo | ✓ | ✓ | not yet — target: **`groups` table, coarse only, SHARED** (D19, S12e) | **✗** | ✗ | personal (solo) / **shared (group)** | no | yes | solo: yes · group: **locked after first write** (D21, S12f, to relax) |
+| Near You results | `Trip`, solo | ✓ | ✓ | not yet — target: **`groups` table, SHARED** (D19, S12e) | **✗** | ✗ | personal (solo) / **shared (group)** | **no** | yes | solo: replaceable · group: **locked** |
+| Favourites | `Trip`, or **group-local store** (D18) | ✓ | ✓ | not yet — target: **own, local, never synced** (D18, S12b) | ✓ (sender's) | ✓ (own copy) | personal | — | no | yes |
 | `alreadyRecommended` | **not persisted** | — | — | — | — | — | derived | computed per call | n/a | n/a |
 
 **Rules this encodes:**
 
 - **A saved trip must never lose a deep dive or a Near You result and then charge again on reopen.** Both are persisted and never regenerated automatically. Regeneration is always an explicit user action.
-- **Accommodation and Near You never leave the device in a share.** Where the sender sleeps is not where the recipient sleeps, and it is personal data. D13.
-- **Accommodation is stored coarse.** Persist a display label plus a rounded centre (≈3 decimal places, ~100m), *not* the resolved `MKMapItem` and not the street address. Sufficient to re-run Near You; not a record of where someone slept.
+- **Accommodation and Near You never leave the device in a solo share.** Where the sender sleeps is not where the recipient sleeps, and it is personal data. D13. **This does not apply within a group** — D19 makes the group's location deliberately shared, because the product assumption is that a group stays in one place together. It is still never a street address (see the next rule); "shared" means every *member* can see the coarse centre and the picks, not that it leaves the group.
+- **Accommodation is stored coarse.** Persist a display label plus a rounded centre (≈3 decimal places, ~100m), *not* the resolved `MKMapItem` and not the street address. Sufficient to re-run Near You; not a record of where someone slept. Applies identically whether the coarse point lives on a solo `Trip` or on a group's server record.
 - **Worth-it/Skip decisions do not travel in a share.** The recipient gets the four cards undecided — deciding is the point.
-- **Group trips get no personal layer.** Near You, deep dives and decisions are absent by design; the tabs/segments hide accordingly.
+- **Group trips get a personal layer after all (D18, supersedes the original design here) — it just never leaves the device.** Favourites and Worth-it/Skip decisions are per-member, stored in a small local store keyed by `groupId` rather than in a `Trip` file (a group trip has none). Nothing syncs, nothing is combined into a group view, and nothing is admin-owned. A future "3 of you want this" combined view is a deliberate non-goal for this build.
+- **Group Near You and group accommodation are the one place group data is MORE shared than solo's, not less.** Any member may set the location (no admin gate — every member already has a token); the first write locks it; it is generated once and never auto-regenerated. Changing it once, after locking, is in scope but is the lowest-priority, most-droppable item of Session 12 (D21).
+- **Group deep dives are admin-triggered because they cost money, but the result is shared content everyone sees** — unlike Worth-it decisions and favourites, a deep dive has no "who decided" to keep personal. The 3-per-trip cap (D9) must be scoped to the **group**, not to the triggering install, or an admin regenerating from two devices gets six.
+- **Server-assigned ids are a precondition for all of the above, not an implementation detail.** See V14 (§2): group/shared content has no ids until Session 12a stamps them in once, server-side. Nothing that persists a favourite or a decision against group content is safe to build before that lands.
 
 **Versioning.** `Trip` gains `schemaVersion: Int`. Every generated component persists as an explicit state, so *loading*, *failed*, *absent* and *genuinely empty* stay distinct — this is what fixes V6:
 
@@ -181,6 +193,8 @@ after:  app --(install token)--> Convex --(server env key)--> OpenAI
 ---
 
 # 6. Cost and latency — what we do not yet know
+
+**Resolved by Session 6, 2026-08-05.** The questions below are kept as written because the reasoning still matters, but they are no longer open: `ConvexBackend/docs/d15-decision.md` has the measured numbers. Headline result, and it cuts against intuition — split (three parallel calls) beat combined (one larger call) on **both** cost and latency: $0.00179 vs $0.00118 per trip (six hundredths of a cent more), but 11.9s vs 19.9s wall-clock (40% faster). Call count was never the billing unit; token volume and structural attention were.
 
 Previous drafts claimed "no extra calls, therefore free" and "near-zero added wait". **Both are withdrawn.**
 
@@ -231,6 +245,8 @@ address or hotel
 
 **Sparse-area behaviour** is a first-class case, not an edge case: rural and island destinations will return few candidates. The design must degrade to "here is what is actually near you, which is not much, and here is the nearest thing that is worth the drive" rather than padding with invented options.
 
+**Two grounding paths, and group Near You (D19, Session 12) is built entirely on the second one.** Solo gets both: address-level when an exact address is entered (never leaves the device, §4/D13), and the neighbourhood-level fallback above when it isn't. **A group only ever gets neighbourhood-level** — deliberately, not as a lesser version of the solo feature. The product assumption is that a group travelling together stays in one place; any member may set that shared centre (no admin gate, since every member already holds a capability token); the first write locks it, generation runs once, and it is never auto-regenerated. Session 12's last and most droppable item (D21) is letting it be changed once after locking. Because it is neighbourhood-level by construction, it stores as the same `CoarseAccommodation` shape §4 already defines for solo's coarse point — the group path needs no new privacy machinery, only a place to write it (the group's server record, since — unlike solo — the whole point is that every member can see it).
+
 ---
 
 # 8. Worth-it/Skip decision state
@@ -278,6 +294,8 @@ Ordinary suggestion favourites keep working exactly as they do — they have no 
 
 **Also fix here:** V10 (carry the whole `LocationLinkableText` so place links render) and V12 (delete the dead `LocationLinkBuilder`).
 
+**Group trips (D18, Session 12b).** The favourites machinery above is unchanged; what's new is a *second* store that isn't `Trip.favorites` at all, because a group trip has no local `Trip` file. A small local store keyed by `groupId` (`GroupTripCredentialsStore` is the closest existing pattern) holds `{favorites, worthItDecisions}` per member, per device. It goes through the exact same §8 invariant table and the exact same single-method-only rule — the risk of two independently-mutated stores disagreeing doesn't go away just because the underlying storage changed. It depends on V14/§2 being fixed first: an id that isn't stable across the group's server-content decode makes this store meaningless the moment the app relaunches.
+
 ---
 
 # 10. Deep dives — real append semantics
@@ -290,7 +308,8 @@ Ordinary suggestion favourites keep working exactly as they do — they have no 
 - **Cap:** 3 per trip (D9), enforced in the Convex mutation against committed results.
 - **Failures:** do not consume the cap; the chip returns.
 - **Retry:** re-request with the same interest label; the version guard prevents a double-commit.
-- **Group/shared:** deep dives are not offered in read-only modes. A sender's dives travel in a share as read-only content.
+- **Shared (published solo) trips:** deep dives are not offered — read-only, sender's content only.
+- **Group trips (D20, Session 12d, supersedes the original "not offered" rule below for groups specifically):** offered, but **admin-only** — deep dives cost money and the admin is the only identity with a capability token for spend-gated actions (mirrors `forceGenerate`/`retryGeneration`). The result is shared content every member sees; there is no per-member decision to keep personal here, unlike favourites. The cap must be scoped to the **group**, not to the triggering install — `generationSlots` keys on `installHash + tripKey + component` today, and an admin retrying from two devices would otherwise get six dives instead of three.
 - **Favourites and context:** dives are heartable (§9) and their places join `alreadyRecommended` (§11).
 
 ---
@@ -355,6 +374,8 @@ Keep the fixtures in the repo so runs are comparable over time.
 
 # 14. Build order and per-session guide
 
+**Progress, `feature/group-trips`, updated 2026-08-05.** S0–S2 landed at `69acb70`. S3–S4 at `b68f9b4`. S5–S7 at `7044d4f`, plus a follow-up at `831ebc8` (real-output debug browser; caught an itinerary segmentation defect, see §14's S8/S10 entry). S9 landed independently on `feature/output-s9-kbyg` (`aeeb9ea`) and is **not yet merged** — merging it is step 0 of the next chat. **Remaining: S8, S10, and a new Session 12 (group parity, added 2026-08-05 — see below the table) that was not in the original plan.** After S12, this plan is complete except S11, which is product-led and was never meant to block a release.
+
 Each row is a unit of dependency-ordered work; they do **not** need to be one chat each. Git commits, not chat boundaries, are what give you clean reviewable/revertable history — you get that either way. The reason to start a fresh chat at all is attention dilution across unrelated subsystems (Convex/TS security work reads very differently from SwiftUI card layouts) and, more importantly, **giving yourself a review checkpoint** before the next phase builds on top of the last one.
 
 **Recommended grouping — 5 chats, not 11, drawn at natural boundaries rather than an arbitrary split:**
@@ -364,29 +385,48 @@ Each row is a unit of dependency-ordered work; they do **not** need to be one ch
 | 1 | S0 + S1 + S2 | Already one dependency lineage — backend boundary, persistence, coordinator. |
 | 2 | S3 + S4 | Both UI: shell, then favourites. |
 | 3 | S5 + S6 + S7 | One story: the suggestions-call experiment, its evaluation (D15), and the derived context that follows from the decision. Don't split this arc — S6 wants S5's actual experiment fresh, not reloaded from a summary. |
-| 4 | S8 + S9 | Both "new content type, mostly additive": deep dives, KBYG v1. |
+| 4 | S8 + S9 | Both "new content type, mostly additive": deep dives, KBYG v1. **In practice S9 ran as its own chat in a worktree and landed first (2026-08-05); S8 is still ahead.** |
 | 5 | S10 | Complex enough alone (MapKit grounding, address privacy) to deserve a clean session. |
+| 6 *(added 2026-08-05, not in the original plan)* | S12 | Group parity — see below the table. Depends on S8 and S10 both landing, because it extends the deep-dive UI and reuses S10's neighbourhood-level grounding path. |
 
 S11 (KBYG v2) is standalone and product-led — whenever the research is done.
 
 Paste this plan file plus the named sessions at the start of each chat.
 
-| S | Work | Model / effort | Depends on | Done when |
-|---|---|---|---|---|
-| **0** | Backend model-call boundary; prompts + schemas moved server-side as the single source; install-ID identity; server quotas; **fix V2 lat/lng schema drift** | **Opus 5 / extra** | `OPENAI_API_KEY` set in Convex | No `api.openai.com` traffic from device; `oa.enc` absent from the built `.app`; 4th deep dive rejected server-side; group generation still works |
-| **1** | Versioned persistence contracts (§3, §4); `ComponentState`; `schemaVersion`; migration tests | **Opus 5 / hard** | S0 | Old saved trips still decode; empty ≠ absent ≠ failed is provable in a test |
-| **2** | Generation coordinator: single-flight, task ownership, attempt IDs, per-component retry, required-vs-best-effort, `Promise.allSettled` orchestration for solo **and** group; usage telemetry | **Opus 5 / extra** | S1 | Re-appear during generation produces exactly one call per component; stale retry cannot overwrite; telemetry lands for every component |
-| **3** | Output shell: tabs, sticky pill chips, navigation, per-tab loading and error states, KBYG placeholder | **Sonnet 5 / hard** | none (parallel with S0–S2) | All four entry points land correctly; every tab has its own loading + retry |
-| **4** | Favourites UI + explicit candidate/decision plumbing (§8, §9); fix V10, V11, V12 | **Sonnet 5 / hard** | S1, S3 | Place links render in favourites; ordering is deterministic; removal clears decisions |
-| **5** | Worth-it/Skip + interest prompts + where-to-stay (**experiment**, instrumented) | **Sonnet 5 / hard** | S2, S4 | Content renders; token/latency/failure telemetry captured for S6 |
-| **6** | **Evaluation gate (D15):** does the enlarged suggestions call stay combined, or split into focused parallel calls? Run the §13 matrix | **Opus 5 / hard** | S5 | A decision backed by measured tokens, latency, truncation rate and decode failures — not call count |
-| **7** | `alreadyRecommended` derived context (§11) | **Sonnet 5 / medium** | S5 | Correct after a dive, a retry and a migration |
-| **8** | Interest deep dives (§10) | **Sonnet 5 / hard** | S6, S7 | Survives save/reopen without re-charging; cap holds server-side; failures don't consume it |
-| **9** | Know Before You Go v1 (§12) | **Sonnet 5 / hard** | S2 only — runs in parallel with S4–S8 | Renders end-to-end for a real trip; stable/verify ratio checked against real output |
-| **10** | Grounded Near You (§7) | **Opus 5 / extra** | S6, S7 | Distances come from MapKit only; address never leaves the device; sparse areas degrade honestly |
-| **11** *(later, product-led)* | KBYG v2 — taxonomy revision from real usage + deeper research | product, then Opus 5 | S9 shipped and used | n/a |
+| S | Work | Model / effort | Depends on | Done when | Status |
+|---|---|---|---|---|---|
+| **0** | Backend model-call boundary; prompts + schemas moved server-side as the single source; install-ID identity; server quotas; **fix V2 lat/lng schema drift** | **Opus 5 / extra** | `OPENAI_API_KEY` set in Convex | No `api.openai.com` traffic from device; `oa.enc` absent from the built `.app`; 4th deep dive rejected server-side; group generation still works | ✅ `69acb70` |
+| **1** | Versioned persistence contracts (§3, §4); `ComponentState`; `schemaVersion`; migration tests | **Opus 5 / hard** | S0 | Old saved trips still decode; empty ≠ absent ≠ failed is provable in a test | ✅ `69acb70` |
+| **2** | Generation coordinator: single-flight, task ownership, attempt IDs, per-component retry, required-vs-best-effort, `Promise.allSettled` orchestration for solo **and** group; usage telemetry | **Opus 5 / extra** | S1 | Re-appear during generation produces exactly one call per component; stale retry cannot overwrite; telemetry lands for every component | ✅ `69acb70` |
+| **3** | Output shell: tabs, sticky pill chips, navigation, per-tab loading and error states, KBYG placeholder | **Sonnet 5 / hard** | none (parallel with S0–S2) | All four entry points land correctly; every tab has its own loading + retry | ✅ `b68f9b4` |
+| **4** | Favourites UI + explicit candidate/decision plumbing (§8, §9); fix V10, V11, V12 | **Sonnet 5 / hard** | S1, S3 | Place links render in favourites; ordering is deterministic; removal clears decisions | ✅ `b68f9b4` |
+| **5** | Worth-it/Skip + interest prompts + where-to-stay (**experiment**, instrumented) | **Sonnet 5 / hard** | S2, S4 | Content renders; token/latency/failure telemetry captured for S6 | ✅ `7044d4f` |
+| **6** | **Evaluation gate (D15):** does the enlarged suggestions call stay combined, or split into focused parallel calls? Run the §13 matrix | **Opus 5 / hard** | S5 | A decision backed by measured tokens, latency, truncation rate and decode failures — not call count | ✅ `7044d4f` — **split**, `ConvexBackend/docs/d15-decision.md` |
+| **7** | `alreadyRecommended` derived context (§11) | **Sonnet 5 / medium** | S5 | Correct after a dive, a retry and a migration | ✅ `7044d4f` |
+| **8** | Interest deep dives (§10) | **Sonnet 5 / hard** | S6, S7 | Survives save/reopen without re-charging; cap holds server-side; failures don't consume it | 🔲 next |
+| **9** | Know Before You Go v1 (§12) | **Sonnet 5 / hard** | S2 only — runs in parallel with S4–S8 | Renders end-to-end for a real trip; stable/verify ratio checked against real output | ✅ `aeeb9ea` on `feature/output-s9-kbyg` — **branch not yet merged**, merge is step 0 of the next chat |
+| **10** | Grounded Near You (§7) | **Opus 5 / extra** | S6, S7 | Distances come from MapKit only; address never leaves the device; sparse areas degrade honestly | 🔲 next, own worktree alongside S8 |
+| **12** *(added 2026-08-05, not in the original plan — see below)* | Group parity: shared Worth-it/where-to-stay/deep-dive content, a local personal layer for group favourites/decisions, group Near You | **Opus 5 / extra** | S8, S10, and the V14 id fix (Session 12a, first) | Detailed per-substep below | 🔲 last, after S8 + S10 |
+| **11** *(later, product-led)* | KBYG v2 — taxonomy revision from real usage + deeper research | product, then Opus 5 | S9 shipped and used | n/a | not started |
 
-**Critical path:** 0 → 1 → 2 → 5 → 6 → {7,8} → 10. **S3 and S9 (KBYG) both only need S0–S2**, so both can run alongside the S4–S8 chain rather than waiting behind it. S4 joins after S1.
+**Critical path:** 0 → 1 → 2 → 5 → 6 → {7,8} → 10 → 12. **S3 and S9 (KBYG) both only need S0–S2**, so both can run alongside the S4–S8 chain rather than waiting behind it. S4 joins after S1. **S12 is now the true end of the critical path** — it did not exist when this ordering was first written.
+
+---
+
+## 14a. Session 12 — group parity (added 2026-08-05)
+
+Not in the original plan. Added after S5–S7 shipped and a conversation about what "group" should actually mean surfaced that §4's "group trips get no personal layer" was a stronger claim than the product wants — see D18–D21 in §1 and the corrected rules in §4. Do these in order, one commit per substep:
+
+| Sub-step | Work | Depends on | Notes |
+|---|---|---|---|
+| **12a** | **Stable server-side ids.** Group/shared content has none; every device decode invents fresh `UUID`s (V14, §2). Stamp them in once in `generate.ts`'s `commitComponent`, before anything else in this session. Fixes the same latent bug for shared solo trips. | none within S12 — must be first | Test: two independent decodes of one committed payload agree on ids |
+| **12b** | **Local personal layer for group trips (D18).** A small store keyed by `groupId`, holding `{favorites, worthItDecisions}` per device — `GroupTripCredentialsStore` is the closest existing pattern. Replaces the current behaviour where `.groupTrip` mode discards every favourite toggle. The §8 invariant table applies in full; route both stores through one method. | 12a | Ships the hint: *"These are your favourites. Everyone in the group keeps their own — compare them when deciding together."* |
+| **12c** | **Content parity (D20).** Add `worthIt` and `whereToStay` to `GROUP_COMPONENTS`, `groupComponentStates`, the `groups` table, `GroupDTO`. The existing `Promise.allSettled` orchestration (S2) picks them up unchanged. With 12b landed, `TripOutputStore`'s hard `.groupTrip` exclusions on the Worth-it segment can come out. | 12a, 12b | Measured cost ≈ $0.0012/group trip (two extra calls at the S6 split rate) |
+| **12d** | **Admin-triggered deep dives (D20).** Guard with `adminToken`, same pattern as `forceGenerate`/`retryGeneration`. Re-scope the `generationSlots` cap from `installHash + tripKey` to the **group**. Result is shared, visible to every member. | 12a, S8 | Hint for non-admins: *"Only the trip admin can open a deep dive. Three per trip."* |
+| **12e** | **Group Near You (D19).** Built on S10's neighbourhood-level path (§7). Any member may set the shared location; first write locks it; generated once, never auto-regenerated. Stored as `CoarseAccommodation` on the group's server record — shared, not personal, unlike solo's coarse point. | 12a, S10 | Hints: before set, *"Near You assumes you're all staying in the same place…"*; after, *"Ana set this to El Born. Near You is generated once for the whole group."* |
+| **12f** | **Change the location once (D21).** Lowest priority, explicitly droppable. A counter on the group plus a mutation bumping `generationVersion`, mirroring how retry already works. Accepted consequence, not a bug to fix: a member's favourited Near You pick silently drops off their list if the location changes, because `favouriteCandidates` walks current content and an absent id contributes nothing. | 12e | Confirm it degrades, don't build a migration for it |
+
+---
 
 **Merge discipline:** S3 can be built early but should not ship a *live* Near You tab before S10, or a live Know Before You Go tab before S9 has real content wired (not just the placeholder shell) — feature-flag closed, or hold the merge, until each is actually ready.
 
@@ -401,6 +441,16 @@ git worktree add ../wanderlust-s9 -b feature/output-s9-kbyg
 - **Safe to start immediately, own worktree:** S3 (works against `Mock*Service`, barely touches what S0–S2 touch) and the Convex/TS half of S0 (`ConvexBackend/`, a different language and folder from the Swift persistence/coordinator work).
 - **Parallel-safe to *draft* once 0–2 land, but merge one at a time:** S4, S5, S9 all add new files plus a few insertion points in `TripOutputStore.swift`. Draft in parallel worktrees; land branches sequentially (S9 first — mostly additive — then rebase S4 onto it, then S5) rather than merging all three blind.
 - **S6, S7, S8, S10** have real data dependencies, not just file overlap — keep these waiting their turn regardless of worktree setup.
+
+**What's left to run, concretely (2026-08-05):**
+
+1. **S9 merge — alone, first, blocking.** Everything below rebases onto it.
+2. **S8 and S10 — parallel-safe by dependency (both only need S6/S7, done), not by file.** Both rewrite `TripOutputStore.swift`. Own worktrees, land one branch at a time:
+   ```bash
+   git worktree add ../wanderlust-s8 -b feature/output-s8-dives
+   git worktree add ../wanderlust-s10 -b feature/output-s10-nearyou
+   ```
+3. **S12 — sequential, and only after both S8 and S10 have landed** (not just been drafted). It extends the deep-dive UI from S8 and reuses the neighbourhood-level grounding path from S10, so it cannot be meaningfully drafted in parallel with either.
 
 ---
 
@@ -432,12 +482,13 @@ All `style: .continuous`. References: `TravelTipsView.swift:154`, `ItineraryCard
 
 # 16. Open questions
 
+**Closed since this table was written, kept here for the record:** combined vs split (D15 — split, Session 6); correct `maxOutputTokens` (measured, Session 6, ~3× headroom on observed maxima); save policy (merge-on-complete, Session 1); favourites ordering (derived, not persisted, Session 4). D16 (parallel generation vs wall-clock) is answered as a side effect of the D15 numbers but was never isolated as its own measurement — not blocking anything, so not reopened here.
+
+Still open:
+
 | Q | Owner | Blocks |
 |---|---|---|
 | KBYG v2: refined taxonomy + volatile-fact grounding strategy, from real usage and deeper research (the 7-video analysis) | product | S11 only — does not block shipping v1 (S9) |
-| Combined vs split suggestions call (D15) | measurement | S6 → S8, S9 |
-| Does parallel generation actually reduce wall-clock (D16)? | measurement | S2 sizing |
-| Correct `maxOutputTokens` per component after the additions | measurement | S5 |
-| Save policy: merge-on-complete (recommended) vs block-until-terminal | product + eng | S1 |
-| Favourites ordering: explicit array vs deterministic derived order | eng | S4 |
-| Does the sender's Near You result have any value to a recipient? (assumed no) | product | S9 |
+| Does the sender's solo-share Near You result have any value to a recipient? (assumed no — distinct from D19's group Near You, which is deliberately shared *within* the group) | product | S10 |
+| Should group favourites/decisions eventually get a combined "N of you liked this" view? Explicitly out of scope for D18/Session 12 — everyone keeps their own, unsynced | product | none yet — no session targets this |
+| Admin-only vs everyone-hearts for group favourites was considered and decided **everyone keeps their own** (D18) — if usage shows travellers want a shared view instead, this is the decision to revisit | product | none yet |

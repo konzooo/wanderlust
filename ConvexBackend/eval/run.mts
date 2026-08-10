@@ -15,8 +15,17 @@
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { runComponent, type SuggestionsVariant } from "../convex/lib/components";
-import { callOpenAI, OpenAIError, OPENAI_MODEL } from "../convex/lib/openai";
+import {
+  componentSpec,
+  runComponent,
+  type SuggestionsVariant,
+} from "../convex/lib/components";
+import {
+  callOpenAI,
+  OpenAIError,
+  OPENAI_MODEL,
+  WORTH_IT_MODEL,
+} from "../convex/lib/openai";
 import { buildSystemPrompt, buildUserMessage } from "../convex/lib/prompts";
 import { suggestionsSchema } from "../convex/lib/schemas";
 import { ValidationError } from "../convex/lib/validation";
@@ -38,6 +47,7 @@ type CallRecord = {
   fixture: string;
   arm: "shared" | SuggestionsVariant;
   component: string;
+  model: string;
   ok: boolean;
   errorCode?: string;
   durationMs: number;
@@ -68,7 +78,7 @@ async function main() {
   // split suggestions + worthIt + whereToStay. Plus one truncation probe.
   const callCount = fixtures.length * 5 + 1;
   console.log(
-    `${fixtures.length} fixtures · ${callCount} model calls · model ${OPENAI_MODEL}`,
+    `${fixtures.length} fixtures · ${callCount} model calls · default ${OPENAI_MODEL} · Worth It ${WORTH_IT_MODEL}`,
   );
   if (dry) {
     for (const f of fixtures) console.log(`  ${f.id.padEnd(32)} ${f.archetype}`);
@@ -116,7 +126,12 @@ async function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   writeFileSync(
     join(RESULTS_DIR, `run-${stamp}.json`),
-    JSON.stringify({ model: OPENAI_MODEL, records, probe }, null, 2),
+    JSON.stringify({
+      model: OPENAI_MODEL,
+      componentModels: { worthIt: WORTH_IT_MODEL },
+      records,
+      probe,
+    }, null, 2),
   );
   const report = summarise(records, probe, fixtures);
   writeFileSync(join(RESULTS_DIR, `run-${stamp}.md`), report);
@@ -130,6 +145,7 @@ async function call(
   component: "itinerary" | "suggestions" | "worthIt" | "whereToStay",
 ): Promise<CallRecord> {
   const variant: SuggestionsVariant = arm === "combined" ? "combined" : "split";
+  const model = componentSpec(component, variant).model ?? OPENAI_MODEL;
   const started = Date.now();
   try {
     const result = await runComponent({
@@ -141,6 +157,7 @@ async function call(
       fixture: fixture.id,
       arm,
       component,
+      model,
       ok: true,
       durationMs: result.durationMs,
       inputTokens: result.usage.inputTokens,
@@ -149,7 +166,7 @@ async function call(
       maxOutputTokens: result.maxOutputTokens,
       repairs: result.validation.repairs,
       droppedSections: result.validation.droppedSections,
-      costUSD: costUSD(result.usage),
+      costUSD: costUSD(result.usage, model),
       data: result.data,
     };
   } catch (error) {
@@ -161,6 +178,7 @@ async function call(
       fixture: fixture.id,
       arm,
       component,
+      model,
       ok: false,
       errorCode:
         error instanceof OpenAIError
@@ -175,7 +193,7 @@ async function call(
       maxOutputTokens: 0,
       repairs: 0,
       droppedSections: [],
-      costUSD: costUSD(usage),
+      costUSD: costUSD(usage, model),
     };
   }
 }
@@ -218,7 +236,10 @@ function summarise(
   const lines: string[] = [];
   lines.push(`# D15 evaluation — ${new Date().toISOString().slice(0, 10)}`);
   lines.push("");
-  lines.push(`Model: \`${OPENAI_MODEL}\` · ${fixtures.length} fixtures · ${records.length} calls`);
+  lines.push(
+    `Models: default \`${OPENAI_MODEL}\` · Worth It \`${WORTH_IT_MODEL}\` · ` +
+      `${fixtures.length} fixtures · ${records.length} calls`,
+  );
   lines.push("");
 
   const arms: SuggestionsVariant[] = ["combined", "split"];

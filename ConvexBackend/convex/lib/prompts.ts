@@ -175,7 +175,7 @@ function roleBlock(component: Component, mode: TripMode): string {
     case "deepDive":
       return `You answer one specific interest a ${mode === "group" ? "group" : "traveller"} asked about, for the Wanderlust mobile app, the way a well-informed local friend who happens to be into that thing would answer it.`;
     case "worthIt":
-      return `You settle the arguments a traveller is already having with themselves, for the Wanderlust mobile app. A local friend who will tell you plainly that the famous thing is worth the queue, or that it is not, and why — never a guidebook hedging both ways.`;
+      return `You help a traveller decide whether the famous things they are already considering deserve time on this particular trip, for the Wanderlust mobile app. Judge the experience rather than its fame: an icon can fully earn the hype, and a celebrated place can still be a poor fit. Write like a candid local friend who understands this traveller.`;
     case "whereToStay":
       return `You advise a traveller on which neighbourhood to sleep in, for the Wanderlust mobile app, the way a friend who lives in the city would: what each area is actually like to wake up in, and what the trade-off is.`;
     case "knowBeforeYouGo":
@@ -192,14 +192,23 @@ function roleBlock(component: Component, mode: TripMode): string {
  * would be comparing two different products.
  */
 const WORTH_IT_TASK = `WORTH IT OR SKIP
-Four things a visitor to this destination has already half decided to do — the big names they would ask a local friend about, not obscure alternatives. Argue each honestly both ways so they can decide for themselves.
+Two to four well-known things a visitor to this destination is likely already considering — the names they would ask a local friend to help them decide about, not a list of obscure alternatives. Answer the real question: is this worth it for this traveller on this trip?
 - place: the place or activity, named the way people name it.
-- theCase: why it might genuinely be worth their time. 120 to 200 characters.
-- theCatch: the honest catch — the queue, the cost, the hours it eats, the version of it that disappoints. 120 to 200 characters.
-- verdict: your actual call, one sentence. "Worth it, but…", "Half worth it…", "Skip it unless…" are all good. A verdict that decides nothing is not a verdict.
-- Return exactly four items, chosen for this particular traveller and season.
-- At least one should come out clearly positive and at least one clearly negative. Four hedges is not a set of decisions.
+- theCase: the core payoff — what is genuinely meaningful, beautiful, enjoyable or distinctive about the experience. 120 to 200 characters.
+- theCatch: what the traveller actually needs to know before deciding. Use a material trade-off, not a compulsory negative. 100 to 180 characters.
+- verdict: your actual call and its reason, in one sentence beginning with exactly one of: "Worth it —", "Worth it if", "Optional for you —", or "Probably skip it for you —".
+- Return two to four items. Fewer strong decisions are better than padding a smaller destination to four.
 - locations: one array per card, covering every place named anywhere in that card's three fields.`;
+
+const WORTH_IT_DECISION_BLOCK = `DECISION STANDARD
+- There is no quota for positive, optional or negative verdicts. Let every item earn its own call.
+- Judge four things together: the intrinsic payoff; whether crowds, commercialization or logistics actually damage that payoff; the time it consumes relative to this trip; and the traveller's stated preferences.
+- "Touristy" and "crowded" are conditions, not verdicts. Mention them only when they materially change the experience, and explain how. When the core experience survives them, say so with conviction.
+- Mention price only when the experience is known to be unusually expensive for its category or poor value. An entry fee or a paid tour is not a catch by itself. Never invent a price.
+- Distinguish "not essential" from "not worthwhile". Use "Optional for you" when something is genuinely good but loses on fit or opportunity cost.
+- For this section, Question 3 is a preference signal, not a veto. Trusted-favourites travellers welcome classics. Off-the-beaten-path travellers hold classics to a higher bar and may prefer a concrete alternative — but an exceptional icon still deserves an enthusiastic "Worth it" when its payoff survives the hype.
+- Name an alternative only when it is genuinely comparable and better for this traveller. Avoid vague escape hatches such as "find somewhere quieter".
+- Specific interests are not automatically niche. Explain the broader significance when it is part of why an experience matters.`;
 
 /** The where-to-stay guide (D10). Same sharing rule as WORTH_IT_TASK. */
 const WHERE_TO_STAY_TASK = `WHERE TO STAY
@@ -231,7 +240,7 @@ function taskBlock(
 ): string {
   switch (component) {
     case "worthIt":
-      return WORTH_IT_TASK;
+      return `${WORTH_IT_TASK}\n\n${WORTH_IT_DECISION_BLOCK}`;
     case "whereToStay":
       return WHERE_TO_STAY_TASK;
     case "nearYou":
@@ -291,7 +300,7 @@ LENGTH
 - Maximize useful detail in the available space and make the experience easy to picture.
 - Name a specific, findable place in most suggestions — a venue, a beach, a neighborhood, a viewpoint. General advice is fine where it genuinely is the advice, but a set where nothing is findable on a map is too vague.${
         opts.interestPrompts ? `\n\n${INTEREST_PROMPTS_TASK}` : ""
-      }${opts.extras ? `\n\n${WORTH_IT_TASK}\n\n${WHERE_TO_STAY_TASK}` : ""}`;
+      }${opts.extras ? `\n\n${WORTH_IT_TASK}\n\n${WORTH_IT_DECISION_BLOCK}\n\n${WHERE_TO_STAY_TASK}` : ""}`;
     }
 
     case "knowBeforeYouGo": {

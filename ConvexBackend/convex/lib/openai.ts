@@ -14,10 +14,23 @@
 export const OPENAI_MODEL = "gpt-4o-mini";
 /**
  * Near You is the one component where current local discovery is the product,
- * not merely background knowledge. Luna keeps the search pass inexpensive
+ * not merely background knowledge. Terra keeps the search pass inexpensive
  * while giving it a stronger editorial model than the default mini call.
  */
 export const NEAR_YOU_MODEL = "gpt-5.6-terra";
+/**
+ * Worth It is a compact judgment task: it benefits from stronger taste and
+ * personalization, but does not need the deeper reasoning budget of Sol.
+ */
+export const WORTH_IT_MODEL = "gpt-5.6-luna";
+
+export type OpenAIReasoningEffort =
+  | "none"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 export type OpenAIWebSource = {
   url: string;
@@ -75,6 +88,7 @@ export async function callOpenAI(args: {
   schemaName: string;
   maxOutputTokens: number;
   model?: string;
+  reasoning?: { effort: OpenAIReasoningEffort };
   webSearch?: {
     /** Requested provider-side ceiling; actual paid actions are measured separately. */
     maxToolCalls: number;
@@ -149,6 +163,7 @@ export function buildOpenAIRequestBody(args: {
   schemaName: string;
   maxOutputTokens: number;
   model?: string;
+  reasoning?: { effort: OpenAIReasoningEffort };
   webSearch?: {
     maxToolCalls: number;
     approximateLocation?: {
@@ -174,6 +189,7 @@ export function buildOpenAIRequestBody(args: {
       },
     },
   };
+  if (args.reasoning) body.reasoning = args.reasoning;
   if (args.webSearch) {
     const userLocation = args.webSearch.approximateLocation;
     body.tools = [{

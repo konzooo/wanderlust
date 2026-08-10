@@ -26,7 +26,7 @@ const card = (place: string, extra: Record<string, unknown> = {}) => ({
   place,
   theCase: "There is nothing else like it.",
   theCatch: "The queue is brutal in the sun.",
-  verdict: "Worth it, but book the first slot.",
+  verdict: "Worth it — book the first slot.",
   locations: [],
   ...extra,
 });
@@ -42,7 +42,7 @@ const area = (name: string, extra: Record<string, unknown> = {}) => ({
 
 // MARK: - Counts the schema cannot express
 
-test("worth-it keeps exactly four cards and counts the truncation", () => {
+test("worth-it caps the section at four cards and counts the truncation", () => {
   const report = emptyReport();
   const items = validateWorthIt(
     [card("A"), card("B"), card("C"), card("D"), card("E")],
@@ -50,6 +50,13 @@ test("worth-it keeps exactly four cards and counts the truncation", () => {
   );
   assert.equal(items?.length, 4);
   assert.equal(report.repairs, 1);
+});
+
+test("worth-it accepts a concise two-card section without padding it", () => {
+  const report = emptyReport();
+  const items = validateWorthIt([card("A"), card("B")], report);
+  assert.equal(items?.length, 2);
+  assert.equal(report.repairs, 0);
 });
 
 test("worth-it drops cards missing a prose field rather than rendering a blank one", () => {

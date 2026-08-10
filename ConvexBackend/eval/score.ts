@@ -331,9 +331,8 @@ export function laneViolations(component: string, data: unknown): string[] {
   for (const item of items) {
     if (!isRecord(item)) continue;
     const verdict = typeof item.verdict === "string" ? item.verdict : "";
-    // "A verdict that decides nothing is not a verdict."
-    if (!/\b(worth it|skip|half worth|do it|don't bother|go|worth the)\b/i.test(verdict)) {
-      violations.push(`worthIt verdict decides nothing: ${String(item.place)}`);
+    if (!/^(worth it —|worth it if|optional for you —|probably skip it for you —)/i.test(verdict)) {
+      violations.push(`worthIt verdict leaves the calibrated scale: ${String(item.place)}`);
     }
   }
 
@@ -347,27 +346,41 @@ export function laneViolations(component: string, data: unknown): string[] {
   return violations;
 }
 
-/**
- * gpt-4o-mini list pricing, USD per million tokens, as of the run recorded in
- * `results/`. Kept here rather than inlined so a re-run under different pricing
- * is a one-line change and the old numbers stay interpretable.
- */
-export const PRICING = {
-  inputPerMillion: 0.15,
-  cachedInputPerMillion: 0.075,
-  outputPerMillion: 0.6,
+/** Standard short-context pricing, USD per million tokens, as of 2026-08-09. */
+export const PRICING_BY_MODEL: Record<string, {
+  inputPerMillion: number;
+  cachedInputPerMillion: number;
+  outputPerMillion: number;
+}> = {
+  "gpt-4o-mini": {
+    inputPerMillion: 0.15,
+    cachedInputPerMillion: 0.075,
+    outputPerMillion: 0.6,
+  },
+  "gpt-5.6-luna": {
+    inputPerMillion: 0.2,
+    cachedInputPerMillion: 0.02,
+    outputPerMillion: 1.2,
+  },
+  "gpt-5.6-terra": {
+    inputPerMillion: 2,
+    cachedInputPerMillion: 0.2,
+    outputPerMillion: 12,
+  },
 };
 
 export function costUSD(usage: {
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;
-}): number {
+}, model = "gpt-4o-mini"): number {
+  const pricing = PRICING_BY_MODEL[model];
+  if (!pricing) throw new Error(`missing pricing for model ${model}`);
   const uncachedInput = Math.max(0, usage.inputTokens - usage.cachedInputTokens);
   return (
-    (uncachedInput * PRICING.inputPerMillion +
-      usage.cachedInputTokens * PRICING.cachedInputPerMillion +
-      usage.outputTokens * PRICING.outputPerMillion) /
+    (uncachedInput * pricing.inputPerMillion +
+      usage.cachedInputTokens * pricing.cachedInputPerMillion +
+      usage.outputTokens * pricing.outputPerMillion) /
     1_000_000
   );
 }

@@ -40,7 +40,7 @@ extension DS {
         public static let segmentTitle = Font.kanitMedium(19)
 
         /// The small italic label introducing a block of generated prose
-        /// ("The case", "The catch").
+        /// ("The case", "What to know").
         public static let eyebrow = Font.kanitMediumItalic(15)
 
         /// Where a favourite came from, shown beside it.

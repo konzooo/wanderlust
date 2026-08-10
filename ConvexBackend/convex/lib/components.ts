@@ -17,7 +17,13 @@ import {
   type PromptOptions,
   type TripInput,
 } from "./prompts";
-import { callOpenAI, NEAR_YOU_MODEL, type OpenAIResult } from "./openai";
+import {
+  callOpenAI,
+  NEAR_YOU_MODEL,
+  WORTH_IT_MODEL,
+  type OpenAIReasoningEffort,
+  type OpenAIResult,
+} from "./openai";
 import {
   emptyReport,
   validateDeepDive,
@@ -114,6 +120,10 @@ type ComponentSpec = {
   schema: unknown;
   schemaName: string;
   maxOutputTokens: number;
+  /** Optional component-specific model route; otherwise use the default. */
+  model?: string;
+  /** Always explicit when a routed model supports configurable reasoning. */
+  reasoning?: { effort: OpenAIReasoningEffort };
   /**
    * A required component's failure fails the whole generation. Everything else
    * is best-effort: it commits `failed(code)` for itself and the trip still
@@ -174,8 +184,12 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
   worthIt: {
     schema: WORTH_IT_SCHEMA,
     schemaName: "travel_worth_it_schema",
-    // Observed max 547. Four cards is a fixed shape, so this barely varies.
+    // Observed max 547 when the section returned four cards.
     maxOutputTokens: 2_048,
+    model: WORTH_IT_MODEL,
+    // This is an editorial classification task, not a multi-step reasoning
+    // task. Explicitly opt out of Luna's default reasoning budget.
+    reasoning: { effort: "none" },
     required: false,
     perTripCap: null,
   },
@@ -195,6 +209,7 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
     // tokens produced, while a too-small ceiling turns a useful long result
     // into an incomplete strict-JSON failure.
     maxOutputTokens: 4_096,
+    model: NEAR_YOU_MODEL,
     required: false,
     perTripCap: null,
   },
@@ -262,9 +277,10 @@ export async function runComponent(args: {
     schema: spec.schema,
     schemaName: spec.schemaName,
     maxOutputTokens: spec.maxOutputTokens,
+    ...(spec.model ? { model: spec.model } : {}),
+    ...(spec.reasoning ? { reasoning: spec.reasoning } : {}),
     ...(args.component === "nearYou"
       ? {
-        model: NEAR_YOU_MODEL,
         webSearch: {
           maxToolCalls: NEAR_YOU_MAX_SEARCH_CALLS,
           approximateLocation: {

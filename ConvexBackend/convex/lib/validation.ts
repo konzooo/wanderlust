@@ -2,7 +2,7 @@
  * Post-decode validation for structured output.
  *
  * §3 of the plan: strict JSON Schema can express "this property exists and is a
- * string". It cannot express "exactly four of these", "between four and six",
+ * string". It cannot express "between two and four of these", "between four and six",
  * "at most 28 characters", or "required only when X" — `minItems`, `maxItems`
  * and conditional subschemas are all ignored under `strict: true`. Every one of
  * those rules therefore has to be enforced here, in application code, **with a
@@ -19,7 +19,7 @@
 import type { OpenAIWebSource } from "./openai";
 import type { NearYouCandidate } from "./prompts";
 
-/** How many cards Worth-it/Skip shows (D7). */
+/** Maximum number of cards Worth-it/Skip shows (D7). */
 export const WORTH_IT_COUNT = 4;
 /** Below this the section is not worth rendering at all. */
 const WORTH_IT_MIN = 2;
@@ -148,13 +148,11 @@ function longestPresentPrefix(value: string, haystack: string): string | null {
 // MARK: - Sections ------------------------------------------------------------
 
 /**
- * Worth-it/Skip: exactly four usable cards.
+ * Worth-it/Skip: two to four usable cards.
  *
- * Extra cards are dropped rather than kept — four is a product decision (D7),
- * and a fifth card would render but would not have been designed for. Too few
- * usable cards means the section is dropped: three cards with one of them blank
- * is worse than no section at all, because the traveller cannot tell that
- * something went wrong.
+ * Extra cards are dropped rather than kept — four is the product maximum (D7),
+ * and a fifth card would render but would not have been designed for. Below two
+ * usable cards the section is too thin to render as a decision set.
  */
 export function validateWorthIt(
   raw: unknown,

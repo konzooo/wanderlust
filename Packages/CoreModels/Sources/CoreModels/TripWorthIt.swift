@@ -107,7 +107,7 @@ extension Trip {
             public var label: String {
                 switch self {
                 case .theCase: "The case"
-                case .theCatch: "The catch"
+                case .theCatch: "What to know"
                 case .verdict: "Verdict"
                 }
             }
@@ -135,8 +135,7 @@ extension Trip {
 }
 
 public extension Trip.WorthItItem {
-    /// Four cards, as the plan specifies. Content only — nothing generates these
-    /// yet; the generation call is the next session's work.
+    /// Four representative cards for previews and fixtures.
     static let mockSet: [Trip.WorthItItem] = [
         .init(
             place: "Sagrada Família",
@@ -148,19 +147,19 @@ public extension Trip.WorthItItem {
             place: "Park Güell",
             theCase: "The mosaic terrace is genuinely lovely, and the free park above it has the better view anyway.",
             theCatch: "The paid Monumental Zone is half an hour of content for a timed ticket and a long uphill walk.",
-            verdict: "Half worth it. Walk up for the free part at sunset, skip the paid zone unless Gaudí is the reason you came."
+            verdict: "Optional for you — walk up for the free part at sunset; pay for the Monumental Zone only if Gaudí is a main reason for this trip."
         ),
         .init(
             place: "La Rambla",
             theCase: "You will end up walking it once, and the Boqueria side streets are worth the detour.",
             theCatch: "Every restaurant on it is a tourist trap, and it is the city's pickpocket capital by a distance.",
-            verdict: "Walk it, eat nothing on it."
+            verdict: "Probably skip it for you — cross it once if it is on your route, but spend your walking and eating time in the surrounding streets."
         ),
         .init(
             place: "Camp Nou tour",
             theCase: "Even if you don't follow football, the scale of the place lands in person.",
             theCatch: "Mid-renovation the tour is a fraction of what it was, for most of the old price.",
-            verdict: "Skip it this year unless you're a Barça fan — a match ticket is the better spend."
+            verdict: "Probably skip it for you — unless you are a Barça fan, the renovation-era tour does not justify the time or cost."
         )
     ]
 }

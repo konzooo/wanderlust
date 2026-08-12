@@ -120,7 +120,7 @@ final class SharedTripStore: ObservableObject {
         if mode == .savedTrip {
             output.accommodation = trip.accommodation
             output.nearYouResponse = trip.nearYouState.asyncValue
-            output.nearYouGenerationRequest = TripGenerationRequest(
+            output.manualGenerationRequest = TripGenerationRequest(
                 tripKey: trip.tripKey ?? TripKey.mint(),
                 input: trip.generationInput
                     ?? TripGenerationInput(details: trip.details, answers: [])

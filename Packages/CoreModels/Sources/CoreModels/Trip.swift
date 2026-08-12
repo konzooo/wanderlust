@@ -27,10 +27,15 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     ///   `interestPrompts` and `knowBeforeYouGoState`.
     /// - 4: grounded `nearYouState` and the generation input needed only for an
     ///   explicit manual regeneration after reopening a saved trip.
-    public static let currentSchemaVersion = 4
+    /// - 5: the trip's creation date, used to keep My Trips newest-first without
+    ///   letting later edits make an old trip look newly created.
+    public static let currentSchemaVersion = 5
 
     public let id = UUID()
     public let schemaVersion: Int
+    /// When this logical trip was first created. Optional only for saved trips
+    /// written before schema v5; new trips always receive a value.
+    public var createdAt: Date?
     public let details: Details
     public let itinerary: Itinerary
 
@@ -135,9 +140,11 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         favorites: Favorites = .init(),
         shareCode: String? = nil,
         tripKey: String? = nil,
+        createdAt: Date? = Date(),
         schemaVersion: Int = Trip.currentSchemaVersion
     ) {
         self.schemaVersion = schemaVersion
+        self.createdAt = createdAt
         self.details = details
         self.itinerary = itinerary
         self.suggestionsState = suggestionsState
@@ -165,7 +172,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         knowBeforeYouGo: KnowBeforeYouGo? = nil,
         favorites: Favorites = .init(),
         shareCode: String? = nil,
-        tripKey: String? = nil
+        tripKey: String? = nil,
+        createdAt: Date? = Date()
     ) {
         self.init(
             details: details,
@@ -174,7 +182,8 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
             knowBeforeYouGoState: knowBeforeYouGo.map(ComponentState.ready) ?? .absent,
             favorites: favorites,
             shareCode: shareCode,
-            tripKey: tripKey
+            tripKey: tripKey,
+            createdAt: createdAt
         )
     }
 
@@ -186,6 +195,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
+        case createdAt
         case details
         case itinerary
         /// v1 shape: the suggestions value itself, or the key absent entirely.
@@ -209,6 +219,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         details = try container.decode(Details.self, forKey: .details)
         itinerary = try container.decode(Itinerary.self, forKey: .itinerary)
 
@@ -256,6 +267,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Trip.currentSchemaVersion, forKey: .schemaVersion)
+        try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encode(details, forKey: .details)
         try container.encode(itinerary, forKey: .itinerary)
         try container.encode(suggestionsState, forKey: .suggestionsState)
@@ -304,7 +316,8 @@ public extension Trip {
             generationInput: generationInput ?? stored.generationInput,
             favorites: favorites,
             shareCode: shareCode ?? stored.shareCode,
-            tripKey: tripKey ?? stored.tripKey
+            tripKey: tripKey ?? stored.tripKey,
+            createdAt: stored.createdAt ?? createdAt
         )
     }
 }

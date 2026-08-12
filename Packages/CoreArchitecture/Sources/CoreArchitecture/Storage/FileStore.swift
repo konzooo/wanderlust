@@ -93,18 +93,33 @@ public final class FileStore<Model: FilePersistable> {
     
     /// Fetch *all* stored objects.
     public func fetchAll() throws -> [Model] {
+        try fetchAllWithMetadata().map(\.value)
+    }
+
+    /// Fetch all stored objects together with filesystem creation dates.
+    ///
+    /// The date is metadata rather than model state, so callers should use it
+    /// only as a migration fallback for records written before their model grew
+    /// its own creation timestamp.
+    public func fetchAllWithMetadata() throws -> [(value: Model, creationDate: Date?)] {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: rootURL,
-                                             includingPropertiesForKeys: [.isRegularFileKey],
+                                             includingPropertiesForKeys: [
+                                                .isRegularFileKey,
+                                                .creationDateKey
+                                             ],
                                              options: [.skipsHiddenFiles])
         else { return [] }
         
-        var result: [Model] = []
+        var result: [(value: Model, creationDate: Date?)] = []
         for case let fileURL as URL in enumerator {
             if fileURL.pathExtension == "json",
                let data = try? Data(contentsOf: fileURL),
                let decoded = try? decode(data) {
-                result.append(decoded)
+                let resourceValues = try? fileURL.resourceValues(
+                    forKeys: [.creationDateKey]
+                )
+                result.append((decoded, resourceValues?.creationDate))
             }
         }
         return result

@@ -335,7 +335,7 @@ struct SavedTripsScreen: View {
         state.deepDives = trip.deepDives
         state.accommodation = trip.accommodation
         state.nearYouResponse = trip.nearYouState.asyncValue
-        state.nearYouGenerationRequest = TripGenerationRequest(
+        state.manualGenerationRequest = TripGenerationRequest(
             tripKey: trip.tripKey ?? TripKey.mint(),
             input: trip.generationInput
                 ?? TripGenerationInput(details: trip.details, answers: [])

@@ -26,6 +26,7 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertNil(trip.worthItDecisions)
         XCTAssertNil(trip.accommodation)
         XCTAssertTrue(trip.knowBeforeYouGoState.isAbsent)
+        XCTAssertNil(trip.createdAt)
     }
 
     /// A v1 file whose suggestions key was simply never written. "There are
@@ -99,6 +100,18 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertEqual(decoded.accommodation?.precision, .address)
     }
 
+    func testCreationDateSurvivesRoundTrip() throws {
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let original = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestions: .mock,
+            createdAt: createdAt
+        )
+
+        XCTAssertEqual(try roundTrip(original).createdAt, createdAt)
+    }
+
     // MARK: - Merge-on-complete
 
     /// The rule the save policy rests on: a component still generating writes
@@ -152,6 +165,67 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertTrue(merged.favorites.liked.isEmpty)
     }
 
+    func testMergePreservesTheOriginalCreationDate() {
+        let originalDate = Date(timeIntervalSince1970: 1_600_000_000)
+        let editDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let stored = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestions: .mock,
+            createdAt: originalDate
+        )
+        let edited = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestions: .mock,
+            createdAt: editDate
+        )
+
+        XCTAssertEqual(edited.merged(over: stored).createdAt, originalDate)
+    }
+
+    func testMyTripsOrdersNewestFirstAndLegacyTripsLast() {
+        let oldest = savedTrip(destination: "Athens", createdAt: 100)
+        let newest = savedTrip(destination: "Berlin", createdAt: 300)
+        let middle = savedTrip(destination: "Copenhagen", createdAt: 200)
+        let legacy = savedTrip(destination: "Amsterdam", createdAt: nil)
+
+        let result = SavedTripsStore.newestFirstUnique([oldest, legacy, newest, middle])
+
+        XCTAssertEqual(result.map(\.details.destination.name), [
+            "Berlin", "Copenhagen", "Athens", "Amsterdam"
+        ])
+    }
+
+    func testMyTripsKeepsTheNewestDuplicate() {
+        let old = savedTrip(destination: "Lisbon", createdAt: 100)
+        let replacement = savedTrip(destination: "Lisbon", createdAt: 200)
+
+        let result = SavedTripsStore.newestFirstUnique([old, replacement])
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.createdAt, Date(timeIntervalSince1970: 200))
+    }
+
+    func testMyTripsUsesFileCreationDateForLegacyTrips() {
+        let older = savedTrip(destination: "Athens", createdAt: nil)
+        let newer = savedTrip(destination: "Berlin", createdAt: nil)
+        let candidates = [
+            SavedTripsStore.StoredTripCandidate(
+                trip: older,
+                fallbackCreatedAt: Date(timeIntervalSince1970: 100)
+            ),
+            SavedTripsStore.StoredTripCandidate(
+                trip: newer,
+                fallbackCreatedAt: Date(timeIntervalSince1970: 200)
+            )
+        ]
+
+        let result = SavedTripsStore.newestFirstUnique(candidates)
+
+        XCTAssertEqual(result.map(\.trip.details.destination.name), ["Berlin", "Athens"])
+    }
+
     // MARK: - Screen state → persisted state
 
     func testInFlightGenerationIsPersistedAsAbsentRatherThanEmpty() {
@@ -179,6 +253,20 @@ final class TripPersistenceTests: XCTestCase {
 
     private func roundTrip(_ trip: Trip) throws -> Trip {
         try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
+    }
+
+    private func savedTrip(destination: String, createdAt: TimeInterval?) -> Trip {
+        Trip(
+            details: .init(
+                destination: .init(name: destination),
+                members: .init(groupType: .solo),
+                duration: 3,
+                month: .may
+            ),
+            itinerary: .mock,
+            suggestions: .mock,
+            createdAt: createdAt.map(Date.init(timeIntervalSince1970:))
+        )
     }
 
     private func decode(_ json: String) throws -> Trip {

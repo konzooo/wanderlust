@@ -52,3 +52,18 @@ In the future, the app can **learn more about you the more you use it.**
 - **Feel:** fun, modern, easy — a source of *inspiration*, not a chore.
 - **Value over ChatGPT:** structured preferences → non-generic recommendations; saved for you; direct links (maps); structured display of otherwise-unstructured LLM output; less context-typing burden on the user.
 - **Vision line:** a friend who knows you well *and* is a local everywhere you go.
+
+## Message architecture
+
+We don't have competing slogans — we have four message *types*, each doing a job the others can't. Which one to use depends on how cold the reader is.
+
+| Line | Job | Answers | Use where |
+|---|---|---|---|
+| "Get inspired for your next trip" | **Category** | What shelf is this on? | App Store title, cold traffic |
+| "Personality-based travel tips" | **Differentiator** | Why this and not ChatGPT? | App Store subtitle, onboarding |
+| "Imagine travelling with a friend who knows you well and happens to be a local wherever you go" | **Promise / story** | Why should I care? | Welcome screen, landing hero |
+| "Your unique path starts here" | **Brand mantra** | Who are you? (identity, not explanation) | Splash — *TBD, revisit with logo rework* |
+
+**Rule:** the friend metaphor is the positioning. The other three are zoom levels of it — "personality-based" is the friend knowing *you*, "local insider" is the friend knowing *the place*, the mantra is that promise compressed to a badge. Pick a zoom level per surface, not a winner.
+
+**Claims are set once; proof is continuous.** Onboarding states the promise. Every suggestion after that has to earn it — attribute picks back to what we learned ("because you like slow mornings"), and mark the local-ness explicitly ("locals go on Tuesdays"). A header repeating "personality-based" convinces nobody; a card that visibly knows them does.

@@ -23,6 +23,15 @@
 		<string>comgooglemaps</string>
 		<string>maps</string>
 	</array>
+	<!-- The system launch screen must be static, so it cannot be the splash
+	     itself — but it can be the splash's first frame. Painting it with the
+	     aurora's top-left colour removes the white flash that otherwise sits
+	     between the icon tap and the animation. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Kanit-Medium.ttf</string>

@@ -9,6 +9,7 @@
 //
 
 import CoreModels
+import DesignSystem
 import SwiftUI
 
 /// A single design-exploration entry shown in the Debug Menu's Design Playground list.
@@ -106,11 +107,21 @@ enum DesignPlayground {
             )
         }
     ]
+    private static let launchVariants: [DesignVariant] = [
+        DesignVariant(
+            id: "splash",
+            title: "Splash — launch animation",
+            subtitle: "The real launch animation on device, with a replay button and a hand-off check against the first screen."
+        ) {
+            SplashLab()
+        }
+    ]
 #else
     private static let questionnaireVariants: [DesignVariant] = []
     private static let outputVariants: [DesignVariant] = []
+    private static let launchVariants: [DesignVariant] = []
 #endif
 
     /// Registry of in-progress design explorations. Add/remove entries here.
-    static let variants: [DesignVariant] = outputVariants + questionnaireVariants
+    static let variants: [DesignVariant] = launchVariants + outputVariants + questionnaireVariants
 }

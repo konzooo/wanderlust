@@ -15,6 +15,11 @@ struct WanderlustApp: App {
     @StateObject private var metricsTracker = MetricsTracker(storage: UserDefaultsMetricsStorage())
     @StateObject private var navigationRouter = NavigationRouter()
 
+    /// Shown once per process launch. `@State` on the `App` is initialised when
+    /// the process starts and never again, so this is a cold-launch splash for
+    /// free — returning from the background does not bring it back.
+    @State private var showSplash = true
+
     init() {
         DS.applyUniformDesign()
 
@@ -36,12 +41,29 @@ struct WanderlustApp: App {
             // HomeScreen owns the app's NavigationStack and destination
             // registrations. Wrapping it in a second stack bound to the same
             // path makes deep links push onto an unregistered outer stack.
-            HomeScreen()
-            .preferredColorScheme(.light)
-            .environmentObject(navigationRouter)
-            .environmentObject(metricsTracker)
-            .onOpenURL { url in
-                navigationRouter.handleDeepLink(url)
+            ZStack {
+                HomeScreen()
+                .preferredColorScheme(.light)
+                .environmentObject(navigationRouter)
+                .environmentObject(metricsTracker)
+                .onOpenURL { url in
+                    // A deep link means the user is heading somewhere specific.
+                    // Get out of the way rather than making them watch the
+                    // animation first.
+                    showSplash = false
+                    navigationRouter.handleDeepLink(url)
+                }
+
+                if showSplash {
+                    SplashView {
+                        withAnimation(.easeInOut(duration: 0.45)) { showSplash = false }
+                    }
+                    .transition(.opacity)
+                    // Nothing on the splash is tappable, and swallowing a tap
+                    // meant for Home during the cross-fade would feel broken.
+                    .allowsHitTesting(false)
+                    .zIndex(1)
+                }
             }
             
 //            NavigationStack {

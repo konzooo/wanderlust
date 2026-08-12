@@ -257,6 +257,15 @@ class NavigationRouter: ObservableObject {
             }
         }
 
+#if DEBUG
+        // `wanderlust://debug` — the Debug Menu is otherwise only reachable by
+        // triple-tapping the Home logo, which nothing automated can drive.
+        if segments.contains("debug") {
+            goToDebugMenu()
+            return
+        }
+#endif
+
         switch url.path {
         case "/feedback":
             goToFeedback()

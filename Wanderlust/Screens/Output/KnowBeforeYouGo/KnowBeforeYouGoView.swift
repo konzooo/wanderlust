@@ -12,8 +12,10 @@ import SwiftUI
 
 /// Know Before You Go.
 ///
-/// Reads top to bottom as a briefing, not as a feed: bucket heading, then the
-/// sections under it, each a card. There is no heart anywhere — this is
+/// Reads as a table of contents, not as a feed. Twelve sections of real prose
+/// laid out flat is a scroll nobody finishes; collapsed under their four buckets
+/// the whole briefing fits on one or two screens and the traveller opens the
+/// three things they actually care about. There is no heart anywhere — this is
 /// reference, and "how people pay in Barcelona" is not something anyone wants a
 /// saved list of (see `Trip.favouriteCandidates`).
 ///
@@ -30,6 +32,14 @@ struct KnowBeforeYouGoView: View {
     let unavailable: Bool
     /// `nil` where there is nothing to re-request (read-only trips).
     let onRetry: (() -> Void)?
+
+    /// Which sections are open, by `Section.id`.
+    ///
+    /// Held here rather than inside each row so it survives the buckets being
+    /// rebuilt, and so the "first one starts open" rule can be applied once
+    /// across the whole briefing rather than once per bucket.
+    @State private var expanded: Set<UUID> = []
+    @State private var hasSeededFirstSection = false
 
     var body: some View {
         if unavailable {
@@ -78,52 +88,147 @@ struct KnowBeforeYouGoView: View {
                 } else {
                     VStack(alignment: .leading, spacing: .Padding.md) {
                         ForEach(briefing.groups) { group in
-                            BucketView(group: group)
+                            BucketView(group: group, expanded: $expanded)
                         }
                     }
                     .padding(.horizontal, .Padding.sm3)
                     .padding(.vertical, .Padding.md)
+                    .onAppear { seedFirstSection(of: briefing) }
                 }
             }
+        }
+    }
+
+    /// Opens the very first section once, so the tab never lands as a wall of
+    /// closed rows with nothing to read. Guarded by its own flag rather than by
+    /// `expanded.isEmpty`, or closing that section by hand would re-open it on
+    /// the next redraw.
+    private func seedFirstSection(of briefing: Trip.KnowBeforeYouGo) {
+        guard !hasSeededFirstSection else { return }
+        hasSeededFirstSection = true
+        if let first = briefing.groups.first?.sections.first {
+            expanded.insert(first.id)
         }
     }
 }
 
 private struct BucketView: View {
     let group: Trip.KnowBeforeYouGo.BucketGroup
+    @Binding var expanded: Set<UUID>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: .Spacing.medium) {
-            HStack(alignment: .firstTextBaseline, spacing: .Spacing.small) {
-                Image(systemName: group.bucket.iconName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.appTint)
+        VStack(alignment: .leading, spacing: .Spacing.small) {
+            header
 
-                Text(group.bucket.title)
-                    .font(DS.Typography.sectionHeader)
-                    .foregroundStyle(.primary)
+            // One card per bucket, rows divided by hairlines rather than by
+            // gaps: the bucket is the object, the sections are its contents.
+            VStack(spacing: 0) {
+                ForEach(Array(group.sections.enumerated()), id: \.element.id) { index, section in
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, .Padding.sm3)
+                    }
+
+                    SectionRow(
+                        section: section,
+                        isExpanded: expanded.contains(section.id),
+                        onToggle: { toggle(section.id) }
+                    )
+                }
             }
+            .background(
+                RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+        }
+    }
 
-            ForEach(group.sections) { section in
-                SectionCard(section: section)
+    private var header: some View {
+        HStack(spacing: .Spacing.small) {
+            Image(systemName: group.bucket.iconName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.appTint)
+                .frame(width: 26, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: CGFloat.Radius.compact, style: .continuous)
+                        .fill(Color.appTint.opacity(0.14))
+                )
+
+            Text(group.bucket.title)
+                .font(DS.Typography.sectionHeader)
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: .Spacing.small)
+
+            // The count is what makes a closed bucket legible — it says how
+            // much is behind the rows without opening any of them.
+            Text("\(group.sections.count)")
+                .font(.kanitMedium(14))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("\(group.sections.count) sections")
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func toggle(_ id: UUID) {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            if expanded.contains(id) {
+                expanded.remove(id)
+            } else {
+                expanded.insert(id)
             }
         }
     }
 }
 
-private struct SectionCard: View {
+/// One collapsible section: always the title, and the prose only when asked for.
+private struct SectionRow: View {
     let section: Trip.KnowBeforeYouGo.Section
+    let isExpanded: Bool
+    let onToggle: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: .Spacing.small) {
-            // Model-written, so it renders as generated prose rather than as
-            // another piece of the app's Kanit furniture — a heading the model
-            // chose is still model text.
-            Text(section.title)
-                .font(DS.Typography.generatedTitle)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onToggle) {
+                HStack(alignment: .top, spacing: .Spacing.small) {
+                    // Model-written, so it renders as generated prose rather
+                    // than as another piece of the app's Kanit furniture — a
+                    // heading the model chose is still model text.
+                    Text(section.title)
+                        .font(DS.Typography.generatedTitle)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .padding(.top, 4)
+                }
+                .padding(.horizontal, .Padding.sm3)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(isExpanded ? "Collapses this section" : "Expands this section")
+
+            if isExpanded {
+                expandedBody(for: section)
+            }
+        }
+    }
+
+    private func expandedBody(for section: Trip.KnowBeforeYouGo.Section) -> some View {
+        VStack(alignment: .leading, spacing: .Spacing.small) {
             Text(section.linkableBody.linkedText)
                 .font(DS.Typography.generatedBody)
                 .foregroundStyle(.primary)
@@ -152,17 +257,9 @@ private struct SectionCard: View {
                 SourceLine(section: section)
             }
         }
-        .padding(.Padding.sm3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
-                .fill(.regularMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+        .padding(.horizontal, .Padding.sm3)
+        .padding(.bottom, .Padding.sm3)
     }
 }
 

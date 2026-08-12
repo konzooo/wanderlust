@@ -75,16 +75,18 @@ struct TripOutputScreen: View {
         // Successful save toast
         .toast(
             style: .success,
-            title: "Trip Saved!" ,
+            title: "Saved to My Trips",
             subtitle: nil,
             isPresented: $store.presentSaveToast,
-            position: .top
+            position: .bottom
         )
+        .sensoryFeedback(.success, trigger: store.presentSaveToast)
 
         // Favourites: a full-screen sheet off the header pill, not a tab.
         .sheet(isPresented: $store.isFavouritesSheetPresented) {
             FavouritesSheet(
                 destination: store.fullDestinationString,
+                imageUrlState: store.state.imageUrlResponse,
                 sections: store.favouriteSections,
                 privacyNote: store.state.mode == .groupTrip
                     ? "These favourites are yours on this device. They are not shared with the group."
@@ -156,6 +158,8 @@ struct TripOutputScreen: View {
                 tabs: store.visibleTabs
             )
 
+            outputTabSubtitle
+
             // -- CONTENT
             switch store.selectedContentTab {
             case .discover:
@@ -173,6 +177,8 @@ struct TripOutputScreen: View {
                     canReplace: store.canReplaceGroupNearYou,
                     favorites: favoritesBinding,
                     onSearchAddress: { store.send(.resolveNearYouAddress($0)) },
+                    onSearchSuggestion: { store.send(.resolveNearYouSuggestion($0)) },
+                    onResetLocationSearch: { store.send(.resetNearYouLocationSearch) },
                     onChooseResolution: { store.send(.chooseNearYouResolution($0)) },
                     onRetryWhereToStay: canRetry
                         ? { store.send(.retryComponent(.whereToStay)) }
@@ -195,11 +201,35 @@ struct TripOutputScreen: View {
         .animation(.easeInOut, value: store.state.selectedContentTab)
     }
 
-    /// Discover: the sticky pill row, then whichever band it selected. The pills
-    /// live outside the content's scroll view so they stay put while it moves.
+    private var outputTabSubtitle: some View {
+        Text(outputTabSubtitleText)
+            .font(.kanit(14))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, .Padding.sm3)
+            .padding(.top, 12)
+            .padding(.bottom, 2)
+            .id(store.selectedContentTab)
+            .transition(.opacity)
+    }
+
+    private var outputTabSubtitleText: String {
+        switch store.selectedContentTab {
+        case .discover:
+            "Ideas shaped around your unique profile and preferences"
+        case .knowBeforeYouGo:
+            "The practical brief for \(store.fullDestinationString) — all in one overview"
+        case .nearYou:
+            "Your neighborhood, vibes, and practical essentials"
+        }
+    }
+
+    /// Discover: the quiet section navigation, then whichever output it selected.
+    /// The navigation lives outside the content's scroll view so it stays put.
     @ViewBuilder
     var discoverTab: some View {
-        DiscoverPillBar(
+        DiscoverSectionNavigation(
             selection: $store.state.discoverSegment,
             segments: store.discoverSegments
         )
@@ -219,7 +249,8 @@ struct TripOutputScreen: View {
                         chips: store.interestChips,
                         used: store.usedDeepDiveInterests,
                         loading: store.deepDiveInFlightInterest,
-                        errorMessage: store.deepDiveGuidanceMessage,
+                        guidance: store.deepDiveGuidanceMessage,
+                        capReached: store.isDeepDiveCapReached,
                         onTap: store.canGenerateDeepDive
                             ? { store.send(.generateDeepDive($0)) }
                             : nil

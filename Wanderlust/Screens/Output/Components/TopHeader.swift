@@ -156,17 +156,22 @@ struct TopHeader: View {
         Button(action: {
             onSaveTapped?()
         }) {
-            Image(systemName: "bookmark")
+            Image(systemName: saveState ? "bookmark.fill" : "bookmark")
                 .resizable()
                 .scaledToFit()
-                .tint(saveState ? .white : Color.white)
+                .tint(.white)
                 .frame(width: 20, height: 20)
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(.bounce, value: saveState)
         }
         .padding(6)
         .background(
-            saveState ? AnyShapeStyle(Color.green) : AnyShapeStyle(Material.thinMaterial.opacity(0.5)),
+            saveState
+                ? AnyShapeStyle(Color.appTint)
+                : AnyShapeStyle(Material.thinMaterial.opacity(0.5)),
             in: Circle()
         )
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: saveState)
     }
 
     var shareButton: some View {

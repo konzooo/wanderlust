@@ -252,6 +252,41 @@ final class DiscoverContentTests: XCTestCase {
         XCTAssertEqual(store.state.deepDives?.count, 3)
     }
 
+    func testSavedTripCanUseItsRemainingDeepDiveThenShowsTheCapMessage() async {
+        let deepDive = RecordingDeepDiveService()
+        var state = TripOutputStore.State(
+            manualGenerationRequest: .init(input: .mock),
+            details: .mock,
+            mode: .savedTrip,
+            itineraryResponse: .loaded(.mock),
+            suggestionsResponse: .loaded(.mock)
+        )
+        state.deepDives = [
+            dive("Wine", requestedInterest: "Natural wine bars"),
+            dive("Runs", requestedInterest: "Running routes")
+        ]
+        let store = TripOutputStore(
+            initialState: state,
+            imageService: StubImageService(),
+            itineraryService: InstantItineraryService(),
+            suggestionsService: MockSuggestionsService(),
+            worthItService: InstantWorthItService(),
+            whereToStayService: InstantWhereToStayService(),
+            deepDiveService: deepDive,
+            variant: .split
+        )
+
+        XCTAssertTrue(store.canGenerateDeepDive)
+
+        store.send(.generateDeepDive("Sunday markets"))
+        await waitUntil { store.state.deepDives?.count == 3 }
+
+        XCTAssertEqual(deepDive.callCount, 1)
+        XCTAssertTrue(store.isDeepDiveCapReached)
+        XCTAssertFalse(store.canGenerateDeepDive)
+        XCTAssertEqual(store.deepDiveGuidanceMessage, "You used up all 3 free deep dives.")
+    }
+
     func testRequestedInterestSurvivesSaveAndReopen() throws {
         var trip = Trip(details: .mock, itinerary: .mock, suggestions: .mock)
         trip.deepDives = [dive("Barcelona bottle shops", requestedInterest: "Natural wine bars")]

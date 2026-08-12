@@ -14,7 +14,7 @@ struct ToastModifier: ViewModifier {
     let subtitle: String?
     @Binding var isPresented: Bool
     let position: DS.Toast.Position
-    let duration: TimeInterval = 3
+    private var duration: TimeInterval { subtitle == nil ? 2.2 : 3 }
 
     func body(content: Content) -> some View {
         ZStack {
@@ -33,21 +33,25 @@ struct ToastModifier: ViewModifier {
                 .zIndex(1)
                 .onAppear {
                     DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                        withAnimation {
-                            isPresented = false
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                        isPresented = false
                         }
                     }
                 }
             }
         }
-        .animation(.easeInOut, value: isPresented)
+        .animation(.spring(response: 0.34, dampingFraction: 0.84), value: isPresented)
     }
 
     private var toastView: some View {
         DS.Toast(style: style, title: title, subtitle: subtitle)
-            .transition(.move(edge: position == .top ? .top : .bottom))//.combined(with: .opacity))
-            .padding(.top, position == .top ? 16 : 0)
-            .padding(.bottom, position == .bottom ? 16 : 0)
+            .transition(
+                .move(edge: position == .top ? .top : .bottom)
+                    .combined(with: .opacity)
+                    .combined(with: .scale(scale: 0.96))
+            )
+            .padding(.top, position == .top ? 18 : 0)
+            .padding(.bottom, position == .bottom ? 28 : 0)
     }
 }
 

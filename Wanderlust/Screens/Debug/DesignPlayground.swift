@@ -71,7 +71,7 @@ enum DesignPlayground {
             VibeMixerPrototype()
         }
     ]
-    /// The output shell, wired to mock content so the tabs, the sticky pills,
+    /// The output shell, wired to mock content so the tabs, Discover navigation,
     /// the favourites sheet and the Worth-it/Skip decisions can be looked at
     /// without generating a trip. `.savedTrip` with no `generationRequest`, so
     /// opening it costs nothing and calls nothing.
@@ -86,7 +86,7 @@ enum DesignPlayground {
         DesignVariant(
             id: "output-shell",
             title: "Trip Output — Discover / Know Before You Go shell",
-            subtitle: "Tabs, sticky Discover pills, Worth-it/Skip decisions and the favourites sheet, on mock content."
+            subtitle: "Tabs, Discover text navigation, Worth-it/Skip decisions and the favourites sheet, on mock content."
         ) {
             TripOutputScreen(
                 initialState: {
@@ -99,6 +99,10 @@ enum DesignPlayground {
                     state.suggestionsResponse = .loaded(.mock)
                     state.worthItResponse = .loaded(Trip.WorthItItem.mockSet)
                     state.whereToStayResponse = .loaded(Trip.StayArea.mockSet)
+                    // Without this the Know Before You Go tab renders its
+                    // "no briefing for this trip" state, which is the one thing
+                    // the shell playground is not for.
+                    state.knowBeforeYouGoResponse = .loaded(.mock)
                     state.interestPrompts = [
                         "Natural wine bars", "Rooftop sunsets", "Modernista rooftops"
                     ]

@@ -211,6 +211,13 @@ class TripOutputStore: ObservableStore {
         case .resolveNearYouAddress(let address):
             resolveNearYouAddress(address)
 
+        case .resolveNearYouSuggestion(let suggestion):
+            resolveNearYouSuggestion(suggestion)
+
+        case .resetNearYouLocationSearch:
+            nearYouTask?.cancel()
+            state.nearYouAddressResolution = .initial
+
         case .chooseNearYouResolution(let choice):
             beginNearYou(around: choice.centre, discovery: nil)
 
@@ -307,8 +314,9 @@ extension TripOutputStore {
         var generationRequest: TripGenerationRequest? = nil
         /// Manual-generation context restored for a saved trip. Kept separate
         /// from `generationRequest` so `onAppear` can never mistake a reopened
-        /// trip for a new one and regenerate its eager components.
-        var nearYouGenerationRequest: TripGenerationRequest? = nil
+        /// trip for a new one and regenerate its eager components. Near You and
+        /// explicitly requested deep dives may use it.
+        var manualGenerationRequest: TripGenerationRequest? = nil
         var details: Trip.Details
         var selectedContentTab: OutputTab = .discover
         var discoverSegment: DiscoverSegment = .suggestions
@@ -393,6 +401,10 @@ extension TripOutputStore {
         /// Exact input is a transient action value. It is never stored on
         /// `State`, encoded in `Trip`, or accepted by the backend contract.
         case resolveNearYouAddress(String)
+        /// Retains MapKit's selected completion until it resolves to a
+        /// coordinate; the opaque completion is never persisted or encoded.
+        case resolveNearYouSuggestion(NearYouAddressSuggestion)
+        case resetNearYouLocationSearch
         case chooseNearYouResolution(NearYouResolutionChoice)
         /// Grounds Near You on a neighbourhood rather than an address.
         ///
@@ -440,11 +452,11 @@ extension TripOutputStore {
     /// received solo shares remain immutable snapshots without accommodation.
     var visibleTabs: [OutputTab] {
         var tabs: [OutputTab] = [.discover]
-        if OutputFeatureFlags.nearYouEnabled && state.mode != .sharedTrip {
-            tabs.append(.nearYou)
-        }
         if OutputFeatureFlags.knowBeforeYouGoEnabled {
             tabs.append(.knowBeforeYouGo)
+        }
+        if OutputFeatureFlags.nearYouEnabled && state.mode != .sharedTrip {
+            tabs.append(.nearYou)
         }
         return tabs
     }
@@ -521,19 +533,34 @@ extension TripOutputStore {
     var canGenerateDeepDive: Bool {
         let hasGenerationAuthority = state.mode == .groupTrip
             ? state.groupViewerIsAdmin && state.groupId != nil && groupCredentials?.adminToken != nil
-            : state.generationRequest != nil && !state.mode.isReadOnly
+            : (state.generationRequest ?? state.manualGenerationRequest) != nil
+                && !state.mode.isReadOnly
         return hasGenerationAuthority
-            && !deepDiveCapReached
-            && (state.deepDives?.count ?? 0) < Self.maxDeepDives
+            && !isDeepDiveCapReached
             && deepDiveInFlightInterest == nil
     }
 
+    /// Drives the compact, final state once the trip has spent its allowance.
+    var isDeepDiveCapReached: Bool {
+        deepDiveCapReached || (state.deepDives?.count ?? 0) >= Self.maxDeepDives
+    }
+
     var deepDiveGuidanceMessage: String? {
-        if state.mode == .groupTrip && !state.groupViewerIsAdmin {
-            return "Only the trip organizer can add a shared deep dive."
+        if state.mode == .groupTrip {
+            if isDeepDiveCapReached {
+                return "This group has used all 3 shared deep dives."
+            }
+            if !state.groupViewerIsAdmin {
+                return "Only the trip organizer can add a shared deep dive."
+            }
         }
-        if state.mode == .groupTrip && (state.deepDives?.count ?? 0) >= Self.maxDeepDives {
-            return "This group has used all three shared deep dives."
+        // Solo: the cap is not mentioned until it is reached. The section is an
+        // invitation to name the thing nobody asked about, and a budget printed
+        // on an invitation changes what the invitation is — the same reason
+        // Worth-it/Skip has no counter (D7). Once it *is* reached it has to be
+        // said, or the chips and the field go inert with no explanation.
+        if isDeepDiveCapReached {
+            return "You used up all 3 free deep dives."
         }
         return deepDiveErrorMessage
     }
@@ -592,7 +619,7 @@ extension TripOutputStore {
 
 extension TripOutputStore {
     private var effectiveNearYouRequest: TripGenerationRequest? {
-        state.generationRequest ?? state.nearYouGenerationRequest
+        state.generationRequest ?? state.manualGenerationRequest
     }
 
     private func resolveNearYouAddress(_ rawAddress: String) {
@@ -608,12 +635,32 @@ extension TripOutputStore {
                     destination: destination
                 )
                 try Task.checkCancellation()
-                switch resolution {
-                case .resolved(let choice):
-                    beginNearYou(around: choice.centre, discovery: nil)
-                case .ambiguous:
-                    state.nearYouAddressResolution = .loaded(resolution)
-                }
+                // Always let the traveller verify the result before nearby
+                // generation starts. Even an unambiguous geocoder result can
+                // be the wrong street or locality.
+                state.nearYouAddressResolution = .loaded(resolution)
+            } catch is CancellationError {
+                return
+            } catch {
+                state.nearYouAddressResolution = .error(error)
+            }
+        }
+    }
+
+    private func resolveNearYouSuggestion(_ suggestion: NearYouAddressSuggestion) {
+        guard state.mode != .sharedTrip else { return }
+        nearYouTask?.cancel()
+        state.nearYouAddressResolution = .loading
+        let destination = state.fullDestinationString
+        nearYouTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let resolution = try await nearYouMapService.resolveSuggestion(
+                    suggestion,
+                    destination: destination
+                )
+                try Task.checkCancellation()
+                state.nearYouAddressResolution = .loaded(resolution)
             } catch is CancellationError {
                 return
             } catch {
@@ -951,7 +998,16 @@ extension TripOutputStore {
         restart: Bool = false
     ) {
         let component = owningComponent(requested)
-        guard let request = state.generationRequest else { return }
+        let request: TripGenerationRequest
+        if component == .deepDive {
+            guard let manualRequest = state.generationRequest ?? state.manualGenerationRequest else {
+                return
+            }
+            request = manualRequest
+        } else {
+            guard let automaticRequest = state.generationRequest else { return }
+            request = automaticRequest
+        }
         let deepDiveInterest = interest?.trimmingCharacters(in: .whitespacesAndNewlines)
         if component == .deepDive {
             guard let deepDiveInterest, !deepDiveInterest.isEmpty,
@@ -1393,8 +1449,10 @@ extension TripOutputStore {
                     return
                 }
                 
-                // Save trip (override if needed)
-                try storage.save(trip)
+                // Save trip (override if needed). Merging also preserves the
+                // original creation date, so overriding or editing an old trip
+                // does not move it to the top of My Trips.
+                try storage.save(existing.map(trip.merged(over:)) ?? trip)
                 await MainActor.run {
                     presentSaveToast = true
                     state.saved = true

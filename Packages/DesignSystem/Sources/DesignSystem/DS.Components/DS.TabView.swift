@@ -18,10 +18,15 @@ public enum OutputTab: Int, CaseIterable, Identifiable {
     /// Everything the model wrote about the destination: suggestions, the
     /// worth-it/skip cards, the sample itinerary.
     case discover
+    /// Destination-wide practical preparation.
+    ///
+    /// Sits in the middle deliberately. It is the tab that applies to every
+    /// traveller on every trip, and it is useful before departure — where Near
+    /// You only becomes useful once there is somewhere to stay. Ordering by when
+    /// each tab starts paying off puts this one second.
+    case knowBeforeYouGo
     /// Address-grounded picks around where the traveller is staying.
     case nearYou
-    /// Destination-wide practical preparation.
-    case knowBeforeYouGo
 
     public var id: Int { rawValue }
 

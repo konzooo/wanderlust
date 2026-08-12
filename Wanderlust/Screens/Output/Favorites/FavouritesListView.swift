@@ -14,27 +14,34 @@ import SwiftUI
 /// The heading carries the context, so the cards no longer repeat it under every
 /// row. Order is derived from the trip (see `Trip.favouriteSections`) rather
 /// than from the `Set` behind `Favorites`, which never had one.
+///
+/// **Scrolls in its container, not on its own.** It sits under the sheet's hero
+/// photo, and a scroll view nested inside that one would fight it for the drag.
 struct FavouritesListView: View {
     let sections: [Trip.FavouriteSection]
     var onRemoveFavorite: (UUID) -> Void
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: .Padding.md, pinnedViews: []) {
-                ForEach(sections) { section in
-                    VStack(alignment: .leading, spacing: .Padding.sm2) {
-                        Text(section.context)
-                            .font(DS.Typography.sectionHeader)
-                            .foregroundStyle(.primary)
+        LazyVStack(alignment: .leading, spacing: .Padding.md) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: .Padding.sm2) {
+                    // A quiet index label rather than a section header: the
+                    // items are the content here, and a Kanit heading per group
+                    // competed with them for attention.
+                    Text(section.context)
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .kerning(0.9)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color.appTint)
+                        .padding(.leading, 4)
 
-                        ForEach(section.items) { item in
-                            FavoriteCard(item: item, onRemoveFavorite: onRemoveFavorite)
-                        }
+                    ForEach(section.items) { item in
+                        FavoriteCard(item: item, onRemoveFavorite: onRemoveFavorite)
                     }
                 }
             }
-            .padding(.Padding.md)
         }
+        .padding(.Padding.md)
     }
 }
 
@@ -76,7 +83,7 @@ struct FavoriteCard: View {
 }
 
 #Preview {
-    FavouritesListView(
+    ScrollView { FavouritesListView(
         sections: [
             Trip.FavouriteSection(
                 context: "Morning",
@@ -100,6 +107,6 @@ struct FavoriteCard: View {
             )
         ],
         onRemoveFavorite: { _ in }
-    )
+    ) }
     .gradientBackground()
 }

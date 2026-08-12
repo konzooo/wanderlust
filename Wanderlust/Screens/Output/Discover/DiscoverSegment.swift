@@ -2,7 +2,7 @@
 //  DiscoverSegment.swift
 //  Wanderlust
 //
-//  The pill selector inside the Discover tab.
+//  The text navigation inside the Discover tab.
 //
 
 import DesignSystem
@@ -10,10 +10,9 @@ import SwiftUI
 
 /// One band of content inside Discover.
 ///
-/// These are pills rather than a second tab bar on purpose: they are three
-/// readings of the same destination, not three destinations. The order is the
-/// product's order — what a friend would tell you first, then the calls they'd
-/// argue with you about, then the day-by-day shape as an example.
+/// The order is the product's order — what a friend would tell you first, then
+/// the calls they'd argue with you about, then the day-by-day shape as an
+/// example.
 enum DiscoverSegment: Int, CaseIterable, Identifiable, Hashable {
     case suggestions
     case worthIt
@@ -23,40 +22,57 @@ enum DiscoverSegment: Int, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .suggestions: "Suggestions for you"
-        case .worthIt: "Worth it or skip"
-        case .itinerary: "Sample itinerary"
+        case .suggestions: "Suggestions"
+        case .worthIt: "Worth it vs. skip?"
+        case .itinerary: "Itinerary"
         }
     }
 }
 
-/// Sticky pill row. Lives above the content rather than inside its scroll view,
-/// so it stays put while the feed moves under it.
-struct DiscoverPillBar: View {
+/// Quiet secondary navigation: text plus one active underline. It stays outside
+/// the selected section's scroll view, so the three destinations remain visible
+/// while their content moves without looking like a second set of primary tabs.
+struct DiscoverSectionNavigation: View {
     @Binding var selection: DiscoverSegment
     let segments: [DiscoverSegment]
+    @Namespace private var underline
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: .Padding.sm2) {
-                ForEach(segments) { segment in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selection = segment
-                        }
-                    } label: {
-                        pill(for: segment)
+        HStack(spacing: 0) {
+            ForEach(segments) { segment in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selection = segment
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(
-                        selection == segment ? [.isSelected, .isButton] : .isButton
-                    )
+                } label: {
+                    Text(segment.title)
+                        .font(DS.Typography.tabLabel)
+                        .foregroundStyle(
+                            selection == segment ? Color.primary : Color.secondary
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 12)
+                        .padding(.bottom, 10)
+                        .overlay(alignment: .bottom) {
+                            if selection == segment {
+                                Capsule()
+                                    .fill(Color.appTint)
+                                    .frame(height: 3)
+                                    .matchedGeometryEffect(
+                                        id: "discover-section-underline",
+                                        in: underline
+                                    )
+                            }
+                        }
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selection == segment ? [.isSelected, .isButton] : .isButton
+                )
             }
-            .padding(.horizontal, .Padding.sm3)
-            .padding(.vertical, .Padding.sm2)
         }
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .padding(.horizontal, .Padding.sm3)
+        .overlay(alignment: .bottom) { Divider() }
         .onAppear(perform: normalizeSelection)
         .onChange(of: segments) { _, _ in normalizeSelection() }
     }
@@ -68,33 +84,12 @@ struct DiscoverPillBar: View {
         selection = first
     }
 
-    @ViewBuilder
-    private func pill(for segment: DiscoverSegment) -> some View {
-        let isSelected = selection == segment
-        Text(segment.title)
-            .font(DS.Typography.tabLabel)
-            .foregroundStyle(isSelected ? Color.white : Color.appTint)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(
-                    isSelected ? AnyShapeStyle(Color.appTint)
-                               : AnyShapeStyle(Color.appTint.opacity(0.07))
-                )
-            )
-            .overlay(
-                Capsule().stroke(
-                    isSelected ? Color.clear : Color.appTint.opacity(0.18),
-                    lineWidth: 1
-                )
-            )
-    }
 }
 
 #Preview {
     @Previewable @State var selection: DiscoverSegment = .suggestions
     return VStack {
-        DiscoverPillBar(selection: $selection, segments: DiscoverSegment.allCases)
+        DiscoverSectionNavigation(selection: $selection, segments: DiscoverSegment.allCases)
         Spacer()
     }
     .gradientBackground()

@@ -12,11 +12,30 @@ import DesignSystem
 import MapKit
 import SwiftUI
 
-struct NearYouAddressSuggestion: Identifiable, Equatable, Sendable {
+/// A value the UI can render while retaining MapKit's exact completion object.
+///
+/// Flattening a completion into `title, subtitle` and searching that text again
+/// can produce a different place. The MapKit object is immutable for our use
+/// and crosses only the main-actor UI/store boundary, so the wrapper owns the
+/// unchecked conformance rather than leaking it through the rest of the model.
+struct NearYouAddressSuggestion: Identifiable, Equatable, @unchecked Sendable {
     let title: String
     let subtitle: String
+    let completion: MKLocalSearchCompletion?
 
     var id: String { "\(title)|\(subtitle)" }
+
+    init(title: String, subtitle: String) {
+        self.title = title
+        self.subtitle = subtitle
+        completion = nil
+    }
+
+    init(completion: MKLocalSearchCompletion) {
+        title = completion.title
+        subtitle = completion.subtitle
+        self.completion = completion
+    }
 
     /// A completion is still resolved by MapKit after confirmation. Keeping the
     /// full subtitle here gives that search enough context to preserve the exact
@@ -30,6 +49,10 @@ struct NearYouAddressSuggestion: Identifiable, Equatable, Sendable {
         }
         return "\(trimmedTitle), \(trimmedSubtitle)"
     }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 @MainActor
@@ -38,11 +61,23 @@ private final class NearYouAddressCompleter: NSObject, ObservableObject {
     @Published private(set) var isSearching = false
 
     private let completer = MKLocalSearchCompleter()
+    private var destination = ""
+    private var destinationRegion: MKCoordinateRegion?
 
     override init() {
         super.init()
         completer.delegate = self
         completer.resultTypes = [.address, .pointOfInterest]
+    }
+
+    func configure(destination: String) async {
+        let trimmed = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != self.destination else { return }
+        self.destination = trimmed
+        destinationRegion = await MapKitNearYouService.searchRegion(for: trimmed)
+        if let destinationRegion {
+            completer.region = destinationRegion
+        }
     }
 
     func update(query: String, destination: String) {
@@ -53,7 +88,8 @@ private final class NearYouAddressCompleter: NSObject, ObservableObject {
         }
 
         let destination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-        if destination.isEmpty || trimmed.localizedCaseInsensitiveContains(destination) {
+        if destinationRegion != nil || destination.isEmpty
+            || trimmed.localizedCaseInsensitiveContains(destination) {
             completer.queryFragment = trimmed
         } else {
             completer.queryFragment = "\(trimmed), \(destination)"
@@ -73,8 +109,7 @@ extension NearYouAddressCompleter: MKLocalSearchCompleterDelegate {
         var seen = Set<String>()
         let suggestions = completer.results.prefix(8).compactMap { completion in
             let suggestion = NearYouAddressSuggestion(
-                title: completion.title,
-                subtitle: completion.subtitle
+                completion: completion
             )
             return seen.insert(suggestion.id).inserted ? suggestion : nil
         }
@@ -128,6 +163,8 @@ struct NearYouView: View {
     let canReplace: Bool
     @Binding var favorites: Trip.Favorites
     let onSearchAddress: (String) -> Void
+    let onSearchSuggestion: (NearYouAddressSuggestion) -> Void
+    let onResetLocationSearch: () -> Void
     let onChooseResolution: (NearYouResolutionChoice) -> Void
     let onRetryWhereToStay: (() -> Void)?
     let onRetryNearYou: () -> Void
@@ -136,7 +173,10 @@ struct NearYouView: View {
 
     @State private var address = ""
     @State private var selectedSuggestion: NearYouAddressSuggestion?
+    @State private var ambiguousPreview: NearYouResolutionChoice?
     @State private var showsWhereToStay = false
+    @State private var showsLocationPicker = false
+    @State private var mapPickerInitialCoordinate: NearYouCoordinate?
     @StateObject private var addressCompleter = NearYouAddressCompleter()
     @FocusState private var isAddressFocused: Bool
 
@@ -155,6 +195,18 @@ struct NearYouView: View {
                 onRetry: onRetryWhereToStay,
                 onClose: { showsWhereToStay = false }
             )
+        }
+        .sheet(isPresented: $showsLocationPicker) {
+            NearYouLocationPicker(
+                destination: destination,
+                initialCoordinate: mapPickerInitialCoordinate,
+                onConfirm: onChooseResolution
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .task(id: destination) {
+            await addressCompleter.configure(destination: destination)
         }
     }
 
@@ -188,14 +240,21 @@ struct NearYouView: View {
                     .padding(.horizontal, .Padding.md)
                     .padding(.top, .Padding.md2)
 
-                Button("Confirm this address", action: submitAddress)
-                    .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-                    .disabled(trimmedAddress.isEmpty || addressResolution.isLoading)
-                    .opacity(trimmedAddress.isEmpty || addressResolution.isLoading ? 0.35 : 1)
-                    .padding(.horizontal, .Padding.md)
-                    .padding(.top, .Spacing.medium)
+                if shouldShowSearchButton {
+                    Button("Find this location", action: submitAddress)
+                        .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                        .disabled(trimmedAddress.isEmpty || addressResolution.isLoading)
+                        .padding(.horizontal, .Padding.md)
+                        .padding(.top, .Spacing.medium)
+                }
 
-                Text("Apple Maps resolves it on this device — only the coarse area is ever sent.")
+                if resolvedPreview == nil {
+                    mapFallback
+                        .padding(.horizontal, .Padding.md)
+                        .padding(.top, .Padding.md2)
+                }
+
+                Text("Your exact address or pin is used for this search. Only the approximate area is saved.")
                     .font(.kanit(12))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -227,7 +286,7 @@ struct NearYouView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.secondary)
 
-                TextField("Street address and number", text: $address)
+                TextField("Guest house, hotel, or full address", text: $address)
                     .textContentType(.fullStreetAddress)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
@@ -237,6 +296,8 @@ struct NearYouView: View {
                     .onChange(of: address) { _, value in
                         if selectedSuggestion?.searchText != value {
                             selectedSuggestion = nil
+                            ambiguousPreview = nil
+                            onResetLocationSearch()
                             addressCompleter.update(query: value, destination: destination)
                         }
                     }
@@ -247,7 +308,9 @@ struct NearYouView: View {
                     Button {
                         address = ""
                         selectedSuggestion = nil
+                        ambiguousPreview = nil
                         addressCompleter.clear()
+                        onResetLocationSearch()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.tertiary)
@@ -277,12 +340,20 @@ struct NearYouView: View {
                !addressCompleter.suggestions.isEmpty {
                 suggestionList
             } else if let selectedSuggestion {
-                Label("Selected in Apple Maps: \(selectedSuggestion.title)", systemImage: "checkmark.circle.fill")
+                Label("Selected: \(selectedSuggestion.title)", systemImage: "checkmark.circle.fill")
                     .font(.kanit(13))
                     .foregroundStyle(Color.appTint)
                     .fixedSize(horizontal: false, vertical: true)
+            } else if isAddressFocused,
+                      trimmedAddress.count >= 3,
+                      !addressCompleter.isSearching,
+                      addressCompleter.suggestions.isEmpty {
+                Text("No exact match? Enter the complete street address, or choose it on the map below.")
+                    .font(.kanit(12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if addressResolutionIsInitial {
-                Text("Choose a match below, or enter the full street address — including the number — and confirm.")
+                Text("Choose a match, or enter the complete street address — including the number.")
                     .font(.kanit(12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -364,6 +435,31 @@ struct NearYouView: View {
         }
     }
 
+    private var mapFallback: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(height: 1)
+                Text("Not showing up?")
+                    .font(.kanit(12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.25))
+                    .frame(height: 1)
+            }
+
+            Button {
+                openLocationPicker()
+            } label: {
+                Label("Choose on map", systemImage: "map")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 9))
+        }
+    }
+
     private var trimmedAddress: String {
         address.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -373,21 +469,38 @@ struct NearYouView: View {
         return true
     }
 
+    private var resolvedPreview: NearYouResolutionChoice? {
+        if let ambiguousPreview { return ambiguousPreview }
+        guard case .loaded(.resolved(let choice)) = addressResolution else { return nil }
+        return choice
+    }
+
+    private var shouldShowSearchButton: Bool {
+        switch addressResolution {
+        case .initial, .error:
+            return true
+        case .loading, .loaded:
+            return false
+        }
+    }
+
     private func selectSuggestion(_ suggestion: NearYouAddressSuggestion) {
         selectedSuggestion = suggestion
+        ambiguousPreview = nil
         address = suggestion.searchText
         addressCompleter.clear()
         isAddressFocused = false
+        onSearchSuggestion(suggestion)
     }
 
-    /// Return can select an unambiguous visible completion, but it never starts
-    /// generation. The separate confirmation button is the only submit path.
+    /// Return resolves one unambiguous completion; otherwise the traveller's
+    /// full input takes the address-first manual path.
     private func handleKeyboardSubmit() {
         if addressCompleter.suggestions.count == 1,
            let suggestion = addressCompleter.suggestions.first {
             selectSuggestion(suggestion)
         } else {
-            isAddressFocused = false
+            submitAddress()
         }
     }
 
@@ -405,44 +518,118 @@ struct NearYouView: View {
             }
         case .error:
             Label(
-                "We couldn't pin that down. Add the city or hotel name and try again.",
+                "We couldn't pin that down. Check the full address or choose it on the map.",
                 systemImage: "exclamationmark.triangle"
             )
             .font(.kanit(13))
             .foregroundStyle(.secondary)
-        case .loaded(.resolved):
-            EmptyView()
+        case .loaded(.resolved(let choice)):
+            locationPreview(choice)
         case .loaded(.ambiguous(let choices)):
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Which one did you mean?")
-                    .font(DS.Typography.eyebrow)
-                    .foregroundStyle(Color.appTint)
+            if let ambiguousPreview {
+                locationPreview(ambiguousPreview, canReturnToChoices: true)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Which one did you mean?")
+                        .font(DS.Typography.eyebrow)
+                        .foregroundStyle(Color.appTint)
 
-                ForEach(choices) { choice in
-                    Button {
-                        onChooseResolution(choice)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(choice.title)
-                                .font(.kanitMedium(15))
-                                .foregroundStyle(.primary)
-                            if let subtitle = choice.subtitle {
-                                Text(subtitle)
-                                    .font(.kanit(12))
-                                    .foregroundStyle(.secondary)
+                    ForEach(choices) { choice in
+                        Button {
+                            ambiguousPreview = choice
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(choice.title)
+                                    .font(.kanitMedium(15))
+                                    .foregroundStyle(.primary)
+                                if let subtitle = choice.subtitle {
+                                    Text(subtitle)
+                                        .font(.kanit(12))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
+                        .buttonStyle(.plain)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.appTint.opacity(0.06))
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.appTint.opacity(0.06))
-                    )
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func locationPreview(
+        _ choice: NearYouResolutionChoice,
+        canReturnToChoices: Bool = false
+    ) -> some View {
+        let coordinate = CLLocationCoordinate2D(
+            latitude: choice.centre.latitude,
+            longitude: choice.centre.longitude
+        )
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Check the pin")
+                    .font(DS.Typography.eyebrow)
+                    .foregroundStyle(Color.appTint)
+                Text(choice.title)
+                    .font(.kanitMedium(16))
+                    .foregroundStyle(.primary)
+                if let subtitle = choice.subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.kanit(12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Map(
+                initialPosition: .region(
+                    MKCoordinateRegion(
+                        center: coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
+                    )
+                ),
+                interactionModes: []
+            ) {
+                Marker("Your stay", coordinate: coordinate)
+                    .tint(Color.appTint)
+            }
+            .frame(height: 145)
+            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+            .allowsHitTesting(false)
+            .accessibilityLabel("Map preview of \(choice.title)")
+
+            Button("Use this location") {
+                onChooseResolution(choice)
+            }
+            .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+
+            HStack {
+                if canReturnToChoices {
+                    Button("Back to matches") { ambiguousPreview = nil }
+                }
+                Spacer()
+                Button("Adjust on map") {
+                    openLocationPicker(around: choice)
+                }
+            }
+            .font(.kanitMedium(13))
+            .foregroundStyle(Color.appTint)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 
     @ViewBuilder
@@ -522,7 +709,26 @@ struct NearYouView: View {
         guard !trimmedAddress.isEmpty else { return }
         isAddressFocused = false
         addressCompleter.clear()
-        onSearchAddress(trimmedAddress)
+        ambiguousPreview = nil
+        if let selectedSuggestion {
+            onSearchSuggestion(selectedSuggestion)
+        } else {
+            onSearchAddress(trimmedAddress)
+        }
+    }
+
+    private func openLocationPicker(around choice: NearYouResolutionChoice? = nil) {
+        if let choice {
+            mapPickerInitialCoordinate = NearYouCoordinate(
+                latitude: choice.centre.latitude,
+                longitude: choice.centre.longitude
+            )
+        } else {
+            mapPickerInitialCoordinate = nil
+        }
+        isAddressFocused = false
+        addressCompleter.clear()
+        showsLocationPicker = true
     }
 }
 

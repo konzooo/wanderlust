@@ -81,6 +81,14 @@ enum NearYouMapError: Error, Equatable {
 }
 
 protocol NearYouMapServicing {
+    /// Resolves the exact completion the traveller selected. Production MapKit
+    /// preserves the opaque completion object; test and alternate providers can
+    /// fall back to the full display text through the default implementation.
+    func resolveSuggestion(
+        _ suggestion: NearYouAddressSuggestion,
+        destination: String
+    ) async throws -> NearYouAddressResolution
+
     /// Returns every plausible exact result. Ambiguity is resolved by the user,
     /// never by silently choosing the model's or MapKit's first guess.
     func resolveAddress(_ input: String, destination: String) async throws -> NearYouAddressResolution
@@ -90,6 +98,15 @@ protocol NearYouMapServicing {
 
     /// Finds real candidates and computes walking routes for each one.
     func discover(around centre: NearYouSearchCentre) async throws -> NearYouDiscovery
+}
+
+extension NearYouMapServicing {
+    func resolveSuggestion(
+        _ suggestion: NearYouAddressSuggestion,
+        destination: String
+    ) async throws -> NearYouAddressResolution {
+        try await resolveAddress(suggestion.searchText, destination: destination)
+    }
 }
 
 struct MapKitNearYouService: NearYouMapServicing {
@@ -114,6 +131,27 @@ struct MapKitNearYouService: NearYouMapServicing {
         (.pharmacy, "pharmacy")
     ]
 
+    func resolveSuggestion(
+        _ suggestion: NearYouAddressSuggestion,
+        destination: String
+    ) async throws -> NearYouAddressResolution {
+        guard let completion = suggestion.completion else {
+            return try await resolveAddress(suggestion.searchText, destination: destination)
+        }
+
+        let request = MKLocalSearch.Request(completion: completion)
+        if let region = await Self.searchRegion(for: destination) {
+            request.region = region
+        }
+        request.resultTypes = [.address, .pointOfInterest]
+        let items = try await MKLocalSearch(request: request).start().mapItems
+        return try resolution(
+            from: items,
+            destination: destination,
+            precision: .address
+        )
+    }
+
     func resolveAddress(
         _ input: String,
         destination: String
@@ -121,15 +159,25 @@ struct MapKitNearYouService: NearYouMapServicing {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw NearYouMapError.emptyQuery }
 
-        let items = try await search(query: "\(trimmed), \(destination)", region: nil)
-        guard !items.isEmpty else { throw NearYouMapError.noResults }
+        let region = await Self.searchRegion(for: destination)
+        let query = Self.scopedQuery(trimmed, destination: destination)
 
-        let choices = items.prefix(5).compactMap {
-            resolutionChoice(for: $0, destination: destination, precision: .address)
+        // A traveller who bypasses autocomplete is most likely entering a full
+        // street address. Search addresses first so sparse Apple POI coverage
+        // cannot crowd a valid address out of the first few results.
+        var items = try await search(
+            query: query,
+            region: region,
+            resultTypes: .address
+        )
+        if items.isEmpty {
+            items = try await search(
+                query: query,
+                region: region,
+                resultTypes: [.address, .pointOfInterest]
+            )
         }
-        guard !choices.isEmpty else { throw NearYouMapError.missingCoordinates }
-        if choices.count == 1 { return .resolved(choices[0]) }
-        return .ambiguous(choices)
+        return try resolution(from: items, destination: destination, precision: .address)
     }
 
     func resolveNeighbourhood(
@@ -272,11 +320,53 @@ struct MapKitNearYouService: NearYouMapServicing {
 
     // MARK: - Search and routing
 
-    private func search(query: String, region: MKCoordinateRegion?) async throws -> [MKMapItem] {
+    private func search(
+        query: String,
+        region: MKCoordinateRegion?,
+        resultTypes: MKLocalSearch.ResultType? = nil
+    ) async throws -> [MKMapItem] {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
         if let region { request.region = region }
+        if let resultTypes { request.resultTypes = resultTypes }
         return try await MKLocalSearch(request: request).start().mapItems
+    }
+
+    /// Resolve the trip destination once to give autocomplete, manual address
+    /// search and the pin picker a real geographic scope. A city-sized region is
+    /// deliberately broad enough for outskirts and rural accommodation.
+    static func searchRegion(for destination: String) async -> MKCoordinateRegion? {
+        let trimmed = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = trimmed
+        request.resultTypes = [.address, .pointOfInterest]
+        do {
+            guard let item = try await MKLocalSearch(request: request).start().mapItems.first,
+                  Self.isValid(item.placemark.coordinate) else {
+                return nil
+            }
+            return region(around: item.placemark.coordinate, span: 0.35)
+        } catch {
+            return nil
+        }
+    }
+
+    static func scopedQuery(_ input: String, destination: String) -> String {
+        let trimmedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedDestination.isEmpty else { return trimmedInput }
+
+        let city = trimmedDestination.split(separator: ",", maxSplits: 1)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? trimmedDestination
+        if trimmedInput.localizedCaseInsensitiveContains(trimmedDestination)
+            || (!city.isEmpty && trimmedInput.localizedCaseInsensitiveContains(city)) {
+            return trimmedInput
+        }
+        return "\(trimmedInput), \(trimmedDestination)"
     }
 
     private func routedCandidates(
@@ -358,6 +448,20 @@ struct MapKitNearYouService: NearYouMapServicing {
                 researchArea: locality ?? destination
             )
         )
+    }
+
+    private func resolution(
+        from items: [MKMapItem],
+        destination: String,
+        precision: CoarseAccommodation.Precision
+    ) throws -> NearYouAddressResolution {
+        guard !items.isEmpty else { throw NearYouMapError.noResults }
+        let choices = items.prefix(5).compactMap {
+            resolutionChoice(for: $0, destination: destination, precision: precision)
+        }
+        guard !choices.isEmpty else { throw NearYouMapError.missingCoordinates }
+        if choices.count == 1 { return .resolved(choices[0]) }
+        return .ambiguous(choices)
     }
 
     static func stableVenueID(name: String, coordinate: CLLocationCoordinate2D) -> UUID {

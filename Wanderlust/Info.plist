@@ -23,6 +23,8 @@
 		<string>comgooglemaps</string>
 		<string>maps</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Use your location to place your stay on the map and find what is nearby.</string>
 	<!-- The system launch screen must be static, so it cannot be the splash
 	     itself — but it can be the splash's first frame. Painting it with the
 	     aurora's top-left colour removes the white flash that otherwise sits

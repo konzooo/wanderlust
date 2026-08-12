@@ -30,6 +30,37 @@ final class NearYouTests: XCTestCase {
         XCTAssertEqual(suggestion.searchText, "Hotel Example, Barcelona")
     }
 
+    func testManualAddressQueryAddsDestinationWithoutDuplicatingItsCity() {
+        XCTAssertEqual(
+            MapKitNearYouService.scopedQuery(
+                "10 Stefan Stambolov Street",
+                destination: "Veliko Tarnovo, Bulgaria"
+            ),
+            "10 Stefan Stambolov Street, Veliko Tarnovo, Bulgaria"
+        )
+        XCTAssertEqual(
+            MapKitNearYouService.scopedQuery(
+                "10 Stefan Stambolov Street, Veliko Tarnovo",
+                destination: "Veliko Tarnovo, Bulgaria"
+            ),
+            "10 Stefan Stambolov Street, Veliko Tarnovo"
+        )
+    }
+
+    func testPinnedLocationKeepsExactSearchCentreButPersistsOnlyCoarseCoordinate() {
+        let choice = NearYouPinnedLocation.choice(
+            coordinate: NearYouCoordinate(latitude: 43.075_734, longitude: 25.617_245),
+            destination: "Veliko Tarnovo, Bulgaria"
+        )
+
+        XCTAssertEqual(choice.centre.latitude, 43.075_734)
+        XCTAssertEqual(choice.centre.longitude, 25.617_245)
+        XCTAssertEqual(choice.centre.accommodation.latitude, 43.076)
+        XCTAssertEqual(choice.centre.accommodation.longitude, 25.617)
+        XCTAssertEqual(choice.centre.accommodation.precision, .address)
+        XCTAssertEqual(choice.centre.researchArea, "Veliko Tarnovo, Bulgaria")
+    }
+
     func testBackendCandidatePayloadCannotContainExactAccommodation() throws {
         let exactAddress = "Carrer de Mallorca 166, 2A"
         let data = try JSONEncoder().encode(NearYouBackendCandidate(candidate: candidate()))
@@ -114,13 +145,14 @@ final class NearYouTests: XCTestCase {
         XCTAssertEqual(accommodation.longitude, 2.174)
     }
 
-    func testAddressLevelPathResolvesLocallyAndGenerates() async {
+    func testAddressLevelPathWaitsForPinConfirmationBeforeGenerating() async {
         let map = StubNearYouMapService()
-        map.addressResult = .resolved(.init(
+        let choice = NearYouResolutionChoice(
             title: "Hotel Example",
             subtitle: "Carrer de Mallorca",
             centre: centre(precision: .address, researchArea: "Eixample")
-        ))
+        )
+        map.addressResult = .resolved(choice)
         let model = StubNearYouGenerator()
         let store = makeStore(map: map, model: model)
 
@@ -128,6 +160,12 @@ final class NearYouTests: XCTestCase {
         await settle()
 
         XCTAssertEqual(map.addressInputs, ["Carrer de Mallorca 166"])
+        XCTAssertEqual(model.callCount, 0)
+        XCTAssertEqual(store.state.nearYouAddressResolution.data, .resolved(choice))
+
+        store.send(.chooseNearYouResolution(choice))
+        await settle()
+
         XCTAssertEqual(model.callCount, 1)
         XCTAssertEqual(model.locations, [.init(area: "Eixample", city: "Destination, Country")])
         XCTAssertFalse(model.locations.description.contains("Carrer de Mallorca 166"))
@@ -152,11 +190,12 @@ final class NearYouTests: XCTestCase {
 
     func testAnyGroupMemberCanSetAddressLevelSharedNearYou() async {
         let map = StubNearYouMapService()
-        map.addressResult = .resolved(.init(
+        let choice = NearYouResolutionChoice(
             title: "Hotel Example",
             subtitle: "Carrer de Mallorca",
             centre: centre(precision: .address)
-        ))
+        )
+        map.addressResult = .resolved(choice)
         let group = StubGroupNearYouGenerator(output: nearYou())
         let store = makeGroupStore(map: map, group: group)
         XCTAssertTrue(store.visibleTabs.contains(.nearYou))
@@ -165,12 +204,44 @@ final class NearYouTests: XCTestCase {
         await settle()
 
         XCTAssertEqual(map.addressInputs, ["Carrer de Mallorca 166"])
+        XCTAssertEqual(group.payloads.count, 0)
+
+        store.send(.chooseNearYouResolution(choice))
+        await settle()
+
         XCTAssertEqual(group.payloads.count, 1)
         XCTAssertFalse(group.payloads[0].replace)
         XCTAssertEqual(store.state.accommodation?.precision, .address)
         XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
         XCTAssertEqual(store.state.groupNearYouSetBy, "Alex")
         XCTAssertTrue(store.state.nearYouResponse.isLoaded)
+    }
+
+    func testAutocompleteSuggestionAlsoWaitsForConfirmation() async {
+        let map = StubNearYouMapService()
+        let choice = NearYouResolutionChoice(
+            title: "Guest House Example",
+            subtitle: "Veliko Tarnovo",
+            centre: centre(precision: .address)
+        )
+        map.addressResult = .resolved(choice)
+        let model = StubNearYouGenerator()
+        let store = makeStore(map: map, model: model)
+        let suggestion = NearYouAddressSuggestion(
+            title: "Guest House Example",
+            subtitle: "Veliko Tarnovo, Bulgaria"
+        )
+
+        store.send(.resolveNearYouSuggestion(suggestion))
+        await settle()
+
+        XCTAssertEqual(map.addressInputs, [suggestion.searchText])
+        XCTAssertEqual(store.state.nearYouAddressResolution.data, .resolved(choice))
+        XCTAssertEqual(model.callCount, 0)
+
+        store.send(.chooseNearYouResolution(choice))
+        await settle()
+        XCTAssertEqual(model.callCount, 1)
     }
 
     func testGroupWhereToStayUsesSharedNeighbourhoodCentre() async {
@@ -425,7 +496,7 @@ final class NearYouTests: XCTestCase {
         trip = try JSONDecoder().decode(Trip.self, from: JSONEncoder().encode(trip))
         let model = StubNearYouGenerator()
         var state = TripOutputStore.State(
-            nearYouGenerationRequest: .init(
+            manualGenerationRequest: .init(
                 tripKey: trip.tripKey!,
                 input: trip.generationInput!
             ),

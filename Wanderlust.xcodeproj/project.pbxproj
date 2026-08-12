@@ -23,6 +23,7 @@
 		AA7700010000000000000001 /* NearYouMapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7700020000000000000002 /* NearYouMapService.swift */; };
 		AA7800010000000000000001 /* NearYouGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7800020000000000000002 /* NearYouGenerationService.swift */; };
 		AA7900010000000000000001 /* NearYouView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7900020000000000000002 /* NearYouView.swift */; };
+		AA7B00010000000000000001 /* NearYouLocationPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7B00020000000000000002 /* NearYouLocationPicker.swift */; };
 		AA7A00010000000000000001 /* NearYouTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7A00020000000000000002 /* NearYouTests.swift */; };
 		AAB000010000000000000001 /* GroupTripPersonalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB000020000000000000002 /* GroupTripPersonalStore.swift */; };
 		AAB000030000000000000003 /* GroupTripPersonalLayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAB000040000000000000004 /* GroupTripPersonalLayerTests.swift */; };
@@ -174,6 +175,7 @@
 		AA7700020000000000000002 /* NearYouMapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouMapService.swift; sourceTree = "<group>"; };
 		AA7800020000000000000002 /* NearYouGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouGenerationService.swift; sourceTree = "<group>"; };
 		AA7900020000000000000002 /* NearYouView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouView.swift; sourceTree = "<group>"; };
+		AA7B00020000000000000002 /* NearYouLocationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouLocationPicker.swift; sourceTree = "<group>"; };
 		AA7A00020000000000000002 /* NearYouTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouTests.swift; sourceTree = "<group>"; };
 		AAB000020000000000000002 /* GroupTripPersonalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripPersonalStore.swift; sourceTree = "<group>"; };
 		AAB000040000000000000004 /* GroupTripPersonalLayerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripPersonalLayerTests.swift; sourceTree = "<group>"; };
@@ -362,6 +364,7 @@
 				AA7700020000000000000002 /* NearYouMapService.swift */,
 				AA7800020000000000000002 /* NearYouGenerationService.swift */,
 				AA7900020000000000000002 /* NearYouView.swift */,
+				AA7B00020000000000000002 /* NearYouLocationPicker.swift */,
 			);
 			path = NearYou;
 			sourceTree = "<group>";
@@ -991,6 +994,7 @@
 				AA7700010000000000000001 /* NearYouMapService.swift in Sources */,
 				AA7800010000000000000001 /* NearYouGenerationService.swift in Sources */,
 				AA7900010000000000000001 /* NearYouView.swift in Sources */,
+				AA7B00010000000000000001 /* NearYouLocationPicker.swift in Sources */,
 				AA6400010000000000000001 /* ComponentStateView.swift in Sources */,
 				AA6500010000000000000001 /* FavouritesSheet.swift in Sources */,
 				619B3D392E2704B500B33648 /* FavouritesListView.swift in Sources */,

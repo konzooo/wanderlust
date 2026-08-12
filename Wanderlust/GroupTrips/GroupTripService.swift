@@ -30,6 +30,18 @@ final class GroupTripService {
         let groupId: String
         let code: String
         let adminToken: String
+        let startMonth: String
+        private let durationDaysRaw: Double
+        private let createdAtRaw: Double
+
+        var durationDays: Int { Int(durationDaysRaw) }
+        var createdAt: Date { Date(timeIntervalSince1970: createdAtRaw / 1_000) }
+
+        private enum CodingKeys: String, CodingKey {
+            case groupId, code, adminToken, startMonth
+            case durationDaysRaw = "durationDays"
+            case createdAtRaw = "createdAt"
+        }
     }
 
     func createGroup(
@@ -379,8 +391,20 @@ struct JoinDTO: Decodable, Equatable {
     let code: String
     let name: String
     let destination: String
+    let startMonth: String
+    private let durationDaysRaw: Double
+    private let createdAtRaw: Double
     let status: GroupStatus
     let members: [JoinMemberDTO]
+
+    var durationDays: Int { Int(durationDaysRaw) }
+    var createdAt: Date { Date(timeIntervalSince1970: createdAtRaw / 1_000) }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupId, code, name, destination, startMonth, status, members
+        case durationDaysRaw = "durationDays"
+        case createdAtRaw = "createdAt"
+    }
 }
 
 struct JoinMemberDTO: Decodable, Equatable, Identifiable {

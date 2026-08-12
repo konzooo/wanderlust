@@ -1,4 +1,5 @@
 import CoreArchitecture
+import CoreModels
 import Foundation
 
 @MainActor
@@ -51,7 +52,10 @@ class GroupTripMembersStore: ObservableStore {
                         groupId: state.groupId,
                         name: state.groupName,
                         destination: state.destination,
-                        code: state.code
+                        code: state.code,
+                        createdAt: state.createdAt,
+                        startMonth: state.startMonth,
+                        durationDays: state.durationDays
                     )
                 )
                 state.members.append(GroupTripMemberRow(memberId: result.memberId, name: name, isAdmin: true))
@@ -143,6 +147,9 @@ extension GroupTripMembersStore {
         let destination: String
         let adminToken: String
         let selectedProfileID: UUID?
+        let createdAt: Date
+        let startMonth: Month
+        let durationDays: Int
         var members: [GroupTripMemberRow] = []
         var newMemberName: String = ""
         var isAddingMember: Bool = false

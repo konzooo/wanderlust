@@ -4,10 +4,11 @@ import Foundation
 
 @MainActor
 class GroupTripCreateStore: ObservableStore {
-    @Published var state: State = State()
+    @Published var state: State
     private let service: GroupTripService
 
-    init(service: GroupTripService = .shared) {
+    init(initialState: State = .init(), service: GroupTripService = .shared) {
+        state = initialState
         self.service = service
     }
 
@@ -66,7 +67,7 @@ class GroupTripCreateStore: ObservableStore {
 }
 
 extension GroupTripCreateStore {
-    enum Segment: String, CaseIterable, Equatable {
+    enum Segment: String, CaseIterable, Hashable {
         case create = "Create Trip"
         case join = "Join Trip"
     }
@@ -94,7 +95,7 @@ extension GroupTripCreateStore {
             String(joinCode.filter(\.isNumber).prefix(5))
         }
 
-        var readyToJoin: Bool { !normalizedJoinCode.isEmpty }
+        var readyToJoin: Bool { normalizedJoinCode.count == 5 }
 
         var durationDays: Int {
             Int(round(duration))

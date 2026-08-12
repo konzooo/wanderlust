@@ -8,7 +8,6 @@ struct SavedTripsScreen: View {
     @StateObject var store: SavedTripsStore = SavedTripsStore()
 
     @EnvironmentObject var router: NavigationRouter
-    @State private var isDrawerOpen = false
     @State private var segment: Segment = .myTrips
     @State private var groupSummaries: [GroupTripSummary] = []
     @State private var sharedTrips: [Trip] = []
@@ -53,29 +52,16 @@ struct SavedTripsScreen: View {
             }
         }
         .gradientBackground()
-        .drawerToolbar(
-            isOpen: $isDrawerOpen,
-            selected: .savedTrips,
-            router: router,
-            trailingButton: AnyView(plusButton)
-        )
-
-        // onAppear is only called the first time this screen is shown (not when returning via pop)
-        .onAppear {
-            AnalyticsTracker.shared.log(.screenViewed(.savedTrips))
-            store.send(.loadSavedTrips)
-            groupSummaries = GroupTripCredentialsStore.summaries
-            sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
-        }
-        // Use onChange to detect when navigation returns to SavedTripsScreen and refresh the data.
-        // (SwiftUI NavigationStack does not call onAppear again when popping back to this screen)
-        .onChange(of: router.path) { _, newPath in
-            // If returning to SavedTripsScreen (either as last or only screen), refresh
-            if newPath.last == .savedTrips || newPath.isEmpty {
-                store.send(.loadSavedTrips)
-                groupSummaries = GroupTripCredentialsStore.summaries
-                sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                plusButton
             }
+        }
+        .onTabRootAppear(.trips, router: router) {
+            AnalyticsTracker.shared.log(.screenViewed(.savedTrips))
+            refreshTrips()
         }
         .onChange(of: store.state.savedTrips) { _, value in
             guard !didLogView, case let .loaded(trips) = value else { return }
@@ -87,6 +73,9 @@ struct SavedTripsScreen: View {
                     "received_count": .integer(sharedTrips.count)
                 ])
             )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .tripLibraryDidChange)) { _ in
+            refreshTrips()
         }
     }
 
@@ -245,27 +234,29 @@ struct SavedTripsScreen: View {
     }
 
     var plusButton: some View {
-        Group {
-            // Nothing to create on "Shared" — links only arrive from friends.
-            if segment != .shared {
-                Button(action: {
-                    // Context-aware: match the active segment.
-                    switch segment {
-                    case .myTrips:
-                        router.goToBasicInfo(resetStack: true)
-                    case .myGroupTrips:
-                        router.goToGroupCreate(resetStack: true)
-                    case .shared:
-                        break
-                    }
-                }) {
-                    Image(systemName: "plus")
-                        .resizable()
-                        .frame(width: 18, height: 18)
-                        .foregroundColor(.appTint)
-                }
+        Menu {
+            Button {
+                router.goToBasicInfo(resetStack: true)
+            } label: {
+                Label("Start a new trip", systemImage: "mappin.and.ellipse")
             }
+            Button {
+                router.goToGroupCreate(resetStack: true)
+            } label: {
+                Label("Create a group trip", systemImage: "person.3.fill")
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.appTint)
         }
+        .accessibilityLabel("Create trip")
+    }
+
+    private func refreshTrips() {
+        store.send(.loadSavedTrips)
+        groupSummaries = GroupTripCredentialsStore.summaries
+        sharedTrips = (try? ReceivedSharedTripStorage.received().fetchAll()) ?? []
     }
 
     var sharedTripsList: some View {
@@ -309,39 +300,10 @@ struct SavedTripsScreen: View {
             properties["destination"] = .string(destination)
         }
         AnalyticsTracker.shared.log(.init(.savedTripOpened, properties: properties))
-        let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
-            .loaded(trip.suggestions!) : .initial
-
-        var state = TripOutputStore.State(
-            details: trip.details,
-            selectedContentTab: .discover,
-            favorites: trip.favorites,
-            saved: true,
-            mode: .savedTrip,
-            shareCode: trip.shareCode,
-            itineraryResponse: .loaded(trip.itinerary),
-            suggestionsResponse: suggestions,
-            knowBeforeYouGoResponse: trip.knowBeforeYouGo.map { .loaded($0) } ?? .initial
+        router.goToItineraryResult(
+            TripOutputStateFactory.savedTrip(trip),
+            resetStack: false
         )
-        // The traveller's own trip: their decisions and their paid-for deep
-        // dives come back with it. Anything missing on an older file is simply
-        // absent, never regenerated — `.initial` here means "there are none",
-        // and with no `generationRequest` on a saved trip nothing will go and
-        // charge for them.
-        state.worthItResponse = trip.worthItItems.map(AsyncValue.loaded) ?? .initial
-        state.whereToStayResponse = trip.whereToStay.map(AsyncValue.loaded) ?? .initial
-        state.interestPrompts = trip.interestPrompts ?? []
-        state.worthItDecisions = trip.worthItDecisions ?? [:]
-        state.deepDives = trip.deepDives
-        state.accommodation = trip.accommodation
-        state.nearYouResponse = trip.nearYouState.asyncValue
-        state.manualGenerationRequest = TripGenerationRequest(
-            tripKey: trip.tripKey ?? TripKey.mint(),
-            input: trip.generationInput
-                ?? TripGenerationInput(details: trip.details, answers: [])
-        )
-
-        router.goToItineraryResult(state, resetStack: false)
     }
 
     /// A trip in "Shared" is already a durable local copy

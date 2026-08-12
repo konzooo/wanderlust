@@ -1,122 +1,105 @@
 import CoreModels
-import SwiftUI
-import DesignSystem
+import Combine
+import Foundation
 
-/// Centralized navigation router for the app. Only mutate the navigation path via these methods.
-class NavigationRouter: ObservableObject {
-    /// The navigation path for the app. Only mutate via router methods.
-    @Published var path: [Destination] = []
+/// Centralized navigation router. Only mutate tab paths through these methods.
+@MainActor
+final class NavigationRouter: ObservableObject {
+    @Published var selectedTab: AppTab = .home
+    @Published var homePath: [Destination] = []
+    @Published var tripsPath: [Destination] = []
+    @Published var profilePath: [Destination] = []
+
     private(set) var groupJoinAnalyticsSource = "manual_code"
 
-    /// Navigate to the home screen (root).
-    func goToHome() {
-        path.removeAll()
+    subscript(tab: AppTab) -> [Destination] {
+        get {
+            switch tab {
+            case .home: homePath
+            case .trips: tripsPath
+            case .profile: profilePath
+            }
+        }
+        set {
+            switch tab {
+            case .home: homePath = newValue
+            case .trips: tripsPath = newValue
+            case .profile: profilePath = newValue
+            }
+        }
     }
 
-    /// Navigate to the basic info screen.
-    func goToBasicInfo(_ state: BasicInfoStore.State = .init(), resetStack: Bool = false) {
-        guard path.last != .basicInfo(state) else {
-            return
-        }
-        
-        if resetStack {
-            path.removeAll()
-        }
-        
-        path.append(.basicInfo(state))
-    }
-    
-    /// Navigate to the saved trips screen.
-    func goToSavedTrips(resetStack: Bool = false) {
-        guard path.last != .savedTrips else {
-            return
-        }
-        
-        if resetStack {
-            path.removeAll()
-        }
-        
-        path.append(.savedTrips)
+    /// Used only by the native TabView binding.
+    func select(_ tab: AppTab) {
+        selectedTab = tab
     }
 
-    /// Navigate to the questionnaire screen.
-    func goToQuestionnaire(_ state: QuestionnaireStore.State = .init(), resetStack: Bool = false) {
-        guard path.last != .questionnaire(state) else {
-            return
-        }
-        
-        if resetStack {
-            path.removeAll()
-            path.append(.basicInfo(.init()))
-        }
-
-        path.append(.questionnaire(state))
+    func goToTabRoot(_ tab: AppTab) {
+        self[tab] = []
+        selectedTab = tab
     }
 
-    /// Navigate to the itinerary result screen. Requires a destination — either
-    /// to generate against, or because content is already loaded for it.
+    func goToBasicInfo(
+        _ state: BasicInfoStore.State = .init(),
+        on tab: AppTab? = nil,
+        resetStack: Bool = false
+    ) {
+        go(to: .basicInfo(state), on: tab, resetStack: resetStack)
+    }
+
+    func goToQuestionnaire(on tab: AppTab? = nil) {
+        go(to: .questionnaire, on: tab)
+    }
+
     func goToItineraryResult(
         _ state: TripOutputStore.State = .init(details: .mock, mode: .newTrip),
+        on tab: AppTab? = nil,
         resetStack: Bool = false
     ) {
         precondition(!state.details.destination.name.isEmpty, "Destination must not be empty")
-        if resetStack {
-            path.removeAll()
-            path.append(.savedTrips)
-        }
-
-        path.append(.itineraryResult(state))
+        go(to: .itineraryResult(state), on: tab, resetStack: resetStack, dedupe: false)
     }
 
-    /// Navigate to the group trip creation screen.
-    func goToGroupCreate(resetStack: Bool = false) {
-        guard path.last != .groupCreate else {
-            return
-        }
-
-        if resetStack {
-            path.removeAll()
-        }
-
-        path.append(.groupCreate)
+    func goToGroupCreate(
+        segment: GroupTripCreateStore.Segment = .create,
+        on tab: AppTab? = nil,
+        resetStack: Bool = false
+    ) {
+        go(to: .groupCreate(segment), on: tab, resetStack: resetStack)
     }
 
-    /// Navigate to the group trip members screen.
-    func goToGroupMembers(_ state: GroupTripMembersStore.State, resetStack: Bool = false) {
-        if resetStack {
-            path.removeAll()
-        }
-
-        path.append(.groupMembers(state))
+    func goToGroupMembers(
+        _ state: GroupTripMembersStore.State,
+        on tab: AppTab? = nil,
+        resetStack: Bool = false
+    ) {
+        go(to: .groupMembers(state), on: tab, resetStack: resetStack, dedupe: false)
     }
 
-    /// Navigate to the group questionnaire (swipe) screen.
     func goToGroupSwipe(
         _ groupId: String,
         profileSelection: ProfileTripSelection = .useDefault,
+        on tab: AppTab? = nil,
         resetStack: Bool = false
     ) {
-        if resetStack {
-            path.removeAll()
-        }
-        path.append(.groupSwipe(groupId: groupId, profileSelection: profileSelection))
+        go(
+            to: .groupSwipe(groupId: groupId, profileSelection: profileSelection),
+            on: tab,
+            resetStack: resetStack
+        )
     }
 
-    /// Navigate to the live group dashboard.
-    func goToGroupDashboard(_ groupId: String, resetStack: Bool = false) {
-        if resetStack {
-            path.removeAll()
-        }
-        guard path.last != .groupDashboard(groupId: groupId) else { return }
-        path.append(.groupDashboard(groupId: groupId))
+    func goToGroupDashboard(
+        _ groupId: String,
+        on tab: AppTab? = nil,
+        resetStack: Bool = false
+    ) {
+        go(to: .groupDashboard(groupId: groupId), on: tab, resetStack: resetStack)
     }
 
-    /// Navigate to the read-only group trip output, built from a loaded group.
-    func goToGroupOutput(_ group: GroupDTO) {
+    func goToGroupOutput(_ group: GroupDTO, on tab: AppTab? = nil) {
         guard let itinerary = group.itinerary else { return }
-        let month = Month(rawValue: group.startMonth) ?? .january
-        // No `generationRequest`: a group trip is generated server-side and
-        // arrives complete, so this screen has nothing to ask the backend for.
+        let month = Month(wireValue: group.startMonth) ?? .january
         var state = TripOutputStore.State(
             details: Trip.Details(
                 destination: Place(name: group.destination),
@@ -129,18 +112,10 @@ class NavigationRouter: ObservableObject {
         state.groupId = group.groupId
         state.groupViewerIsAdmin = group.viewerIsAdmin
         state.itineraryResponse = .loaded(itinerary)
-        if let suggestions = group.suggestions {
-            state.suggestionsResponse = .loaded(suggestions)
-        }
-        if let briefing = group.knowBeforeYouGo {
-            state.knowBeforeYouGoResponse = .loaded(briefing)
-        }
-        if let items = group.worthItItems {
-            state.worthItResponse = .loaded(items)
-        }
-        if let areas = group.whereToStay {
-            state.whereToStayResponse = .loaded(areas)
-        }
+        if let suggestions = group.suggestions { state.suggestionsResponse = .loaded(suggestions) }
+        if let briefing = group.knowBeforeYouGo { state.knowBeforeYouGoResponse = .loaded(briefing) }
+        if let items = group.worthItItems { state.worthItResponse = .loaded(items) }
+        if let areas = group.whereToStay { state.whereToStayResponse = .loaded(areas) }
         state.interestPrompts = group.interestPrompts
         state.deepDives = group.deepDives
         state.accommodation = group.accommodation
@@ -160,139 +135,129 @@ class NavigationRouter: ObservableObject {
         case .absent:
             break
         }
-        if let imageUrl = group.imageUrl, let url = URL(string: imageUrl) {
+        if let imageURL = group.imageUrl, let url = URL(string: imageURL) {
             state.imageUrlResponse = .loaded(url)
         }
-        path.append(.groupOutput(state))
+        go(to: .groupOutput(state), on: tab, dedupe: false)
     }
 
-    /// Navigate to the join-a-group-trip screen for an invite code.
     func goToGroupJoin(
         code: String,
+        on tab: AppTab? = nil,
         resetStack: Bool = false,
         analyticsSource: String = "manual_code"
     ) {
         groupJoinAnalyticsSource = analyticsSource
-        if resetStack {
-            path.removeAll()
-        }
-        path.append(.groupJoin(code: code))
+        go(to: .groupJoin(code: code), on: tab, resetStack: resetStack, dedupe: false)
     }
 
-    /// Navigate to a trip shared via a share link.
-    func goToSharedTrip(code: String, resetStack: Bool = false) {
-        if resetStack {
-            path.removeAll()
-        }
-        guard path.last != .sharedTrip(code: code) else { return }
-        path.append(.sharedTrip(code: code))
+    func goToSharedTrip(
+        code: String,
+        on tab: AppTab? = nil,
+        resetStack: Bool = false
+    ) {
+        go(to: .sharedTrip(code: code), on: tab, resetStack: resetStack)
     }
 
-    /// Navigate to the feedback screen.
-    func goToFeedback() {
-        guard path.last != .feedback else {
-            return
-        }
-        path.append(.feedback)
+    func goToFeedback(on tab: AppTab? = nil, resetStack: Bool = false) {
+        go(to: .feedback, on: tab, resetStack: resetStack)
     }
 
-    func goToProfiles() {
-        guard path.last != .profiles else { return }
-        path.append(.profiles)
+    func goToSettings(on tab: AppTab? = nil, resetStack: Bool = false) {
+        go(to: .settings, on: tab, resetStack: resetStack)
     }
 
-    /// Navigate to an unknown or deprecated destination (for deep linking or migration).
-    func goToUnknown(_ message: String? = nil) {
-        path.append(.unknown(message))
+    func goToUnknown(
+        _ message: String? = nil,
+        on tab: AppTab? = nil,
+        resetStack: Bool = false
+    ) {
+        go(to: .unknown(message), on: tab, resetStack: resetStack, dedupe: false)
     }
 
-    /// Navigate to the internal debug menu.
-    func goToDebugMenu() {
-        guard path.last != .debugMenu else { return }
-        path.append(.debugMenu)
+    func goToDebugMenu(on tab: AppTab? = nil, resetStack: Bool = false) {
+        go(to: .debugMenu, on: tab, resetStack: resetStack)
     }
 
-    /// Pop the last screen from the navigation stack.
-    func pop() {
-        _ = path.popLast()
+    func pop(on tab: AppTab? = nil) {
+        let target = tab ?? selectedTab
+        _ = self[target].popLast()
     }
 
-    /// Pop to the root screen.
-    func popToRoot() {
-        path.removeAll()
+    func popToRoot(on tab: AppTab? = nil) {
+        self[tab ?? selectedTab] = []
     }
 
-    /// Handle a deep link URL and navigate accordingly. Extend this for your deep link structure.
-    ///
-    /// Group invite links are `https://<domain>/join/<code>`. We validate the
-    /// path shape and extract the 5-digit code, then route straight into the
-    /// join screen. Anything else falls through to the existing handlers.
     func handleDeepLink(_ url: URL) {
-        // Handle both the Universal Link form (https://<domain>/join/<code>) and
-        // the dev custom-scheme form (wanderlust://join/<code>) by flattening the
-        // host + path into segments and looking for "join" followed by a code.
         let segments = ([url.host] + url.pathComponents)
             .compactMap { $0 }
             .filter { $0 != "/" }
+
         if let joinIndex = segments.firstIndex(of: "join"), joinIndex + 1 < segments.count {
-            let code = segments[joinIndex + 1].filter(\.isNumber)
-            if !code.isEmpty {
+            let code = segments[joinIndex + 1]
+            if code.count == 5, code.allSatisfy(\.isNumber) {
                 goToGroupJoin(
                     code: code,
+                    on: .trips,
                     resetStack: true,
                     analyticsSource: "deep_link"
                 )
+                selectedTab = .trips
                 return
             }
         }
 
-        // Shared trip links are `/t/<32-hex>`. Unlike invite codes these are
-        // NOT digits-only, so they need their own filter — `\.isNumber` would
-        // mangle a hex code.
-        if let tIndex = segments.firstIndex(of: "t"), tIndex + 1 < segments.count {
-            let code = segments[tIndex + 1].filter { $0.isHexDigit }.lowercased()
-            if code.count == 32 {
-                goToSharedTrip(code: code, resetStack: true)
+        if let tripIndex = segments.firstIndex(of: "t"), tripIndex + 1 < segments.count {
+            let code = segments[tripIndex + 1].lowercased()
+            if code.count == 32, code.allSatisfy(\.isHexDigit) {
+                goToSharedTrip(code: code, on: .trips, resetStack: true)
+                selectedTab = .trips
                 return
             }
         }
 
 #if DEBUG
-        // `wanderlust://debug` — the Debug Menu is otherwise only reachable by
-        // triple-tapping the Home logo, which nothing automated can drive.
         if segments.contains("debug") {
-            goToDebugMenu()
+            goToDebugMenu(on: .profile, resetStack: true)
+            selectedTab = .profile
             return
         }
 #endif
 
-        switch url.path {
-        case "/feedback":
-            goToFeedback()
-        default:
-            goToUnknown("Unknown deep link: \(url.absoluteString)")
+        if segments.contains("feedback") {
+            goToFeedback(on: .profile, resetStack: true)
+            selectedTab = .profile
+            return
+        }
+
+        goToUnknown(
+            "Unknown deep link: \(url.absoluteString)",
+            on: .home,
+            resetStack: true
+        )
+        selectedTab = .home
+    }
+
+    private func go(
+        to destination: Destination,
+        on tab: AppTab? = nil,
+        resetStack: Bool = false,
+        dedupe: Bool = true
+    ) {
+        let target = tab ?? selectedTab
+        if resetStack {
+            self[target] = [destination]
+        } else if !dedupe || self[target].last != destination {
+            self[target].append(destination)
         }
     }
 }
 
-extension NavigationRouter: DrawerNavigating {
-    /// Process a DrawerRow selection and perform the appropriate navigation.
-    func processDrawerSelection(_ row: DrawerRow) {
-        switch row {
-        case .home:
-            goToHome()
-        case .savedTrips:
-            goToSavedTrips()
-        case .profiles:
-            goToProfiles()
-        case .newTrip:
-            goToBasicInfo(resetStack: true)
-        case .groupTrip:
-            goToGroupCreate(resetStack: true)
-        case .feedback:
-            goToFeedback()
-        case .none:
-            break
-        }
+extension Month {
+    init?(wireValue: String) {
+        guard let value = Month.all.first(where: {
+            $0.rawValue.caseInsensitiveCompare(wireValue) == .orderedSame
+        }) else { return nil }
+        self = value
     }
 }

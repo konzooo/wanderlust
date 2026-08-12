@@ -7,6 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0DE10010000000000000001 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10010000000000000002 /* AppTab.swift */; };
+		C0DE10020000000000000001 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10020000000000000002 /* RootTabView.swift */; };
+		C0DE10030000000000000001 /* NavigationDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10030000000000000002 /* NavigationDestinations.swift */; };
+		C0DE20010000000000000001 /* ProfileTabScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE20010000000000000002 /* ProfileTabScreen.swift */; };
+		C0DE20020000000000000001 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE20020000000000000002 /* SettingsScreen.swift */; };
+		C0DE40010000000000000001 /* HomeTripsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40010000000000000002 /* HomeTripsStore.swift */; };
+		C0DE40020000000000000001 /* TripStartDateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40020000000000000002 /* TripStartDateTests.swift */; };
+		C0DE40030000000000000001 /* HomeTripsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40030000000000000002 /* HomeTripsStoreTests.swift */; };
+		C0DE10040000000000000001 /* NavigationTabEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10040000000000000002 /* NavigationTabEnvironment.swift */; };
+		C0DE10050000000000000001 /* TabRootAppear.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10050000000000000002 /* TabRootAppear.swift */; };
+		C0DE10060000000000000001 /* UnknownDestinationScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10060000000000000002 /* UnknownDestinationScreen.swift */; };
+		C0DE10070000000000000001 /* NavigationRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10070000000000000002 /* NavigationRouterTests.swift */; };
 		AA6000010000000000000001 /* OutputFeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6000020000000000000002 /* OutputFeatureFlags.swift */; };
 		AA6100010000000000000001 /* DiscoverSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6100020000000000000002 /* DiscoverSegment.swift */; };
 		AA6200010000000000000001 /* WorthItSkipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6200020000000000000002 /* WorthItSkipView.swift */; };
@@ -159,6 +171,18 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C0DE10010000000000000002 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTab.swift; sourceTree = "<group>"; };
+		C0DE10020000000000000002 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		C0DE10030000000000000002 /* NavigationDestinations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationDestinations.swift; sourceTree = "<group>"; };
+		C0DE20010000000000000002 /* ProfileTabScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTabScreen.swift; sourceTree = "<group>"; };
+		C0DE20020000000000000002 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
+		C0DE40010000000000000002 /* HomeTripsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTripsStore.swift; sourceTree = "<group>"; };
+		C0DE40020000000000000002 /* TripStartDateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripStartDateTests.swift; sourceTree = "<group>"; };
+		C0DE40030000000000000002 /* HomeTripsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTripsStoreTests.swift; sourceTree = "<group>"; };
+		C0DE10040000000000000002 /* NavigationTabEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationTabEnvironment.swift; sourceTree = "<group>"; };
+		C0DE10050000000000000002 /* TabRootAppear.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabRootAppear.swift; sourceTree = "<group>"; };
+		C0DE10060000000000000002 /* UnknownDestinationScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnknownDestinationScreen.swift; sourceTree = "<group>"; };
+		C0DE10070000000000000002 /* NavigationRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouterTests.swift; sourceTree = "<group>"; };
 		AA6000020000000000000002 /* OutputFeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputFeatureFlags.swift; sourceTree = "<group>"; };
 		AA6100020000000000000002 /* DiscoverSegment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverSegment.swift; sourceTree = "<group>"; };
 		AA6200020000000000000002 /* WorthItSkipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorthItSkipView.swift; sourceTree = "<group>"; };
@@ -430,6 +454,7 @@
 			children = (
 				5D22A9B12DB8EAA100B13C44 /* HomeScreen.swift */,
 				5D22A9B22DB8EAA100B13C44 /* HomeStore.swift */,
+				C0DE40010000000000000002 /* HomeTripsStore.swift */,
 				5D605B1A2DE7512000756799 /* Feedback */,
 			);
 			path = Home;
@@ -438,6 +463,12 @@
 		5D233B612DC7A78F001F47CE /* Navigation */ = {
 			isa = PBXGroup;
 			children = (
+				C0DE10010000000000000002 /* AppTab.swift */,
+				C0DE10020000000000000002 /* RootTabView.swift */,
+				C0DE10030000000000000002 /* NavigationDestinations.swift */,
+				C0DE10040000000000000002 /* NavigationTabEnvironment.swift */,
+				C0DE10050000000000000002 /* TabRootAppear.swift */,
+				C0DE10060000000000000002 /* UnknownDestinationScreen.swift */,
 				61CA97062E16C64D00791288 /* NavigationRouter.swift */,
 				5D233B622DC7A7D1001F47CE /* Destinations.swift */,
 			);
@@ -557,6 +588,9 @@
 		5D4EFFC42CB05B0F007E3FF2 /* WanderlustTests */ = {
 			isa = PBXGroup;
 			children = (
+				C0DE10070000000000000002 /* NavigationRouterTests.swift */,
+				C0DE40020000000000000002 /* TripStartDateTests.swift */,
+				C0DE40030000000000000002 /* HomeTripsStoreTests.swift */,
 				AA1000020000000000000002 /* AnalyticsStoreTests.swift */,
 				AA3000020000000000000002 /* TripPersistenceTests.swift */,
 				AA5000020000000000000002 /* TripGenerationCoordinatorTests.swift */,
@@ -620,6 +654,8 @@
 			isa = PBXGroup;
 			children = (
 				D1A000000000000000000002 /* TravellerProfiles.swift */,
+				C0DE20010000000000000002 /* ProfileTabScreen.swift */,
+				C0DE20020000000000000002 /* SettingsScreen.swift */,
 			);
 			path = Profiles;
 			sourceTree = "<group>";
@@ -952,6 +988,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0DE10010000000000000001 /* AppTab.swift in Sources */,
+				C0DE10020000000000000001 /* RootTabView.swift in Sources */,
+				C0DE10030000000000000001 /* NavigationDestinations.swift in Sources */,
+				C0DE20010000000000000001 /* ProfileTabScreen.swift in Sources */,
+				C0DE20020000000000000001 /* SettingsScreen.swift in Sources */,
+				C0DE40010000000000000001 /* HomeTripsStore.swift in Sources */,
+				C0DE10040000000000000001 /* NavigationTabEnvironment.swift in Sources */,
+				C0DE10050000000000000001 /* TabRootAppear.swift in Sources */,
+				C0DE10060000000000000001 /* UnknownDestinationScreen.swift in Sources */,
 				D1A000000000000000000001 /* TravellerProfiles.swift in Sources */,
 				5D4E8B472DE8D4FB00EFBAF5 /* FeedbackStore.swift in Sources */,
 				5D4EFFB42CB05B0E007E3FF2 /* WanderlustApp.swift in Sources */,
@@ -1042,6 +1087,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0DE10070000000000000001 /* NavigationRouterTests.swift in Sources */,
+				C0DE40020000000000000001 /* TripStartDateTests.swift in Sources */,
+				C0DE40030000000000000001 /* HomeTripsStoreTests.swift in Sources */,
 				AA1000010000000000000001 /* AnalyticsStoreTests.swift in Sources */,
 				AA3000010000000000000001 /* TripPersistenceTests.swift in Sources */,
 				AA5000010000000000000001 /* TripGenerationCoordinatorTests.swift in Sources */,

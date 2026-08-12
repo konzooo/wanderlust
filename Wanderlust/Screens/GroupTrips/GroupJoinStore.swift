@@ -1,5 +1,6 @@
 import Combine
 import CoreArchitecture
+import CoreModels
 import Foundation
 
 /// Drives the join screen: resolves an invite code to its roster (live), lets
@@ -95,7 +96,10 @@ final class GroupJoinStore: ObservableStore {
                         groupId: dto.groupId,
                         name: dto.name,
                         destination: dto.destination,
-                        code: dto.code
+                        code: dto.code,
+                        createdAt: dto.createdAt,
+                        startMonth: Month(wireValue: dto.startMonth),
+                        durationDays: dto.durationDays
                     )
                 )
                 state.isJoining = false

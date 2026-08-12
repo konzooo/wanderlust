@@ -35,7 +35,9 @@ final class WanderlustUITests: XCTestCase {
         app.launchArguments.append("-ui-testing-reset-profiles")
         app.launch()
 
-        app.buttons["Get Started"].tap()
+        let beachSuggestion = app.buttons["Beach"]
+        XCTAssertTrue(beachSuggestion.waitForExistence(timeout: 5))
+        beachSuggestion.tap()
 
         let profileButton = app.buttons["profile-selection-button"]
         XCTAssertTrue(profileButton.waitForExistence(timeout: 3))

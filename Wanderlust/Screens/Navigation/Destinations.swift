@@ -15,18 +15,14 @@ enum ProfileTripSelection: Hashable {
 
 /// Represents all possible navigation destinations in the app.
 enum Destination: Hashable {
-    /// The home screen (root).
-    case home
     /// The basic info screen, with its state.
     case basicInfo(BasicInfoStore.State)
-    /// The questionnaire screen, with its state.
-    case questionnaire(QuestionnaireStore.State)
+    /// The questionnaire reads its session from TripOrganizer.
+    case questionnaire
     /// The itinerary result screen, with its state.
     case itineraryResult(TripOutputStore.State)
-    /// The saved trips screen.
-    case savedTrips
     /// The group trip creation screen.
-    case groupCreate
+    case groupCreate(GroupTripCreateStore.Segment)
     /// The group trip members screen, with its state.
     case groupMembers(GroupTripMembersStore.State)
     /// The group questionnaire (swipe) screen for a given group.
@@ -41,10 +37,20 @@ enum Destination: Hashable {
     case sharedTrip(code: String)
     /// The feedback screen.
     case feedback
-    /// Local Traveller DNA profile management.
-    case profiles
+    /// App settings, reached from the Profile tab.
+    case settings
     /// An unknown or deprecated destination, for future-proofing and deep linking.
     case unknown(String? = nil)
     /// The internal debug menu (QA toggles, design-in-progress previews). DEBUG builds only.
     case debugMenu
+
+    var hidesTabBar: Bool {
+        switch self {
+        case .basicInfo, .questionnaire, .itineraryResult, .groupCreate,
+             .groupMembers, .groupSwipe, .groupJoin, .groupOutput, .sharedTrip:
+            true
+        case .groupDashboard, .feedback, .settings, .unknown, .debugMenu:
+            false
+        }
+    }
 }

@@ -26,7 +26,7 @@ struct WanderlustApp: App {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-ui-testing-reset-profiles") {
             TravellerProfileLibrary.shared.resetForUITesting()
-            UserDefaults.standard.removeObject(forKey: "profiles.introduction.dismissed")
+            UserDefaults.standard.removeObject(forKey: ProfilePreferenceKey.introductionDismissed)
         }
 #endif
 
@@ -38,11 +38,8 @@ struct WanderlustApp: App {
     
     var body: some Scene {
         WindowGroup {
-            // HomeScreen owns the app's NavigationStack and destination
-            // registrations. Wrapping it in a second stack bound to the same
-            // path makes deep links push onto an unregistered outer stack.
             ZStack {
-                HomeScreen()
+                RootTabView()
                 .preferredColorScheme(.light)
                 .environmentObject(navigationRouter)
                 .environmentObject(metricsTracker)

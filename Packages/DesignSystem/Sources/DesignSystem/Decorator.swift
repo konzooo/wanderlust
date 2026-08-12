@@ -9,6 +9,20 @@ import SwiftUI
 public enum DS {
     @MainActor public static func applyUniformDesign() {
         UISegmentedControl.applyAppTint(UIColor(Color.appTint))
+        UITabBar.applyUniformAppearance(tint: UIColor(Color.appTint))
+    }
+}
+
+extension UITabBar {
+    static func applyUniformAppearance(tint: UIColor) {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .systemBackground
+
+        let proxy = UITabBar.appearance()
+        proxy.standardAppearance = appearance
+        proxy.scrollEdgeAppearance = appearance
+        proxy.tintColor = tint
     }
 }
 

@@ -11,17 +11,16 @@ import DesignSystem
 import SwiftUI
 
 struct BasicInfoScreen: View {
-    @ObservedObject var store: BasicInfoStore = BasicInfoStore()
+    @StateObject var store: BasicInfoStore
     @FocusState private var destinationFocused: Bool
-    @State private var isDrawerOpen = false
     @State private var didInitializeProfileSelection = false
     @ObservedObject private var tripOrganizer = TripOrganizer.shared
 
     @EnvironmentObject var router: NavigationRouter
 
     @MainActor
-    init(store: BasicInfoStore? = nil) {
-        self.store = store ?? BasicInfoStore()
+    init(state: BasicInfoStore.State = .init()) {
+        _store = StateObject(wrappedValue: BasicInfoStore(initialState: state))
     }
 
     var body: some View {
@@ -52,7 +51,6 @@ struct BasicInfoScreen: View {
             specifyFormView
         }
         .animation(.easeInOut, value: store.state.presentSpecifySheet)
-        .drawerToolbar(isOpen: $isDrawerOpen, selected: .newTrip, router: router)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)

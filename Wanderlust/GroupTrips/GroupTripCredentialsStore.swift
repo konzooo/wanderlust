@@ -1,3 +1,4 @@
+import CoreModels
 import Foundation
 import Security
 
@@ -24,6 +25,27 @@ struct GroupTripSummary: Codable, Equatable, Identifiable {
     let name: String
     let destination: String
     let code: String
+    let createdAt: Date?
+    let startMonth: Month?
+    let durationDays: Int?
+
+    init(
+        groupId: String,
+        name: String,
+        destination: String,
+        code: String,
+        createdAt: Date? = nil,
+        startMonth: Month? = nil,
+        durationDays: Int? = nil
+    ) {
+        self.groupId = groupId
+        self.name = name
+        self.destination = destination
+        self.code = code
+        self.createdAt = createdAt
+        self.startMonth = startMonth
+        self.durationDays = durationDays
+    }
 
     var id: String { groupId }
 }
@@ -74,6 +96,7 @@ enum GroupTripCredentialsStore {
         if let data = try? JSONEncoder().encode(all) {
             UserDefaults.standard.set(data, forKey: summariesKey)
         }
+        TripLibraryNotifier.postSoon()
     }
 
     static var summaries: [GroupTripSummary] {
@@ -97,6 +120,7 @@ enum GroupTripCredentialsStore {
             UserDefaults.standard.set(data, forKey: summariesKey)
         }
         GroupTripPersonalStore().clear(groupId: groupId)
+        TripLibraryNotifier.postSoon()
     }
 
     private static func memberTokenKey(_ groupId: String) -> String {
@@ -141,6 +165,18 @@ enum GroupTripCredentialsStore {
         if SecItemAdd(query as CFDictionary, nil) == errSecDuplicateItem {
             SecItemUpdate(query as CFDictionary,
                           [kSecValueData as String: data] as CFDictionary)
+        }
+    }
+}
+
+extension Notification.Name {
+    static let tripLibraryDidChange = Notification.Name("wanderlust.tripLibraryDidChange")
+}
+
+enum TripLibraryNotifier {
+    static func postSoon() {
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .tripLibraryDidChange, object: nil)
         }
     }
 }

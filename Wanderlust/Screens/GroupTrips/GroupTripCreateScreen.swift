@@ -4,11 +4,15 @@ import DesignSystem
 import SwiftUI
 
 struct GroupTripCreateScreen: View {
-    @ObservedObject var store: GroupTripCreateStore = GroupTripCreateStore()
-    @State private var isDrawerOpen = false
+    @StateObject var store: GroupTripCreateStore
     @State private var didInitializeProfileSelection = false
 
     @EnvironmentObject var router: NavigationRouter
+
+    @MainActor
+    init(store: GroupTripCreateStore? = nil) {
+        _store = StateObject(wrappedValue: store ?? GroupTripCreateStore())
+    }
 
     var body: some View {
         ZStack {
@@ -55,7 +59,6 @@ struct GroupTripCreateScreen: View {
             }
         }
         .cleanTopInsets()
-        .drawerToolbar(isOpen: $isDrawerOpen, selected: .groupTrip, router: router)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 ProfileSelectionButton(selection: $store.state.selectedProfileID)
@@ -73,7 +76,10 @@ struct GroupTripCreateScreen: View {
                     groupName: store.state.groupName,
                     destination: store.state.destination,
                     adminToken: createdGroup.adminToken,
-                    selectedProfileID: store.state.selectedProfileID
+                    selectedProfileID: store.state.selectedProfileID,
+                    createdAt: createdGroup.createdAt,
+                    startMonth: Month(wireValue: createdGroup.startMonth) ?? store.state.month,
+                    durationDays: createdGroup.durationDays
                 )
             )
         }

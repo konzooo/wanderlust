@@ -50,7 +50,7 @@ struct SharedTripScreen: View {
                     .padding(.horizontal, 32)
 
                 Button {
-                    router.popToRoot()
+                    router.goToTabRoot(.trips)
                 } label: {
                     Text("Back to Trips")
                 }

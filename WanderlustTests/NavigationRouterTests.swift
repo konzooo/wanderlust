@@ -1,113 +1,134 @@
 import XCTest
 @testable import Wanderlust
 
+@MainActor
 final class NavigationRouterTests: XCTestCase {
-    func testGoToHome() {
+    func testTabPathsAreIsolated() {
         let router = NavigationRouter()
-        router.goToHome()
-        XCTAssertEqual(router.path, [.home])
+
+        router.goToBasicInfo(.init(destination: "Paris"))
+        router.selectedTab = .trips
+        router.goToGroupCreate()
+
+        XCTAssertEqual(router.homePath, [.basicInfo(.init(destination: "Paris"))])
+        XCTAssertEqual(router.tripsPath, [.groupCreate(.create)])
+        XCTAssertTrue(router.profilePath.isEmpty)
     }
 
-    func testGoToBasicInfo() {
+    func testResetStackReplacesOnlyTargetTab() {
         let router = NavigationRouter()
-        let state = BasicInfoStore.State(destination: "Paris")
-        router.goToBasicInfo(state)
-        XCTAssertEqual(router.path, [.basicInfo(state)])
+        router.goToBasicInfo(.init(destination: "Paris"), on: .home)
+        router.goToFeedback(on: .profile)
+
+        router.goToGroupCreate(on: .home, resetStack: true)
+
+        XCTAssertEqual(router.homePath, [.groupCreate(.create)])
+        XCTAssertEqual(router.profilePath, [.feedback])
     }
 
-    func testGoToQuestionnaire() {
+    func testItineraryResetLandsOnOriginRootWithoutSyntheticTripsFrame() {
         let router = NavigationRouter()
-        let state = QuestionnaireStore.State(cards: [])
-        router.goToQuestionnaire(state)
-        XCTAssertEqual(router.path, [.questionnaire(state)])
-    }
-
-    func testGoToItineraryResult() {
-        let router = NavigationRouter()
-        let state = ItineraryResultStore.State(
-            tripSummary: "Trip to Rome",
-            details: .mock
+        router.selectedTab = .trips
+        router.goToBasicInfo(.init(destination: "Rome"))
+        router.goToQuestionnaire()
+        let state = TripOutputStore.State(
+            details: .init(
+                destination: .init(name: "Rome"),
+                members: .init(groupType: .solo),
+                duration: 3,
+                month: .may
+            ),
+            mode: .newTrip
         )
-        router.goToItineraryResult(state)
-        XCTAssertEqual(router.path, [.itineraryResult(state)])
+
+        router.goToItineraryResult(state, resetStack: true)
+
+        XCTAssertEqual(router.tripsPath, [.itineraryResult(state)])
+        XCTAssertTrue(router.homePath.isEmpty)
     }
 
-    func testGoToFeedback() {
+    func testUniversalJoinLinkSelectsTripsAndReplacesItsStack() {
         let router = NavigationRouter()
-        router.goToFeedback()
-        XCTAssertEqual(router.path, [.feedback])
+        router.goToFeedback(on: .trips)
+
+        router.handleDeepLink(URL(string: "https://wanderlust.get-catalyst.app/join/01234")!)
+
+        XCTAssertEqual(router.selectedTab, .trips)
+        XCTAssertEqual(router.tripsPath, [.groupJoin(code: "01234")])
+        XCTAssertEqual(router.groupJoinAnalyticsSource, "deep_link")
     }
 
-    func testGoToUnknown() {
+    func testCustomSchemeJoinLinkSelectsTrips() {
         let router = NavigationRouter()
-        router.goToUnknown("test")
-        XCTAssertEqual(router.path, [.unknown("test")])
+
+        router.handleDeepLink(URL(string: "wanderlust://join/54321")!)
+
+        XCTAssertEqual(router.selectedTab, .trips)
+        XCTAssertEqual(router.tripsPath, [.groupJoin(code: "54321")])
     }
 
-    func testPop() {
+    func testMalformedJoinCodeFallsThroughToUnknown() {
         let router = NavigationRouter()
-        router.goToHome()
-        router.goToFeedback()
-        router.pop()
-        XCTAssertEqual(router.path, [.home])
-    }
 
-    func testPopToRoot() {
-        let router = NavigationRouter()
-        router.goToHome()
-        router.goToFeedback()
-        router.popToRoot()
-        XCTAssertTrue(router.path.isEmpty)
-    }
+        router.handleDeepLink(URL(string: "wanderlust://join/12ab3")!)
 
-    func testHandleDeepLinkFeedback() {
-        let router = NavigationRouter()
-        router.handleDeepLink(URL(string: "myapp://feedback")!)
-        XCTAssertEqual(router.path, [.feedback])
-    }
-
-    func testHandleDeepLinkUnknown() {
-        let router = NavigationRouter()
-        router.handleDeepLink(URL(string: "myapp://unknown")!)
-        XCTAssertEqual(router.path, [.unknown("Unknown deep link: myapp://unknown")])
-    }
-
-    func testGoToItineraryResultPrecondition() {
-        let router = NavigationRouter()
-        let emptyState = ItineraryResultStore.State(tripSummary: "", details: .mock)
-        // This should trigger a precondition failure in debug, but we can't test that directly in XCTest.
-        // Instead, we check that it does not append to the path if the precondition is not met (in release builds, precondition is ignored).
-        #if !DEBUG
-        router.goToItineraryResult(emptyState)
-        XCTAssertEqual(router.path, [.itineraryResult(emptyState)])
-        #endif
-    }
-
-    func testGoToItineraryResultWithValidState() {
-        let router = NavigationRouter()
-        let state = ItineraryResultStore.State(
-            tripSummary: "Test Trip",
-            details: .mock
-        )
-        
-        router.goToItineraryResult(state)
-        
-        XCTAssertEqual(router.path.count, 1)
-        if case .itineraryResult(let resultState) = router.path.first {
-            XCTAssertEqual(resultState.tripSummary, "Test Trip")
-        } else {
-            XCTFail("Expected itineraryResult destination")
+        XCTAssertEqual(router.selectedTab, .home)
+        guard case .unknown = router.homePath.first else {
+            return XCTFail("Expected malformed join link to become unknown")
         }
     }
 
-    func testGoToItineraryResultWithEmptySummaryThrows() {
+    func testSharedTripLinkSelectsTripsAndNormalizesHex() {
         let router = NavigationRouter()
-        let emptyState = ItineraryResultStore.State(tripSummary: "", details: .mock)
-        
-        // This should not throw in the current implementation, but we can test the precondition
-        router.goToItineraryResult(emptyState)
-        
-        // The router should still add the destination even with empty summary
-        XCTAssertEqual(router.path.count, 1)
+        let code = "ABCDEF0123456789ABCDEF0123456789"
+
+        router.handleDeepLink(URL(string: "wanderlust://t/\(code)")!)
+
+        XCTAssertEqual(router.selectedTab, .trips)
+        XCTAssertEqual(router.tripsPath, [.sharedTrip(code: code.lowercased())])
     }
-} 
+
+    func testUniversalFeedbackLinkSelectsProfileAndResets() {
+        let router = NavigationRouter()
+        router.goToDebugMenu(on: .profile)
+
+        router.handleDeepLink(URL(string: "https://wanderlust.get-catalyst.app/feedback")!)
+
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertEqual(router.profilePath, [.feedback])
+    }
+
+    func testCustomSchemeFeedbackLinkUsesHostSegment() {
+        let router = NavigationRouter()
+
+        router.handleDeepLink(URL(string: "wanderlust://feedback")!)
+
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertEqual(router.profilePath, [.feedback])
+    }
+
+#if DEBUG
+    func testDebugLinkSelectsProfileAndResets() {
+        let router = NavigationRouter()
+        router.goToFeedback(on: .profile)
+
+        router.handleDeepLink(URL(string: "wanderlust://debug")!)
+
+        XCTAssertEqual(router.selectedTab, .profile)
+        XCTAssertEqual(router.profilePath, [.debugMenu])
+    }
+#endif
+
+    func testUnknownLinkSelectsHomeAndRendersUnknownDestination() {
+        let router = NavigationRouter()
+        router.goToGroupCreate(on: .home)
+
+        router.handleDeepLink(URL(string: "wanderlust://not-a-real-route")!)
+
+        XCTAssertEqual(router.selectedTab, .home)
+        guard case let .unknown(message) = router.homePath.first else {
+            return XCTFail("Expected unknown destination")
+        }
+        XCTAssertTrue(message?.contains("not-a-real-route") == true)
+    }
+}

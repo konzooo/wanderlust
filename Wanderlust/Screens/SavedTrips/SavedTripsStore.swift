@@ -32,27 +32,7 @@ class SavedTripsStore: ObservableStore {
         
         Task {
             do {
-                let storage = try TripStorage()
-                let candidates = try storage.fetchAllWithMetadata().map {
-                    StoredTripCandidate(
-                        trip: $0.value,
-                        fallbackCreatedAt: $0.creationDate
-                    )
-                }
-                let uniqueCandidates = Self.newestFirstUnique(candidates)
-                let sortedTrips = uniqueCandidates.map { candidate in
-                    var trip = candidate.trip
-                    guard trip.createdAt == nil,
-                          let fallback = candidate.fallbackCreatedAt else {
-                        return trip
-                    }
-
-                    // One-time migration for pre-v5 files. Once the fallback is
-                    // inside the JSON, later edits cannot change its ordering.
-                    trip.createdAt = fallback
-                    _ = try? storage.save(trip)
-                    return trip
-                }
+                let sortedTrips = try Self.loadTrips()
                 
                 await MainActor.run {
                     self.state.savedTrips = .loaded(sortedTrips)
@@ -62,6 +42,23 @@ class SavedTripsStore: ObservableStore {
                     self.state.savedTrips = .error(error)
                 }
             }
+        }
+    }
+
+    /// Shared read path for My Trips and Home. The legacy-date write is a
+    /// one-time migration and deliberately does not emit a change notification.
+    nonisolated static func loadTrips() throws -> [Trip] {
+        let storage = try TripStorage()
+        let candidates = try storage.fetchAllWithMetadata().map {
+            StoredTripCandidate(trip: $0.value, fallbackCreatedAt: $0.creationDate)
+        }
+        return newestFirstUnique(candidates).map { candidate in
+            var trip = candidate.trip
+            guard trip.createdAt == nil,
+                  let fallback = candidate.fallbackCreatedAt else { return trip }
+            trip.createdAt = fallback
+            _ = try? storage.save(trip)
+            return trip
         }
     }
 
@@ -113,5 +110,36 @@ extension SavedTripsStore {
     enum Action: Equatable {
         case loadSavedTrips
         case tripTapped(Trip)
+    }
+}
+
+enum TripOutputStateFactory {
+    @MainActor
+    static func savedTrip(_ trip: Trip) -> TripOutputStore.State {
+        let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions.map(AsyncValue.loaded) ?? .initial
+        var state = TripOutputStore.State(
+            details: trip.details,
+            selectedContentTab: .discover,
+            favorites: trip.favorites,
+            saved: true,
+            mode: .savedTrip,
+            shareCode: trip.shareCode,
+            itineraryResponse: .loaded(trip.itinerary),
+            suggestionsResponse: suggestions,
+            knowBeforeYouGoResponse: trip.knowBeforeYouGo.map(AsyncValue.loaded) ?? .initial
+        )
+        state.worthItResponse = trip.worthItItems.map(AsyncValue.loaded) ?? .initial
+        state.whereToStayResponse = trip.whereToStay.map(AsyncValue.loaded) ?? .initial
+        state.interestPrompts = trip.interestPrompts ?? []
+        state.worthItDecisions = trip.worthItDecisions ?? [:]
+        state.deepDives = trip.deepDives
+        state.accommodation = trip.accommodation
+        state.nearYouResponse = trip.nearYouState.asyncValue
+        state.manualGenerationRequest = TripGenerationRequest(
+            tripKey: trip.tripKey ?? TripKey.mint(),
+            input: trip.generationInput
+                ?? TripGenerationInput(details: trip.details, answers: [])
+        )
+        return state
     }
 }

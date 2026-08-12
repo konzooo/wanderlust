@@ -230,7 +230,10 @@ extension GroupTripMembersScreen {
                     groupName: "Barcelona Squad",
                     destination: "Barcelona",
                     adminToken: "preview-token",
-                    selectedProfileID: nil
+                    selectedProfileID: nil,
+                    createdAt: Date(),
+                    startMonth: .August,
+                    durationDays: 5
                 )
             )
         )

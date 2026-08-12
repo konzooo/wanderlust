@@ -13,6 +13,7 @@ import SwiftUI
 struct TripOutputScreen: View {
     @StateObject var store: TripOutputStore
     @EnvironmentObject var router: NavigationRouter
+    @Environment(\.navigationTab) private var navigationTab
     
     @State private var isDrawerOpen = false
     @State private var hasDismissedOutputOnThisVisit = false
@@ -135,7 +136,7 @@ struct TripOutputScreen: View {
         // On appear trigger Itinerary generation
         .onAppear {
             AnalyticsTracker.shared.log(.screenViewed(.tripOutput))
-            store.setRouter(router)
+            store.setRouter(router, tab: navigationTab)
             store.send(.onAppear)
             store.logResultViewedIfNeeded()
             previousFavoriteCount = store.state.favorites.liked.count
@@ -356,7 +357,7 @@ struct TripOutputScreen: View {
         RetryErrorView(retryCount: $store.retryCount) {
             store.send(.retry)
         } restartAction: {
-            router.popToRoot() // Use router for navigation
+            router.popToRoot(on: navigationTab)
         }
     }
     

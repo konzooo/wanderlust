@@ -59,6 +59,7 @@ export const createGroup = mutation({
     }
 
     const adminToken = newToken();
+    const createdAt = Date.now();
     const groupId = await ctx.db.insert("groups", {
       code,
       name: args.name,
@@ -69,12 +70,19 @@ export const createGroup = mutation({
       status: "collecting",
       generationVersion: 0,
       attemptCount: 0,
-      createdAt: Date.now(),
+      createdAt,
     });
 
     // The admin's own roster slot is created on the members screen (addAdminSelf)
     // where they enter their name alongside the people they invite.
-    return { groupId, code, adminToken };
+    return {
+      groupId,
+      code,
+      adminToken,
+      startMonth: args.startMonth,
+      durationDays: args.durationDays,
+      createdAt,
+    };
   },
 });
 
@@ -196,6 +204,9 @@ export const joinResolve = query({
       code: group.code,
       name: group.name,
       destination: group.destination,
+      startMonth: group.startMonth,
+      durationDays: group.durationDays,
+      createdAt: group.createdAt,
       status: group.status,
       members: members.map((m) => ({
         memberId: m._id,

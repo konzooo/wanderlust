@@ -10,8 +10,11 @@ import CoreModels
 import Foundation
 
 class BasicInfoStore: ObservableStore {
-    init () {}
-    @Published var state: State = State()
+    @Published var state: State
+
+    init(initialState: State = .init()) {
+        state = initialState
+    }
 
     func send(_ action: Action) {
         switch action {

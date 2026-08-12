@@ -42,6 +42,7 @@ class TripOutputStore: ObservableStore {
     
     // Navigation
     var router: NavigationRouter?
+    private var routerTab: AppTab?
     
     private let itineraryService: any ItineraryGenerating
     private let suggestionsService: any SuggestionsGenerating
@@ -138,8 +139,9 @@ class TripOutputStore: ObservableStore {
         }
     }
 
-    func setRouter(_ router: NavigationRouter) {
+    func setRouter(_ router: NavigationRouter, tab: AppTab) {
         self.router = router
+        routerTab = tab
     }
 
     /// Entry point for all user actions. Triggers parallel data fetching.
@@ -265,16 +267,16 @@ class TripOutputStore: ObservableStore {
                 // silently discarded), a shared trip IS a real local file —
                 // persist any favorite changes to the recipient's own copy.
                 persistReceivedTripFavorites()
-                router?.pop()
+                router?.pop(on: routerTab)
             } else if state.mode == .groupTrip {
                 persistGroupPersonalLayer()
-                router?.pop()
+                router?.pop(on: routerTab)
             } else if state.saved {
                 if state.mode == .savedTrip {
                     // Trip is already saved, save changes and navigate back directly
                     reSaveTrip()
                 }
-                router?.pop()
+                router?.pop(on: routerTab)
 
             } else {
                 // Trip is not saved, show confirmation dialog
@@ -288,7 +290,7 @@ class TripOutputStore: ObservableStore {
         case .discardAndNavigateBack:
             // Discard changes and navigate back
             state.alert = nil
-            router?.pop()
+            router?.pop(on: routerTab)
             
         case .deleteTrip(let confirmDeletion):
             if confirmDeletion {
@@ -1369,6 +1371,7 @@ extension TripOutputStore {
                      .fetch(inGrouping: trip.groupingFolder)
                      .first { $0.duplicateIdentity == trip.duplicateIdentity }
                  try storage.save(stored.map(trip.merged(over:)) ?? trip)
+                 TripLibraryNotifier.postSoon()
              } catch {
                  // Handle error (could add error state)
                  print("Failed to save trip: \(error)")
@@ -1454,12 +1457,13 @@ extension TripOutputStore {
                 // does not move it to the top of My Trips.
                 try storage.save(existing.map(trip.merged(over:)) ?? trip)
                 await MainActor.run {
+                    TripLibraryNotifier.postSoon()
                     presentSaveToast = true
                     state.saved = true
                     
                     // If the unsaved trip dialog was showing, navigate back after saving
                     if state.alert == .unsavedTrip {
-                        router?.pop()
+                        router?.pop(on: routerTab)
                     }
                     
                     state.alert = nil
@@ -1499,6 +1503,7 @@ extension TripOutputStore {
                 let storage = try TripStorage()
                 try storage.delete(trip)
                 await MainActor.run {
+                    TripLibraryNotifier.postSoon()
                     state.alert = nil
                     AnalyticsTracker.shared.log(
                         .outcome(
@@ -1507,7 +1512,7 @@ extension TripOutputStore {
                             properties: analyticsTripProperties
                         )
                     )
-                    router?.pop()
+                    router?.pop(on: routerTab)
                 }
             } catch {
                 await MainActor.run {

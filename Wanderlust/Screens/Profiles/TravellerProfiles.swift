@@ -4,6 +4,10 @@ import DesignSystem
 import Foundation
 import SwiftUI
 
+enum ProfilePreferenceKey {
+    static let introductionDismissed = "profiles.introduction.dismissed"
+}
+
 // MARK: - Local profile library
 
 @MainActor
@@ -427,7 +431,7 @@ private extension TravellerProfile {
 struct ProfileSelectionButton: View {
     @Binding var selection: UUID?
     @ObservedObject private var library = TravellerProfileLibrary.shared
-    @AppStorage("profiles.introduction.dismissed") private var onboardingDismissed = false
+    @AppStorage(ProfilePreferenceKey.introductionDismissed) private var onboardingDismissed = false
     @State private var profilesPresented = false
     @State private var startCreating = false
     @State private var pickerPresented = false
@@ -685,10 +689,14 @@ private struct TravellerDNAOnboardingScreen: View {
 struct ProfilesScreen: View {
     var startsCreating = false
     var onProfileCreated: ((TravellerProfile) -> Void)?
+    var showsDoneButton = true
+    var showsInfoButton = true
+    var automaticallyPresentsOnboarding = true
+    var logsScreenViewOnAppear = true
 
     @ObservedObject private var library = TravellerProfileLibrary.shared
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("profiles.introduction.dismissed") private var onboardingDismissed = false
+    @AppStorage(ProfilePreferenceKey.introductionDismissed) private var onboardingDismissed = false
     @State private var editorProfile: TravellerProfile?
     @State private var editorPresented = false
     @State private var onboardingPresented = false
@@ -712,21 +720,29 @@ struct ProfilesScreen: View {
         .navigationTitle("Profiles")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Done") { dismiss() }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showInfo = true } label: {
-                    Image(systemName: "info.circle")
+            if showsDoneButton {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
                 }
-                .accessibilityLabel("About Traveller profiles")
+            }
+            if showsInfoButton {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showInfo = true } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .accessibilityLabel("About Traveller profiles")
+                }
             }
         }
         .onAppear {
-            AnalyticsTracker.shared.log(.screenViewed(.profiles))
+            if logsScreenViewOnAppear {
+                AnalyticsTracker.shared.log(.screenViewed(.profiles))
+            }
             guard !didHandleInitialAction else { return }
             didHandleInitialAction = true
-            if library.profiles.isEmpty, !onboardingDismissed {
+            if automaticallyPresentsOnboarding,
+               library.profiles.isEmpty,
+               !onboardingDismissed {
                 onboardingPresented = true
             } else if startsCreating {
                 editorProfile = nil

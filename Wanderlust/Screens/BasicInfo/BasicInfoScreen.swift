@@ -43,6 +43,7 @@ struct BasicInfoScreen: View {
                     .padding(.bottom, 8)
             }
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .cleanTopInsets()
         .onAppear {
             AnalyticsTracker.shared.log(.screenViewed(.basicInfo))

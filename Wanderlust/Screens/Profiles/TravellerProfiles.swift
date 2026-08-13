@@ -460,7 +460,7 @@ struct ProfileSelectionButton: View {
                 }
             }
             .frame(width: 28, height: 28)
-            .padding(7)
+            .frame(width: 42, height: 42)
             .background(.white.opacity(0.88), in: Circle())
             .overlay {
                 Circle()
@@ -689,6 +689,7 @@ private struct TravellerDNAOnboardingScreen: View {
 struct ProfilesScreen: View {
     var startsCreating = false
     var onProfileCreated: ((TravellerProfile) -> Void)?
+    var navigationTitle = "Profiles"
     var showsDoneButton = true
     var showsInfoButton = true
     var automaticallyPresentsOnboarding = true
@@ -717,7 +718,7 @@ struct ProfilesScreen: View {
                 }
             }
         }
-        .navigationTitle("Profiles")
+        .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if showsDoneButton {

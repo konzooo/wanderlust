@@ -10,7 +10,17 @@ struct HomeScreen: View {
     @FocusState private var askFieldFocused: Bool
     @State private var selectedContinueID: String?
 
-    private let suggestions = ["Beach", "City break", "Mountains", "Food trip", "Surprise me"]
+    private let suggestions = ["Lisbon", "Tokyo", "Norway road trip", "North Vietnam"]
+    private let logoHeight: CGFloat
+    private let subtitleFontSize: Float
+
+    init(
+        logoHeight: CGFloat = 56,
+        subtitleFontSize: Float = 13
+    ) {
+        self.logoHeight = logoHeight
+        self.subtitleFontSize = subtitleFontSize
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -45,16 +55,18 @@ struct HomeScreen: View {
                 .padding(.top, 12)
 
             Text("Get inspired for your next travel")
-                .font(.kanitLightItalic(13))
+                .font(.kanitLightItalic(subtitleFontSize))
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
 
             Spacer(minLength: 22)
 
-            VStack(spacing: 15) {
-                Text("Where are you going next?")
-                    .font(DS.Typography.displayRegular)
-                    .multilineTextAlignment(.center)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Where are you\ngoing next?")
+                    .font(.kanitLight(30))
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(-3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 askField
 
@@ -103,7 +115,7 @@ struct HomeScreen: View {
         Image("app-logo")
             .resizable()
             .scaledToFit()
-            .frame(height: 56)
+            .frame(height: logoHeight)
 #if DEBUG
             .onTapGesture(count: 3) {
                 router.goToDebugMenu(on: .home)
@@ -112,37 +124,49 @@ struct HomeScreen: View {
     }
 
     private var askField: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sparkles")
+        HStack(spacing: 14) {
+            PrototypeMapPin()
+                .frame(width: 18, height: 20)
                 .foregroundStyle(Color.appTint)
 
-            TextField("Ask Wanderlust…", text: $store.state.destinationQuery)
-                .font(.kanit(16))
-                .textInputAutocapitalization(.words)
-                .submitLabel(.go)
-                .focused($askFieldFocused)
-                .onSubmit(planTrip)
+            ZStack(alignment: .leading) {
+                if store.state.destinationQuery.isEmpty {
+                    Text("Barcelona, a road trip,\nanywhere…")
+                        .font(.kanit(17))
+                        .foregroundStyle(Color.secondary.opacity(0.72))
+                        .allowsHitTesting(false)
+                }
+
+                TextField("", text: $store.state.destinationQuery, axis: .vertical)
+                    .font(.kanit(17))
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.go)
+                    .lineLimit(1...2)
+                    .focused($askFieldFocused)
+                    .onSubmit(planTrip)
+                    .accessibilityLabel("Trip destination")
+            }
 
             Button(action: planTrip) {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Color.appTint, in: Circle())
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.appTint)
+                    .frame(width: 34, height: 44)
+                    .contentShape(Rectangle())
             }
             .disabled(store.state.trimmedDestination.isEmpty)
-            .opacity(store.state.trimmedDestination.isEmpty ? 0.38 : 1)
+            .opacity(store.state.trimmedDestination.isEmpty ? 0.78 : 1)
             .accessibilityLabel("Plan this trip")
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 9)
-        .frame(height: 56)
-        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 18))
+        .padding(.leading, 20)
+        .padding(.trailing, 14)
+        .frame(minHeight: 88)
+        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 24))
         .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(.white.opacity(0.72), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.05), radius: 18, y: 8)
+        .shadow(color: Color.appTint.opacity(0.08), radius: 20, y: 10)
     }
 
     private var groupTripCard: some View {
@@ -244,20 +268,7 @@ struct HomeScreen: View {
         case let .group(summary):
             HomeGroupTripCard(summary: summary)
         case .seeAll:
-            ZStack {
-                LinearGradient(
-                    colors: [Color.appTint.opacity(0.82), Color.appTint.opacity(0.52)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                VStack(spacing: 9) {
-                    Image(systemName: "suitcase.rolling.fill")
-                        .font(.system(size: 28))
-                    Text("See all trips")
-                        .font(DS.Typography.displayLight)
-                }
-                .foregroundStyle(.white)
-            }
+            HomeSeeAllTripsCard()
         }
     }
 
@@ -282,6 +293,114 @@ struct HomeScreen: View {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         AnalyticsTracker.shared.log(.tripPlanningStarted(entryPoint: "home_ask"))
         router.goToBasicInfo(.init(destination: destination), on: .home)
+    }
+}
+
+/// Matches the lightweight, Lucide-style pin used in the Home prototype.
+private struct PrototypeMapPin: Shape {
+    func path(in rect: CGRect) -> Path {
+        let scaleX = rect.width / 24
+        let scaleY = rect.height / 24
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: x * scaleX, y: y * scaleY)
+        }
+
+        var path = Path()
+        path.move(to: point(12, 22))
+        path.addCurve(
+            to: point(4, 10),
+            control1: point(10.2, 20.2),
+            control2: point(4, 14.8)
+        )
+        path.addCurve(
+            to: point(12, 2),
+            control1: point(4, 5.6),
+            control2: point(7.6, 2)
+        )
+        path.addCurve(
+            to: point(20, 10),
+            control1: point(16.4, 2),
+            control2: point(20, 5.6)
+        )
+        path.addCurve(
+            to: point(12, 22),
+            control1: point(20, 14.8),
+            control2: point(13.8, 20.2)
+        )
+        path.addEllipse(in: CGRect(
+            x: 9 * scaleX,
+            y: 7 * scaleY,
+            width: 6 * scaleX,
+            height: 6 * scaleY
+        ))
+        return path.strokedPath(
+            StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+        )
+    }
+}
+
+private struct HomeSeeAllTripsCard: View {
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    Color(hex: "#EEF0FF").opacity(0.96),
+                    Color(hex: "#FFF7EA").opacity(0.92)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(Color.appTint.opacity(0.10))
+                .frame(width: 150, height: 150)
+                .blur(radius: 2)
+                .offset(x: 265, y: -70)
+
+            Circle()
+                .stroke(Color.appTint.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [4, 6]))
+                .frame(width: 130, height: 130)
+                .offset(x: 300, y: 76)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Label("TRIP LIBRARY", systemImage: "rectangle.stack.fill")
+                        .font(.kanit(11).weight(.semibold))
+                        .tracking(1.3)
+                        .foregroundStyle(Color.appTint)
+
+                    Spacer()
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.appTint)
+                        .frame(width: 36, height: 36)
+                        .background(.white.opacity(0.78), in: Circle())
+                        .overlay { Circle().stroke(Color.appTint.opacity(0.10)) }
+                }
+
+                Spacer(minLength: 4)
+
+                Text("See all your trips")
+                    .font(.kanitMedium(27))
+                    .foregroundStyle(.primary)
+
+                Text("Every plan, group adventure and shared journey — together.")
+                    .font(.kanit(13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: 310, alignment: .leading)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: CGFloat.Radius.cardLarge, style: .continuous)
+                .stroke(.white.opacity(0.82), lineWidth: 1)
+        }
+        .shadow(color: Color.appTint.opacity(0.10), radius: 18, y: 8)
     }
 }
 

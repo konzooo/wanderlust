@@ -34,6 +34,38 @@ struct DesignVariant: Identifiable {
 
 enum DesignPlayground {
 #if DEBUG
+    private static let homeHeaderVariants: [DesignVariant] = [
+        DesignVariant(
+            id: "home-header-larger-brand-lockup",
+            title: "Home — Larger Brand Lockup",
+            subtitle: "The current Home screen, shown full-screen, with a larger logo and a smaller, quieter subtitle."
+        ) {
+            HomeHeaderConceptLab()
+        }
+    ]
+    private static let tripHeaderVariants: [DesignVariant] = [
+        DesignVariant(
+            id: "trip-header-native-lockup",
+            title: "Trip Header 1 — Native Lockup",
+            subtitle: "Highest and most consistent: icon, title and subtitle live inside the standard navigation bar."
+        ) {
+            TripHeaderConceptLab(style: .nativeLockup)
+        },
+        DesignVariant(
+            id: "trip-header-leading-lockup",
+            title: "Trip Header 2 — Leading Lockup",
+            subtitle: "Compact and branded: a small icon badge leads a title and essential subtitle beneath the navigation bar."
+        ) {
+            TripHeaderConceptLab(style: .leadingLockup)
+        },
+        DesignVariant(
+            id: "trip-header-centered-signature",
+            title: "Trip Header 3 — Centered Signature",
+            subtitle: "Closest to today: the centered icon, title and subtitle are tightened into a smaller deliberate signature."
+        ) {
+            TripHeaderConceptLab(style: .centeredSignature)
+        }
+    ]
     private static let questionnaireVariants: [DesignVariant] = [
         DesignVariant(
             id: "questionnaire-split-postcard",
@@ -121,11 +153,17 @@ enum DesignPlayground {
         }
     ]
 #else
+    private static let homeHeaderVariants: [DesignVariant] = []
+    private static let tripHeaderVariants: [DesignVariant] = []
     private static let questionnaireVariants: [DesignVariant] = []
     private static let outputVariants: [DesignVariant] = []
     private static let launchVariants: [DesignVariant] = []
 #endif
 
     /// Registry of in-progress design explorations. Add/remove entries here.
-    static let variants: [DesignVariant] = launchVariants + outputVariants + questionnaireVariants
+    static let variants: [DesignVariant] = homeHeaderVariants
+        + tripHeaderVariants
+        + launchVariants
+        + outputVariants
+        + questionnaireVariants
 }

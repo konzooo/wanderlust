@@ -45,6 +45,8 @@
 		D1A000000000000000000001 /* TravellerProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000000000000000000002 /* TravellerProfiles.swift */; };
 		09BF7BFE463967564DA59F92 /* GroupTripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5022352E6B4CC55BC3492D /* GroupTripService.swift */; };
 		0F415E840931ACCB739FA5E1 /* DebugMenuScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */; };
+		A17EAD3E1202608120000002 /* TripHeaderConceptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17EAD3E1202608120000001 /* TripHeaderConceptLab.swift */; };
+		B18EAD3E1202608120000002 /* HomeHeaderConceptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18EAD3E1202608120000001 /* HomeHeaderConceptLab.swift */; };
 		1D6283A9FFC00BC44F5935A1 /* GroupDashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE33AB09EFB47E97220B5A20 /* GroupDashboardStore.swift */; };
 		22C70A98EBDD52A6B339A03F /* GroupTripCreateScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */; };
 		2376A248BA52548A813D14B0 /* GroupOnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4094912D9593FA81DA180FB9 /* GroupOnboardingSheet.swift */; };
@@ -293,6 +295,8 @@
 		61CA97062E16C64D00791288 /* NavigationRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationRouter.swift; sourceTree = "<group>"; };
 		6A5022352E6B4CC55BC3492D /* GroupTripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripService.swift; sourceTree = "<group>"; };
 		8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignPlayground.swift; sourceTree = "<group>"; };
+		A17EAD3E1202608120000001 /* TripHeaderConceptLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripHeaderConceptLab.swift; sourceTree = "<group>"; };
+		B18EAD3E1202608120000001 /* HomeHeaderConceptLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeHeaderConceptLab.swift; sourceTree = "<group>"; };
 		AA7500020000000000000002 /* EvalSampleBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalSampleBrowser.swift; sourceTree = "<group>"; };
 		AA7600020000000000000002 /* EvalSamples.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = EvalSamples.json; sourceTree = "<group>"; };
 		8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripCreateScreen.swift; sourceTree = "<group>"; };
@@ -804,6 +808,8 @@
 			isa = PBXGroup;
 			children = (
 				8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */,
+				B18EAD3E1202608120000001 /* HomeHeaderConceptLab.swift */,
+				A17EAD3E1202608120000001 /* TripHeaderConceptLab.swift */,
 				AA7500020000000000000002 /* EvalSampleBrowser.swift */,
 				AA7600020000000000000002 /* EvalSamples.json */,
 				E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */,
@@ -1009,6 +1015,8 @@
 				5BA329CEEDA5C197EA48C686 /* DesignPlayground.swift in Sources */,
 				AA7500010000000000000001 /* EvalSampleBrowser.swift in Sources */,
 				0F415E840931ACCB739FA5E1 /* DebugMenuScreen.swift in Sources */,
+				B18EAD3E1202608120000002 /* HomeHeaderConceptLab.swift in Sources */,
+				A17EAD3E1202608120000002 /* TripHeaderConceptLab.swift in Sources */,
 				C0DE019F8F54000100000001 /* QuestionnaireConceptLab.swift in Sources */,
 				5DED710D2D4BE57700FFC8A4 /* Card.swift in Sources */,
 				61519E8C2DF85D7900627DF4 /* TopHeader.swift in Sources */,

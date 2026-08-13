@@ -52,8 +52,15 @@ struct BasicInfoScreen: View {
         }
         .animation(.easeInOut, value: store.state.presentSpecifySheet)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)
+                }
+                .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)
+                }
             }
         }
         .simultaneousGesture(

@@ -30,13 +30,12 @@ struct SavedTripsScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            titleSubtitle
-
             Picker("View", selection: $segment) {
                 ForEach(Segment.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
+            .padding(.top, 14)
             .padding(.bottom, 12)
 
             switch segment {
@@ -52,7 +51,7 @@ struct SavedTripsScreen: View {
             }
         }
         .gradientBackground()
-        .navigationTitle("")
+        .navigationTitle("My Trips")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -147,21 +146,6 @@ struct SavedTripsScreen: View {
             .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    var titleSubtitle: some View {
-        VStack(spacing: 2) {
-            Text("My trips")
-                .font(.kanit(34))
-
-            if case let .loaded(trips) = store.state.savedTrips, !trips.isEmpty {
-                Text(trips.count == 1 ? "1 trip" : "\(trips.count) trips")
-                    .font(DS.Typography.subtitle)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.top, 8)
-        .padding(.bottom, 14)
     }
 
     var tripsList: some View {

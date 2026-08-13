@@ -60,8 +60,15 @@ struct GroupTripCreateScreen: View {
         }
         .cleanTopInsets()
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ProfileSelectionButton(selection: $store.state.selectedProfileID)
+            if #available(iOS 26.0, *) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProfileSelectionButton(selection: $store.state.selectedProfileID)
+                }
+                .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProfileSelectionButton(selection: $store.state.selectedProfileID)
+                }
             }
         }
         .simultaneousGesture(

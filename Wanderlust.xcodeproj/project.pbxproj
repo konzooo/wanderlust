@@ -46,7 +46,7 @@
 		09BF7BFE463967564DA59F92 /* GroupTripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A5022352E6B4CC55BC3492D /* GroupTripService.swift */; };
 		0F415E840931ACCB739FA5E1 /* DebugMenuScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */; };
 		A17EAD3E1202608120000002 /* TripHeaderConceptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17EAD3E1202608120000001 /* TripHeaderConceptLab.swift */; };
-		B18EAD3E1202608120000002 /* HomeHeaderConceptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18EAD3E1202608120000001 /* HomeHeaderConceptLab.swift */; };
+		B18EAD3E1202608120000012 /* HomeLogoLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18EAD3E1202608120000011 /* HomeLogoLab.swift */; };
 		1D6283A9FFC00BC44F5935A1 /* GroupDashboardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE33AB09EFB47E97220B5A20 /* GroupDashboardStore.swift */; };
 		22C70A98EBDD52A6B339A03F /* GroupTripCreateScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */; };
 		2376A248BA52548A813D14B0 /* GroupOnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4094912D9593FA81DA180FB9 /* GroupOnboardingSheet.swift */; };
@@ -144,7 +144,6 @@
 		BF3E1E7EBA14B1DA603CD911 /* SharedTripService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC7FFC331298734584BE3852 /* SharedTripService.swift */; };
 		F8B6C3F9E2E41317B0C568F0 /* SharedTripStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C71F79703F7699836FA63E /* SharedTripStore.swift */; };
 		40E6FFCCF4682F2C425E53E2 /* SharedTripScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA7FF4BB5A6E8C86D5D7282 /* SharedTripScreen.swift */; };
-		C0DE019F8F54000100000001 /* QuestionnaireConceptLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE019F8F54000100000002 /* QuestionnaireConceptLab.swift */; };
 		D59368E70C3420299BF88A3D /* GroupDashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4057D1E9A5E0D37EA9B0301 /* GroupDashboardScreen.swift */; };
 		EB1C12E35EA1BF6C1A59DD0F /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = DE4D79994C3CA95E87EFB613 /* ConvexMobile */; };
 		F16301D3AAB415962565DB9E /* GroupTripMembersStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C1A45E246D034167EB10D5 /* GroupTripMembersStore.swift */; };
@@ -296,7 +295,7 @@
 		6A5022352E6B4CC55BC3492D /* GroupTripService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripService.swift; sourceTree = "<group>"; };
 		8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignPlayground.swift; sourceTree = "<group>"; };
 		A17EAD3E1202608120000001 /* TripHeaderConceptLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripHeaderConceptLab.swift; sourceTree = "<group>"; };
-		B18EAD3E1202608120000001 /* HomeHeaderConceptLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeHeaderConceptLab.swift; sourceTree = "<group>"; };
+		B18EAD3E1202608120000011 /* HomeLogoLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLogoLab.swift; sourceTree = "<group>"; };
 		AA7500020000000000000002 /* EvalSampleBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalSampleBrowser.swift; sourceTree = "<group>"; };
 		AA7600020000000000000002 /* EvalSamples.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = EvalSamples.json; sourceTree = "<group>"; };
 		8C81D13685CF71ADB9BC05B0 /* GroupTripCreateScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupTripCreateScreen.swift; sourceTree = "<group>"; };
@@ -304,7 +303,6 @@
 		AA041251E74B9209F2AAE9E4 /* GroupJoinScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupJoinScreen.swift; sourceTree = "<group>"; };
 		B13F57FD9CCC66F2D6859F87 /* GroupJoinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupJoinStore.swift; sourceTree = "<group>"; };
 		B4DD8613F5E5F3E9DCBE8E6C /* QuestionnaireSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionnaireSession.swift; sourceTree = "<group>"; };
-		C0DE019F8F54000100000002 /* QuestionnaireConceptLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuestionnaireConceptLab.swift; sourceTree = "<group>"; };
 		CE33AB09EFB47E97220B5A20 /* GroupDashboardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupDashboardStore.swift; sourceTree = "<group>"; };
 		DC51194E8795E9C6BE21138B /* GroupQuestionnaireDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupQuestionnaireDraftStore.swift; sourceTree = "<group>"; };
 		E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugMenuScreen.swift; sourceTree = "<group>"; };
@@ -808,12 +806,11 @@
 			isa = PBXGroup;
 			children = (
 				8AF008BC4DE3C4F4A7A456CD /* DesignPlayground.swift */,
-				B18EAD3E1202608120000001 /* HomeHeaderConceptLab.swift */,
 				A17EAD3E1202608120000001 /* TripHeaderConceptLab.swift */,
+				B18EAD3E1202608120000011 /* HomeLogoLab.swift */,
 				AA7500020000000000000002 /* EvalSampleBrowser.swift */,
 				AA7600020000000000000002 /* EvalSamples.json */,
 				E2C164370FCBE7DB2B78EB02 /* DebugMenuScreen.swift */,
-				C0DE019F8F54000100000002 /* QuestionnaireConceptLab.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -1015,9 +1012,8 @@
 				5BA329CEEDA5C197EA48C686 /* DesignPlayground.swift in Sources */,
 				AA7500010000000000000001 /* EvalSampleBrowser.swift in Sources */,
 				0F415E840931ACCB739FA5E1 /* DebugMenuScreen.swift in Sources */,
-				B18EAD3E1202608120000002 /* HomeHeaderConceptLab.swift in Sources */,
 				A17EAD3E1202608120000002 /* TripHeaderConceptLab.swift in Sources */,
-				C0DE019F8F54000100000001 /* QuestionnaireConceptLab.swift in Sources */,
+				B18EAD3E1202608120000012 /* HomeLogoLab.swift in Sources */,
 				5DED710D2D4BE57700FFC8A4 /* Card.swift in Sources */,
 				61519E8C2DF85D7900627DF4 /* TopHeader.swift in Sources */,
 				6199854D2E1C0433003A8A61 /* SavedTripsStore.swift in Sources */,

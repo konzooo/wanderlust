@@ -11,16 +11,6 @@ struct HomeScreen: View {
     @State private var selectedContinueID: String?
 
     private let suggestions = ["Lisbon", "Tokyo", "Norway road trip", "North Vietnam"]
-    private let logoHeight: CGFloat
-    private let subtitleFontSize: Float
-
-    init(
-        logoHeight: CGFloat = 56,
-        subtitleFontSize: Float = 13
-    ) {
-        self.logoHeight = logoHeight
-        self.subtitleFontSize = subtitleFontSize
-    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -51,21 +41,23 @@ struct HomeScreen: View {
 
     private var aboveTheFold: some View {
         VStack(spacing: 0) {
-            logo
+            brand
                 .padding(.top, 12)
 
             Text("Get inspired for your next travel")
-                .font(.kanitLightItalic(subtitleFontSize))
+                .font(.kanitLightItalic(10))
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
 
-            Spacer(minLength: 22)
+            Spacer(minLength: 24)
 
             VStack(alignment: .leading, spacing: 16) {
                 Text("Where are you\ngoing next?")
                     .font(.kanitLight(30))
                     .multilineTextAlignment(.leading)
                     .lineSpacing(-3)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.86)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 askField
@@ -111,11 +103,11 @@ struct HomeScreen: View {
         .padding(.horizontal, 20)
     }
 
-    private var logo: some View {
+    private var brand: some View {
         Image("app-logo")
             .resizable()
             .scaledToFit()
-            .frame(height: logoHeight)
+            .frame(height: 72)
 #if DEBUG
             .onTapGesture(count: 3) {
                 router.goToDebugMenu(on: .home)

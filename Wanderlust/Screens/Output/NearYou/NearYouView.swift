@@ -211,26 +211,22 @@ struct NearYouView: View {
     }
 
     /// The un-grounded state asks for one honest grounding point: an exact
-    /// address selected or confirmed by the traveller.
+    /// address selected or confirmed by the traveller. Everything that isn't
+    /// that one question stays out of the way — the map is a quiet fallback,
+    /// not a competing call to action.
     private var ungroundedContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 0) {
                 Spacer(minLength: .Padding.md3)
 
-                VStack(spacing: .Spacing.medium) {
+                VStack(spacing: .Spacing.small) {
                     Image(systemName: "location.magnifyingglass")
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(Color.appTint)
 
-                    Text("Where you stay decides the trip you have.")
+                    Text(isGroup ? "Where is the group staying?" : "Where are you staying?")
                         .font(.kanitMedium(25))
                         .foregroundStyle(.primary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(lede)
-                        .font(.kanit(15))
-                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -249,21 +245,16 @@ struct NearYouView: View {
                 }
 
                 if resolvedPreview == nil {
-                    mapFallback
-                        .padding(.horizontal, .Padding.md)
-                        .padding(.top, .Padding.md2)
+                    Button("Not showing up?") { openLocationPicker() }
+                        .font(.kanitMedium(13))
+                        .foregroundStyle(Color.appTint)
+                        .padding(.top, .Spacing.medium)
+
+                    Button("No place booked yet?") { showsWhereToStay = true }
+                        .font(.kanitMedium(13))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, .Spacing.small)
                 }
-
-                Text("Your exact address or pin is used for this search. Only the approximate area is saved.")
-                    .font(.kanit(12))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, .Padding.md2)
-                    .padding(.top, .Spacing.small)
-
-                whereToStayPrompt
-                    .padding(.top, .Padding.lg)
 
                 Spacer(minLength: .Padding.md3)
             }
@@ -271,12 +262,6 @@ struct NearYouView: View {
             .padding(.bottom, .Padding.md)
         }
         .onDisappear { addressCompleter.clear() }
-    }
-
-    private var lede: String {
-        isGroup
-            ? "It is your first coffee, the walk home at night, and whether you wake up in a neighbourhood or in a postcard. Set where the group is based and we'll map what's genuinely around you."
-            : "It is your first coffee, the walk home at night, and whether you wake up in a neighbourhood or in a postcard. Tell us where you're based and we'll map what's genuinely around you."
     }
 
     private var addressField: some View {
@@ -344,19 +329,6 @@ struct NearYouView: View {
                     .font(.kanit(13))
                     .foregroundStyle(Color.appTint)
                     .fixedSize(horizontal: false, vertical: true)
-            } else if isAddressFocused,
-                      trimmedAddress.count >= 3,
-                      !addressCompleter.isSearching,
-                      addressCompleter.suggestions.isEmpty {
-                Text("No exact match? Enter the complete street address, or choose it on the map below.")
-                    .font(.kanit(12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if addressResolutionIsInitial {
-                Text("Choose a match, or enter the complete street address — including the number.")
-                    .font(.kanit(12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             resolutionFeedback
@@ -411,62 +383,8 @@ struct NearYouView: View {
         .shadow(color: .black.opacity(0.10), radius: 14, y: 5)
     }
 
-    private var whereToStayPrompt: some View {
-        VStack(spacing: .Spacing.medium) {
-            Divider()
-                .padding(.horizontal, .Padding.md)
-
-            VStack(spacing: 6) {
-                Text("Don't have a place booked yet?")
-                    .font(.kanitMedium(17))
-                    .foregroundStyle(.primary)
-
-                Text("Where you book changes everything else. See which area of \(destination) actually fits the trip you want.")
-                    .font(.kanit(14))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, .Padding.md)
-            .padding(.top, .Spacing.small)
-
-            Button("Explore the best areas for you") { showsWhereToStay = true }
-                .buttonStyle(SecondaryButtonStyle(fullWidth: false, internalPadding: 10))
-        }
-    }
-
-    private var mapFallback: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(height: 1)
-                Text("Not showing up?")
-                    .font(.kanit(12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(height: 1)
-            }
-
-            Button {
-                openLocationPicker()
-            } label: {
-                Label("Choose on map", systemImage: "map")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(SecondaryButtonStyle(fullWidth: true, internalPadding: 9))
-        }
-    }
-
     private var trimmedAddress: String {
         address.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var addressResolutionIsInitial: Bool {
-        guard case .initial = addressResolution else { return false }
-        return true
     }
 
     private var resolvedPreview: NearYouResolutionChoice? {
@@ -624,6 +542,11 @@ struct NearYouView: View {
             }
             .font(.kanitMedium(13))
             .foregroundStyle(Color.appTint)
+
+            Text("Your exact address is used for this search. Only the approximate area is saved.")
+                .font(.kanit(11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .background(

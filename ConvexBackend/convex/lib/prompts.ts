@@ -177,7 +177,7 @@ function roleBlock(component: Component, mode: TripMode): string {
     case "worthIt":
       return `You help a traveller decide whether the famous things they are already considering deserve time on this particular trip, for the Wanderlust mobile app. Judge the experience rather than its fame: an icon can fully earn the hype, and a celebrated place can still be a poor fit. Write like a candid local friend who understands this traveller.`;
     case "whereToStay":
-      return `You advise a traveller on which neighbourhood to sleep in, for the Wanderlust mobile app, the way a friend who lives in the city would: what each area is actually like to wake up in, and what the trade-off is.`;
+      return `You advise a traveller on where to sleep, for the Wanderlust mobile app, the way a friend who lives there would: what each place is actually like to wake up in, and what the trade-off is. For a city that means which neighbourhood; for a region it means which town or valley to base in.`;
     case "knowBeforeYouGo":
       return `You brief a ${party ? "group of travellers" : "traveller"} on the practical side of a destination for the Wanderlust mobile app — the things a friend who lives there tells someone before they arrive, so nothing about the trip comes as an unpleasant surprise.`;
     case "nearYou":
@@ -212,14 +212,31 @@ const WORTH_IT_DECISION_BLOCK = `DECISION STANDARD
 
 /** The where-to-stay guide (D10). Same sharing rule as WORTH_IT_TASK. */
 const WHERE_TO_STAY_TASK = `WHERE TO STAY
-The neighbourhood guide for someone who has not booked anywhere yet. Four to six areas, compared honestly.
+The guide for someone who has not booked anywhere yet. Four to six entries, compared honestly.
+
+SCOPE — decide what the destination is before choosing what to compare
+- A city or town: compare neighbourhoods inside it. This is the common case.
+- A region, province, island, island group or country: compare the bases a traveller actually sleeps in across it — the cities, towns and valleys the trip is built around. Listing the districts of its largest city is the wrong answer for a region: someone going to North Vietnam needs Hanoi, Ha Long, Ninh Binh, Sapa and Ha Giang, not five wards of Hanoi.
+- Several named places ("Tokyo and Kyoto"): treat each named place as one entry.
+
+The four fields are the same either way. What changes is what fills them.
+
+FOR A CITY
 - area: the neighbourhood as both locals and booking sites name it.
 - theCase: what it is actually like to stay there. 120 to 200 characters.
 - bestFor: the traveller it suits, one short phrase. Specific — "everyone" is not an answer.
 - watchOut: the real trade-off — noise, distance, price, dead after dark, tourists only. Every area has one; an area presented without a trade-off is not being described honestly.
+
+FOR A REGION
+- area: the base, named as a traveller would search for it.
+- theCase: why this base earns a night at all, and where inside it to sleep. When the base is a city large enough to have real neighbourhood choice, name the two or three worth knowing with a clause each and end with the line that lets the traveller choose between them. When it is a small town with no meaningful district choice, say so plainly and spend the space on what the stay is like instead. 160 to 280 characters.
+- bestFor: which part of this region's trip this base is for — the traveller or the stretch of the trip it serves.
+- watchOut: the answer a local friend gives to "what should I consider when booking here" — what the room itself needs in this specific place (heating and hot water in the mountains, a window off the karaoke street, a hard floor above the flood line, walking distance to the night-bus stop), together with the honest trade-off. Generic advice that would fit any town is a wasted field.
+
+BOTH
 - Order them best-fit-first for this traveller.
-- Areas only. Do not name hotels and do not quote prices.
-- locations: one array per area, covering every place named anywhere in that area's three fields.`;
+- Areas and towns only. Do not name hotels and do not quote prices.
+- locations: one array per entry, covering every place named anywhere in that entry's three fields.`;
 
 /**
  * Three model-picked interest labels (D8). The app pairs them with three fixed

@@ -127,25 +127,17 @@ struct SavedTripsScreen: View {
     }
 
     private var emptyGroupState: some View {
-        VStack(spacing: 14) {
-            Spacer(minLength: 60)
-            ZStack {
-                Circle().fill(Color.appTint.opacity(0.12)).frame(width: 92, height: 92)
-                Image(systemName: "person.3").font(.system(size: 38)).foregroundStyle(Color.appTint)
-            }
-            Text("No group trips yet").font(DS.Typography.displayLight)
-            Text("Start or join a group trip and it’ll live here.")
-                .font(DS.Typography.subtitle).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center).padding(.horizontal, 40)
-            Button { router.goToGroupCreate(resetStack: true) } label: {
-                HStack(spacing: 6) { Image(systemName: "person.3.fill"); Text("Group trip") }
-                    .font(.kanit(17)).foregroundStyle(.white)
-                    .padding(.horizontal, 24).padding(.vertical, 14)
-                    .background(Capsule().fill(Color.appTint))
-            }
-            .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
+        DS.EmptyState(
+            eyebrow: "Group trips",
+            symbol: "person.3",
+            title: "Plan one together",
+            message: "Everyone swipes on their own, and the trip is built from what the group actually agrees on.",
+            actionTitle: "Create a group trip",
+            action: { router.goToGroupCreate(resetStack: true) },
+            secondaryTitle: "Join with a code",
+            secondaryAction: { router.goToGroupCreate(segment: .join, resetStack: true) }
+        )
+        .padding(.top, 20)
     }
 
     var tripsList: some View {
@@ -158,7 +150,9 @@ struct SavedTripsScreen: View {
                     } else {
                         ForEach(trips) { trip in
                             Button(action: { navigateToTripDetails(trip) }) {
-                                TripCard(trip: trip)
+                                TripCard(trip: trip) { url in
+                                    persistImageURL(url, for: trip, received: false)
+                                }
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
@@ -180,41 +174,15 @@ struct SavedTripsScreen: View {
     }
 
     var emptyState: some View {
-        VStack(spacing: 14) {
-            Spacer(minLength: 60)
-            ZStack {
-                Circle()
-                    .fill(Color.appTint.opacity(0.12))
-                    .frame(width: 92, height: 92)
-                Image(systemName: "suitcase.rolling")
-                    .font(.system(size: 40, weight: .regular))
-                    .foregroundStyle(Color.appTint)
-            }
-            Text("No trips yet")
-                .font(DS.Typography.displayLight)
-            Text("Plan your first adventure and it’ll live here.")
-                .font(DS.Typography.subtitle)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Button {
-                router.goToBasicInfo(resetStack: true)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("Plan a trip")
-                }
-                .font(.kanit(17))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(Capsule().fill(Color.appTint))
-                .shadow(color: Color.appTint.opacity(0.3), radius: 12, y: 6)
-            }
-            .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
+        DS.EmptyState(
+            eyebrow: "My trips",
+            symbol: "suitcase.rolling",
+            title: "Your trips live here",
+            message: "Plan one and it stays on this device — itinerary, favourites and everything you saved along the way.",
+            actionTitle: "Plan a trip",
+            action: { router.goToBasicInfo(resetStack: true) }
+        )
+        .padding(.top, 20)
     }
 
     var plusButton: some View {
@@ -251,7 +219,9 @@ struct SavedTripsScreen: View {
                 } else {
                     ForEach(sharedTrips) { trip in
                         Button(action: { navigateToSharedTripDetails(trip) }) {
-                            TripCard(trip: trip)
+                            TripCard(trip: trip) { url in
+                                persistImageURL(url, for: trip, received: true)
+                            }
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -262,19 +232,19 @@ struct SavedTripsScreen: View {
         }
     }
 
+    /// The one empty state a traveller cannot fix from this screen — nobody has
+    /// sent them anything yet. It offers the code path rather than nothing at
+    /// all, so the segment is not a dead end.
     var sharedEmptyState: some View {
-        VStack(spacing: 14) {
-            Spacer(minLength: 60)
-            ZStack {
-                Circle().fill(Color.appTint.opacity(0.12)).frame(width: 92, height: 92)
-                Image(systemName: "paperplane.fill").font(.system(size: 36)).foregroundStyle(Color.appTint)
-            }
-            Text("No shared trips yet").font(DS.Typography.displayLight)
-            Text("Trips your friends share with you will land here.")
-                .font(DS.Typography.subtitle).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center).padding(.horizontal, 40)
-        }
-        .frame(maxWidth: .infinity)
+        DS.EmptyState(
+            eyebrow: "Shared",
+            symbol: "paperplane",
+            title: "Trips friends send you",
+            message: "Open a link someone shares and their whole trip lands here — their favourites already marked.",
+            secondaryTitle: "Join a group trip with a code",
+            secondaryAction: { router.goToGroupCreate(segment: .join, resetStack: true) }
+        )
+        .padding(.top, 20)
     }
 
     // should be part of a Store Action
@@ -329,8 +299,37 @@ struct SavedTripsScreen: View {
         // fields with similar names.
         state.accommodation = nil
         state.nearYouResponse = .initial
+        if let imageURL = trip.imageUrl.flatMap(URL.init(string:)) {
+            state.imageUrlResponse = .loaded(imageURL)
+        }
 
         router.goToItineraryResult(state, resetStack: false)
+    }
+
+    /// One-time migration for trips saved before their selected image URL was
+    /// part of the model. Avoids even the cached async URL lookup on the next
+    /// tab switch or app launch.
+    private func persistImageURL(_ url: URL, for trip: Trip, received: Bool) {
+        guard trip.imageUrl == nil else { return }
+        Task.detached(priority: .utility) {
+            do {
+                let storage: TripStorage
+                if received {
+                    storage = try ReceivedSharedTripStorage.received()
+                } else {
+                    storage = try TripStorage()
+                }
+                var updated = trip
+                updated.imageUrl = url.absoluteString
+                let stored = try storage
+                    .fetch(inGrouping: updated.groupingFolder)
+                    .first { $0.duplicateIdentity == updated.duplicateIdentity }
+                try storage.save(stored.map(updated.merged(over:)) ?? updated)
+            } catch {
+                // Best effort: both the URL-selection cache and image-byte
+                // cache still prevent network work if this migration fails.
+            }
+        }
     }
 }
 

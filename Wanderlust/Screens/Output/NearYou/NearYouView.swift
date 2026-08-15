@@ -215,53 +215,96 @@ struct NearYouView: View {
     /// that one question stays out of the way — the map is a quiet fallback,
     /// not a competing call to action.
     private var ungroundedContent: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 0) {
-                Spacer(minLength: .Padding.md3)
+        GeometryReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    Spacer(minLength: .Padding.md3)
 
-                VStack(spacing: .Spacing.small) {
-                    Image(systemName: "location.magnifyingglass")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(Color.appTint)
+                    VStack(spacing: .Spacing.small) {
+                        Image(systemName: "location.magnifyingglass")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(Color.appTint)
 
-                    Text(isGroup ? "Where is the group staying?" : "Where are you staying?")
-                        .font(.kanitMedium(25))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, .Padding.md)
-
-                addressField
+                        Text(isGroup ? "Where is the group staying?" : "Where are you staying?")
+                            .font(.kanitMedium(25))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     .padding(.horizontal, .Padding.md)
-                    .padding(.top, .Padding.md2)
 
-                if shouldShowSearchButton {
-                    Button("Find this location", action: submitAddress)
-                        .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-                        .disabled(trimmedAddress.isEmpty || addressResolution.isLoading)
+                    addressField
                         .padding(.horizontal, .Padding.md)
-                        .padding(.top, .Spacing.medium)
+                        .padding(.top, .Padding.md2)
+
+                    if shouldShowSearchButton {
+                        Button("Find this location", action: submitAddress)
+                            .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                            .disabled(trimmedAddress.isEmpty || addressResolution.isLoading)
+                            .padding(.horizontal, .Padding.md)
+                            .padding(.top, .Spacing.medium)
+                    }
+
+                    if resolvedPreview == nil {
+                        Button("Not showing up?") { openLocationPicker() }
+                            .font(.kanitMedium(13))
+                            .foregroundStyle(Color.appTint)
+                            .padding(.top, .Spacing.medium)
+
+                        // The traveller with nothing booked cannot answer the
+                        // question above at all, so their way out sits at the
+                        // far end of the screen rather than in the middle of
+                        // someone else's flow.
+                        Spacer(minLength: .Padding.lg)
+
+                        whereToStayPrompt
+                            .padding(.horizontal, .Padding.md)
+                    }
+
+                    Spacer(minLength: .Padding.md3)
                 }
-
-                if resolvedPreview == nil {
-                    Button("Not showing up?") { openLocationPicker() }
-                        .font(.kanitMedium(13))
-                        .foregroundStyle(Color.appTint)
-                        .padding(.top, .Spacing.medium)
-
-                    Button("No place booked yet?") { showsWhereToStay = true }
-                        .font(.kanitMedium(13))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, .Spacing.small)
-                }
-
-                Spacer(minLength: .Padding.md3)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: proxy.size.height, alignment: .top)
+                .padding(.bottom, .Padding.md)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, .Padding.md)
         }
         .onDisappear { addressCompleter.clear() }
+    }
+
+    /// Two lines rather than one: the question names the traveller this is for,
+    /// and the tinted line under it is the part that reads as tappable.
+    private var whereToStayPrompt: some View {
+        Button { showsWhereToStay = true } label: {
+            VStack(spacing: 3) {
+                Text("No place booked yet?")
+                    .font(.kanit(13))
+                    .foregroundStyle(.secondary)
+
+                Text(whereToStayLinkTitle)
+                    .font(.kanitMedium(14))
+                    .foregroundStyle(Color.appTint)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, .Spacing.medium)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.18))
+                    .frame(width: 44, height: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("No place booked yet? \(whereToStayLinkTitle)")
+    }
+
+    /// The count is only honest once the guide has actually arrived; until then
+    /// the line promises the guide without promising a number.
+    private var whereToStayLinkTitle: String {
+        guard case .loaded(let areas) = whereToStay, !areas.isEmpty else {
+            return "Check out the best places to stay"
+        }
+        return "Check out the \(areas.count) best places to stay"
     }
 
     private var addressField: some View {

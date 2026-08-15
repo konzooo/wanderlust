@@ -7,6 +7,7 @@ struct ProfileTabScreen: View {
     @ObservedObject private var library = TravellerProfileLibrary.shared
     @EnvironmentObject private var router: NavigationRouter
     @Environment(\.navigationTab) private var navigationTab
+    @State private var createDNAPresented = false
 
     var body: some View {
         ZStack {
@@ -14,10 +15,7 @@ struct ProfileTabScreen: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    travellerPassport
-
-                    personalisationMessage
-                        .padding(.top, 14)
+                    travellerDNAEntry
 
                     settingsSection
                         .padding(.top, 28)
@@ -25,10 +23,11 @@ struct ProfileTabScreen: View {
                     communitySection
                         .padding(.top, 25)
 
-#if DEBUG
-                    developerSection
+                    aboutSection
                         .padding(.top, 25)
-#endif
+
+                    versionFooter
+                        .padding(.top, 18)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
@@ -38,49 +37,40 @@ struct ProfileTabScreen: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $createDNAPresented) {
+            TravellerDNAEditorScreen(profile: nil) { _ in }
+        }
         .onTabRootAppear(.profile, router: router) {
             AnalyticsTracker.shared.log(.screenViewed(.profiles))
         }
     }
 
-    private var travellerPassport: some View {
-        NavigationLink {
-            ProfilesScreen(
-                navigationTitle: "Traveller profiles",
-                showsDoneButton: false,
-                automaticallyPresentsOnboarding: false
-            )
-        } label: {
-            TravelPassportCard(
-                profile: library.mainProfile,
-                profileCount: library.profiles.count
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens Traveller DNA profiles")
-    }
-
-    private var personalisationMessage: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.appTint)
-                .frame(width: 32, height: 32)
-                .background(Color.appTint.opacity(0.10), in: Circle())
-
-            Text("The more Wanderlust learns about you, the more personal your travel advice becomes.")
-                .font(.kanit(14))
-                .foregroundStyle(Color.primary.opacity(0.74))
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 15)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.56), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(.white.opacity(0.72), lineWidth: 1)
+    @ViewBuilder
+    private var travellerDNAEntry: some View {
+        if let profile = library.mainProfile {
+            NavigationLink {
+                ProfilesScreen(
+                    navigationTitle: "Traveller DNA",
+                    showsDoneButton: false,
+                    automaticallyPresentsOnboarding: false
+                )
+            } label: {
+                TravellerDNACard(
+                    profile: profile,
+                    profileCount: library.profiles.count
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens your profile")
+        } else {
+            Button {
+                createDNAPresented = true
+            } label: {
+                EmptyTravellerDNACard()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Create Traveller DNA")
+            .accessibilityHint("Starts the Traveller DNA setup")
         }
     }
 
@@ -97,16 +87,6 @@ struct ProfileTabScreen: View {
                 )
             }
             .buttonStyle(.plain)
-
-            ProfileMenuDivider()
-
-            ProfileMenuRow(
-                symbol: "person.crop.circle",
-                title: "Account",
-                subtitle: "Your account and personal details",
-                accessory: .comingSoon
-            )
-            .accessibilityElement(children: .combine)
         }
     }
 
@@ -126,50 +106,89 @@ struct ProfileTabScreen: View {
         }
     }
 
-#if DEBUG
-    private var developerSection: some View {
-        ProfileMenuSection(title: "Developer") {
-            Button {
-                router.goToDebugMenu(on: navigationTab)
-            } label: {
+    private var aboutSection: some View {
+        ProfileMenuSection(title: "About") {
+            Link(destination: Self.writeReviewURL) {
                 ProfileMenuRow(
-                    symbol: "ladybug",
-                    title: "Debug Menu",
-                    subtitle: "Design playground and QA controls",
+                    symbol: "star",
+                    title: "Rate Wanderlust",
+                    subtitle: "Opens the App Store review sheet",
+                    accessory: .chevron
+                )
+            }
+            .buttonStyle(.plain)
+
+            ProfileMenuDivider()
+
+            Link(destination: Self.supportURL) {
+                ProfileMenuRow(
+                    symbol: "questionmark.circle",
+                    title: "Support",
+                    subtitle: "Answers to the usual questions",
+                    accessory: .chevron
+                )
+            }
+            .buttonStyle(.plain)
+
+            ProfileMenuDivider()
+
+            Link(destination: Self.privacyURL) {
+                ProfileMenuRow(
+                    symbol: "lock.shield",
+                    title: "Privacy",
+                    subtitle: "What stays on this device, and what doesn't",
                     accessory: .chevron
                 )
             }
             .buttonStyle(.plain)
         }
     }
-#endif
+
+    /// The version belongs wherever a traveller is asked to read it out in a
+    /// bug report, so it sits at the end of the list rather than in a row.
+    private var versionFooter: some View {
+        Text("Wanderlust \(Self.versionString)")
+            .font(.kanit(11))
+            .foregroundStyle(Color.secondary.opacity(0.8))
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("Wanderlust version \(Self.versionString)")
+    }
+
+    private static let supportURL = URL(string: "https://wanderlust.get-catalyst.app/support")!
+    private static let privacyURL = URL(string: "https://wanderlust.get-catalyst.app/privacy")!
+
+    /// `action=write-review` opens the App Store on the review sheet rather
+    /// than dropping the traveller on the product page.
+    private static let writeReviewURL = URL(
+        string: "https://apps.apple.com/app/id6746957492?action=write-review"
+    )!
+
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(version) (\(build))"
+    }
 }
 
-private struct TravelPassportCard: View {
-    let profile: TravellerProfile?
+private struct TravellerDNACard: View {
+    let profile: TravellerProfile
     let profileCount: Int
 
     private var displayName: String {
-        profile?.name ?? "Your travel profile"
+        profile.name
     }
 
     private var archetype: String {
-        profile?.archetype ?? "Ready to become uniquely yours"
+        profile.archetype
     }
 
-    private var countLabel: String? {
-        guard profileCount > 0 else { return nil }
+    private var countLabel: String {
         return profileCount == 1 ? "1 profile" : "\(profileCount) profiles"
     }
 
     private var answers: [ProfileScaleAnswer] {
-        profile?.scaleAnswers ?? [
-            ProfileScaleAnswer(dimension: .adviceDetail, value: 4),
-            ProfileScaleAnswer(dimension: .physicalEnergy, value: 3),
-            ProfileScaleAnswer(dimension: .experienceBreadth, value: 2),
-            ProfileScaleAnswer(dimension: .dayRhythm, value: 4),
-            ProfileScaleAnswer(dimension: .structure, value: 2)
-        ]
+        profile.scaleAnswers
     }
 
     var body: some View {
@@ -180,18 +199,18 @@ private struct TravelPassportCard: View {
                 endPoint: .bottomTrailing
             )
 
-            passportDecoration
+            dnaDecoration
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Label("TRAVEL PASSPORT", systemImage: "airplane")
+                    Label("TRAVELLER DNA", systemImage: "sparkles")
                         .font(.kanit(10).weight(.semibold))
                         .tracking(1.45)
                         .foregroundStyle(.white.opacity(0.76))
 
                     Spacer()
 
-                    Text(profile == nil ? "SET UP" : "MAIN")
+                    Text("MAIN")
                         .font(.kanit(9).weight(.semibold))
                         .tracking(0.9)
                         .foregroundStyle(.white.opacity(0.86))
@@ -228,26 +247,32 @@ private struct TravelPassportCard: View {
                             .foregroundStyle(.white.opacity(0.73))
                             .lineLimit(1)
 
-                        if let countLabel {
-                            Label(countLabel, systemImage: "person.2.fill")
-                                .font(.kanit(10).weight(.medium))
-                                .foregroundStyle(.white.opacity(0.58))
-                                .padding(.top, 2)
-                        }
+                        Label(countLabel, systemImage: "person.2.fill")
+                            .font(.kanit(10).weight(.medium))
+                            .foregroundStyle(.white.opacity(0.58))
+                            .padding(.top, 2)
                     }
 
                     Spacer(minLength: 0)
                 }
                 .padding(.top, 20)
 
-                Spacer(minLength: 18)
+                Spacer(minLength: 14)
+
+                Text("The more Wanderlust learns about you, the more personal your travel advice gets.")
+                    .font(.kanit(11))
+                    .foregroundStyle(.white.opacity(0.58))
+                    .lineSpacing(1)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.trailing, 22)
 
                 Rectangle()
                     .fill(.white.opacity(0.14))
                     .frame(height: 1)
+                    .padding(.top, 12)
 
                 HStack(spacing: 8) {
-                    Text(profile == nil ? "Create Traveller DNA" : "Manage Traveller DNA")
+                    Text("Manage Profile")
                         .font(.kanit(13).weight(.medium))
                     Spacer()
                     Image(systemName: "arrow.up.right")
@@ -260,7 +285,7 @@ private struct TravelPassportCard: View {
             }
             .padding(20)
         }
-        .frame(height: 246)
+        .frame(height: 278)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -270,27 +295,105 @@ private struct TravelPassportCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
-    private var passportDecoration: some View {
+    private var dnaDecoration: some View {
         GeometryReader { proxy in
-            ZStack {
-                Circle()
-                    .stroke(.white.opacity(0.08), lineWidth: 1)
-                    .frame(width: 210, height: 210)
-                    .position(x: proxy.size.width - 26, y: 14)
-
-                Circle()
-                    .stroke(.white.opacity(0.06), lineWidth: 1)
-                    .frame(width: 142, height: 142)
-                    .position(x: proxy.size.width - 26, y: 14)
-
-                Image(systemName: "globe.europe.africa.fill")
-                    .font(.system(size: 128, weight: .ultraLight))
-                    .foregroundStyle(.white.opacity(0.035))
-                    .position(x: proxy.size.width - 52, y: proxy.size.height - 38)
-            }
+            Image(systemName: "globe.europe.africa.fill")
+                .font(.system(size: 128, weight: .ultraLight))
+                .foregroundStyle(.white.opacity(0.035))
+                .position(x: proxy.size.width - 52, y: proxy.size.height - 38)
         }
         .allowsHitTesting(false)
     }
+}
+
+private struct EmptyTravellerDNACard: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.92),
+                    Color(hex: "#F1F1FF").opacity(0.94),
+                    Color(hex: "#FFF8EC").opacity(0.92)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Label("PROFILE", systemImage: "atom")
+                        .font(.kanit(10).weight(.semibold))
+                        .tracking(1.45)
+                        .foregroundStyle(Color.appTint)
+
+                    Spacer()
+
+                    Label("2 MIN", systemImage: "clock")
+                        .font(.kanit(9).weight(.semibold))
+                        .tracking(0.75)
+                        .foregroundStyle(Color.appTint)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Color.appTint.opacity(0.09), in: Capsule())
+                }
+
+                HStack(spacing: 15) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 29, weight: .light))
+                        .foregroundStyle(Color.appTint)
+                        .frame(width: 66, height: 66)
+                        .background(.white.opacity(0.80), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(Color.appTint.opacity(0.12), lineWidth: 1)
+                        }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Let’s personalize")
+                            .font(.kanit(24).weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        Text("Two minutes now, better advice on every trip.")
+                            .font(.kanit(13).weight(.medium))
+                            .foregroundStyle(Color.primary.opacity(0.72))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 18)
+
+                Text("The better we know you, the more personal the advice gets.")
+                    .font(.kanit(12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 15)
+
+                HStack(spacing: 8) {
+                    Text("Create Traveller DNA")
+                        .font(.kanit(13).weight(.semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 15)
+                .frame(height: 44)
+                .background(Color.appTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.top, 17)
+            }
+            .padding(20)
+        }
+        .frame(height: 290)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(.white.opacity(0.88), lineWidth: 1)
+        }
+        .shadow(color: Color.appTint.opacity(0.12), radius: 22, y: 12)
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+
 }
 
 private enum ProfileMenuAccessory {

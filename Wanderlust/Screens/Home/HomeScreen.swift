@@ -24,10 +24,19 @@ struct HomeScreen: View {
                         continueSection(width: proxy.size.width)
                     }
                 }
+                // Dismissing the keyboard sits behind the content instead of on
+                // the whole screen: a screen-wide tap gesture also fires on taps
+                // inside the ask field and cancels its double/triple-tap
+                // selection before the selection can appear.
+                .background {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { askFieldFocused = false }
+                }
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .background { AuroraBackground() }
+        .background { HomeBackground() }
         .toolbar(.hidden, for: .navigationBar)
         .onTabRootAppear(.home, router: router) {
             AnalyticsTracker.shared.log(.screenViewed(.home))
@@ -36,7 +45,6 @@ struct HomeScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: .tripLibraryDidChange)) { _ in
             tripsStore.load()
         }
-        .simultaneousGesture(TapGesture().onEnded { askFieldFocused = false })
     }
 
     private var aboveTheFold: some View {
@@ -103,15 +111,24 @@ struct HomeScreen: View {
         .padding(.horizontal, 20)
     }
 
+    /// The compass lockup: the pin mark over the name in wide lowercase, sitting
+    /// on the bearing rings drawn by `HomeBackground`.
     private var brand: some View {
-        Image("app-logo")
-            .resizable()
-            .scaledToFit()
-            .frame(height: 72)
+        VStack(spacing: 12) {
+            PinPlaneMark(size: 36)
+
+            Text("wanderlust")
+                .font(.kanitLight(23))
+                .tracking(7.5)
+                // Tracking hangs off the final letter; half of it back keeps the
+                // word optically centred under the mark.
+                .padding(.leading, 7.5)
+                .foregroundStyle(Color(hex: "#2A2F45").opacity(0.9))
+        }
 #if DEBUG
-            .onTapGesture(count: 3) {
-                router.goToDebugMenu(on: .home)
-            }
+        .onTapGesture(count: 3) {
+            router.goToDebugMenu(on: .home)
+        }
 #endif
     }
 
@@ -137,6 +154,11 @@ struct HomeScreen: View {
                     .focused($askFieldFocused)
                     .onSubmit(planTrip)
                     .accessibilityLabel("Trip destination")
+                    // A double tap natively selects one word only. A destination
+                    // is usually replaced wholesale, so extend it to everything.
+                    .simultaneousGesture(
+                        TapGesture(count: 2).onEnded { selectWholeQuery() }
+                    )
             }
 
             Button(action: planTrip) {
@@ -278,6 +300,18 @@ struct HomeScreen: View {
         }
     }
 
+    /// Selects the full query in whichever field is first responder, so a double
+    /// tap marks the whole destination rather than a single word.
+    private func selectWholeQuery() {
+        guard !store.state.destinationQuery.isEmpty else { return }
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.selectAll(_:)),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+
     private func planTrip() {
         let destination = store.state.trimmedDestination
         guard !destination.isEmpty else { return }
@@ -285,6 +319,67 @@ struct HomeScreen: View {
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         AnalyticsTracker.shared.log(.tripPlanningStarted(entryPoint: "home_ask"))
         router.goToBasicInfo(.init(destination: destination), on: .home)
+    }
+}
+
+/// Home's own backdrop, in place of the shared `AuroraBackground`.
+///
+/// Two things it does that the shared one doesn't: it carries real colour at the
+/// top and real warmth at the bottom rather than washing out to white in the
+/// middle, and it draws the bearing rings the brand lockup stands on — so the
+/// mark sits inside the artwork instead of on top of it.
+struct HomeBackground: View {
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(hex: "#D5DDFF"), location: 0),
+                        .init(color: Color(hex: "#E6EAFD"), location: 0.34),
+                        .init(color: Color(hex: "#F6F4F6"), location: 0.58),
+                        .init(color: Color(hex: "#FDF0DC"), location: 0.86),
+                        .init(color: Color(hex: "#FFF7E8"), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                Circle()
+                    .fill(Color.appTint.opacity(0.30))
+                    .frame(width: 360, height: 360)
+                    .blur(radius: 95)
+                    .offset(x: -150, y: -300)
+
+                Circle()
+                    .fill(Color.lightPurple.opacity(0.30))
+                    .frame(width: 320, height: 320)
+                    .blur(radius: 85)
+                    .offset(x: 165, y: -190)
+
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.83, blue: 0.52).opacity(0.42))
+                    .frame(width: 340, height: 340)
+                    .blur(radius: 95)
+                    .offset(x: 130, y: 330)
+
+                // The bearing dial, centred on the mark.
+                ZStack {
+                    ForEach(1..<6, id: \.self) { ring in
+                        Circle()
+                            .stroke(
+                                Color.appTint.opacity(0.17 - Double(ring) * 0.021),
+                                lineWidth: 0.9
+                            )
+                            .frame(width: CGFloat(ring) * 96, height: CGFloat(ring) * 96)
+                    }
+                }
+                // Sits on the pin's own centre: safe-area top, the header's 12pt
+                // inset, then half the mark.
+                .position(x: proxy.size.width / 2, y: proxy.safeAreaInsets.top + 30)
+            }
+            .ignoresSafeArea()
+        }
+        .ignoresSafeArea()
     }
 }
 

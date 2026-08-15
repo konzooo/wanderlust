@@ -1,0 +1,445 @@
+<title>Wanderlust — pin + plane, done properly</title>
+<style>
+  :root {
+    --tint: #586FF2; --violet: #8B6BF6; --ink: #2A2F45;
+    --page: #F6F7FB; --card: #FFFFFF;
+    --line: rgba(42, 47, 69, 0.09); --muted: rgba(42, 47, 69, 0.56);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#ECEDF5; --page:#101219; --card:#191C26;
+            --line: rgba(255,255,255,0.09); --muted: rgba(236,237,245,0.56); }
+  }
+  :root[data-theme="light"] { --ink:#2A2F45; --page:#F6F7FB; --card:#FFF;
+            --line: rgba(42,47,69,0.09); --muted: rgba(42,47,69,0.56); }
+  :root[data-theme="dark"] { --ink:#ECEDF5; --page:#101219; --card:#191C26;
+            --line: rgba(255,255,255,0.09); --muted: rgba(236,237,245,0.56); }
+
+  body {
+    margin: 0; padding: 52px 24px 96px; background: var(--page); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  header { max-width: 700px; margin-bottom: 40px; }
+  h1 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 10px; font-weight: 630; }
+  header p { margin: 0 0 10px; color: var(--muted); }
+  header p:last-child { margin: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(292px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 20px; padding: 22px 22px 20px; display: flex; flex-direction: column;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .pane {
+    height: 132px; border-radius: 14px; display: grid; place-items: center;
+    background: linear-gradient(155deg, rgba(88,111,242,0.06), rgba(139,107,246,0.045));
+  }
+  .pane.icon { background: transparent; }
+
+  .sizes {
+    display: flex; align-items: center; gap: 15px;
+    padding: 11px 14px; margin-bottom: 14px;
+    border: 1px dashed var(--line); border-radius: 12px;
+  }
+  .slot { display: grid; place-items: center; gap: 4px; }
+  .px { font-size: 10px; color: var(--muted); }
+  .onink { background: var(--ink); border-radius: 8px; padding: 5px 7px; display: grid; place-items: center; }
+  .knock { filter: brightness(0) invert(1); }
+
+  .n { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--tint); margin-bottom: 4px; }
+  h2 { font-size: 16.5px; margin: 0 0 5px; font-weight: 620; letter-spacing: -0.012em; }
+  .card p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .card p:last-child { margin: 0; }
+  .built { font-size: 12px; color: var(--muted); }
+  .built b { color: var(--ink); font-weight: 600; }
+
+  .note {
+    margin-top: 44px; padding: 22px 24px; max-width: 820px;
+    border-left: 2px solid var(--tint); background: var(--card); border-radius: 0 14px 14px 0;
+  }
+  .note h3 { margin: 0 0 8px; font-size: 15px; font-weight: 630; }
+  .note p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+  .note p:last-child { margin: 0; }
+  .note b { color: var(--ink); font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="g" x1="0.1" y1="0" x2="0.9" y2="1">
+        <stop offset="0" stop-color="#6E82F6"/><stop offset="1" stop-color="#7C5EF0"/>
+      </linearGradient>
+      <linearGradient id="gTile" x1="0" y1="0" x2="0.85" y2="1">
+        <stop offset="0" stop-color="#7C8CFF"/><stop offset="0.55" stop-color="#5E6FF0"/>
+        <stop offset="1" stop-color="#8B5CF0"/>
+      </linearGradient>
+      <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#8FA2FF"/><stop offset="0.55" stop-color="#6E7BF2"/>
+        <stop offset="1" stop-color="#F2C98C"/>
+      </linearGradient>
+      <radialGradient id="gSun" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#FFE3AE"/><stop offset="1" stop-color="#FFD79A" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="drop" x="-40%" y="-40%" width="180%" height="180%">
+        <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#3B3E86" flood-opacity="0.28"/>
+      </filter>
+
+      <!-- The two travel primitives, drawn once and reused everywhere. -->
+      <!-- Pin: circular head, tangent taper, tip at bottom. -->
+      <path id="pin" d="M60 164 C36 128 16 106 16 74 A44 44 0 1 1 104 74 C104 106 84 128 60 164 Z"/>
+      <!-- Airliner from above: swept wings, tailplane, clean notch. -->
+      <path id="plane" d="M50 0 L57 30 L98 58 L98 69 L57 55 L57 82 L70 94 L70 101 L50 92
+                          L30 101 L30 94 L43 82 L43 55 L2 69 L2 58 L43 30 Z"/>
+      <!-- The spark, for the 10% AI hint. -->
+      <path id="sp" d="M50 0 Q50 44 92 44 Q50 44 50 128 Q50 44 8 44 Q50 44 50 0 Z"/>
+
+      <mask id="mPlaneOut">
+        <rect x="0" y="0" width="120" height="168" fill="#fff"/>
+        <g transform="translate(60 68) rotate(-38) scale(0.50) translate(-50 -50)">
+          <use href="#plane" fill="#000"/>
+        </g>
+      </mask>
+      <mask id="mPlaneSpark">
+        <rect x="0" y="0" width="120" height="168" fill="#fff"/>
+        <g transform="translate(60 72) rotate(-38) scale(0.46) translate(-50 -50)">
+          <use href="#plane" fill="#000"/>
+        </g>
+        <g transform="translate(88 34) scale(0.17) translate(-50 -44)"><use href="#sp" fill="#000"/></g>
+      </mask>
+      <mask id="mPinPlaneTile">
+        <rect x="0" y="0" width="120" height="120" fill="#fff"/>
+        <g transform="translate(60 60) scale(0.62) translate(-60 -84)">
+          <use href="#pin" fill="#000"/>
+        </g>
+        <g transform="translate(60 51) rotate(-38) scale(0.32) translate(-50 -50)">
+          <use href="#plane" fill="#fff"/>
+        </g>
+      </mask>
+      <clipPath id="cPin">
+        <use href="#pin"/>
+      </clipPath>
+      <clipPath id="cTile"><rect width="120" height="120" rx="27"/></clipPath>
+
+      <!-- 01 · the current idea, drawn properly -->
+      <symbol id="m1" viewBox="0 0 120 168">
+        <use href="#pin" fill="url(#g)" mask="url(#mPlaneOut)"/>
+      </symbol>
+
+      <!-- 02 · plane + spark inside the pin -->
+      <symbol id="m2" viewBox="0 0 120 168">
+        <use href="#pin" fill="url(#g)" mask="url(#mPlaneSpark)"/>
+      </symbol>
+
+      <!-- 03 · pin and plane as one cut in the tile -->
+      <symbol id="m3" viewBox="0 0 120 168">
+        <g transform="translate(0 24)">
+          <rect width="120" height="120" rx="27" fill="url(#gTile)" mask="url(#mPinPlaneTile)"/>
+          <rect x="0.6" y="0.6" width="118.8" height="118.8" rx="26.6" fill="none"
+                stroke="#fff" stroke-opacity="0.32" stroke-width="1.2"/>
+        </g>
+      </symbol>
+
+      <!-- 04 · the pin's taper becomes a swept wing -->
+      <symbol id="m4" viewBox="0 0 120 168">
+        <!-- Plane and pin head as one union: a round-headed aircraft, which is
+             also a pin whose body happens to have wings. -->
+        <!-- Banked, because a round head over symmetrical wings reads as a
+             standing figure the moment it is upright. -->
+        <g transform="rotate(-32 60 84)">
+          <g fill="url(#g)">
+            <g transform="translate(60 96) scale(0.95) translate(-50 -50)">
+              <use href="#plane"/>
+            </g>
+            <circle cx="60" cy="44" r="27"/>
+          </g>
+          <circle cx="60" cy="42" r="9.5" fill="#fff" opacity="0.94"/>
+        </g>
+      </symbol>
+
+      <!-- 05 · delta with a spark tail -->
+      <symbol id="m5" viewBox="0 0 120 168">
+        <g transform="translate(60 78) scale(1.02) translate(-50 -50)">
+          <use href="#plane" fill="url(#g)"/>
+        </g>
+        <g transform="translate(60 20) scale(0.20) translate(-50 -44)">
+          <use href="#sp" fill="url(#g)" opacity="0.55"/>
+        </g>
+      </symbol>
+
+      <!-- 06 · pin with a route arriving and a plane on it -->
+      <symbol id="m6" viewBox="0 0 120 168">
+        <path d="M4 132 Q26 88 58 84" fill="none" stroke="url(#g)" stroke-width="6"
+              stroke-linecap="round" stroke-dasharray="1 11" opacity="0.55"/>
+        <g transform="translate(60 78) scale(0.78) translate(-60 -84)">
+          <use href="#pin" fill="url(#g)" mask="url(#mPlaneOut)"/>
+        </g>
+      </symbol>
+
+      <!-- 07 · a view inside the pin -->
+      <symbol id="m7" viewBox="0 0 120 168">
+        <g clip-path="url(#cPin)">
+          <rect x="0" y="0" width="120" height="168" fill="url(#gSky)"/>
+          <circle cx="60" cy="92" r="34" fill="url(#gSun)"/>
+          <path d="M0 92 L120 92" stroke="#fff" stroke-width="2.5" opacity="0.55"/>
+          <g transform="translate(74 48) rotate(28) scale(0.20) translate(-50 -50)">
+            <use href="#plane" fill="#fff"/>
+          </g>
+          <path d="M20 44 Q44 34 66 40" fill="none" stroke="#fff" stroke-width="2.5"
+                stroke-linecap="round" stroke-dasharray="1 7" opacity="0.7"/>
+        </g>
+        <use href="#pin" fill="none" stroke="url(#g)" stroke-width="6"/>
+      </symbol>
+
+      <!-- 08 · here to there -->
+      <symbol id="m8" viewBox="0 0 120 168">
+        <path d="M22 122 Q60 56 100 92" fill="none" stroke="url(#g)" stroke-width="5"
+              stroke-linecap="round" stroke-dasharray="1 10" opacity="0.5"/>
+        <g transform="translate(22 122) scale(0.30) translate(-60 -84)">
+          <use href="#pin" fill="url(#g)" opacity="0.5"/>
+        </g>
+        <g transform="translate(100 92) scale(0.42) translate(-60 -84)">
+          <use href="#pin" fill="url(#g)" mask="url(#mPlaneOut)"/>
+        </g>
+        <g transform="translate(66 62) rotate(52) scale(0.26) translate(-50 -50)">
+          <use href="#plane" fill="url(#g)"/>
+        </g>
+      </symbol>
+
+      <!-- 09 · the pin standing on the world -->
+      <symbol id="m9" viewBox="0 0 120 168">
+        <!-- Convex, so the pin stands on the crest of the world rather than
+             sitting in a bowl. -->
+        <path d="M6 134 A76 76 0 0 1 114 134" fill="none" stroke="url(#g)" stroke-width="7"
+              stroke-linecap="round" opacity="0.45"/>
+        <path d="M22 152 A78 78 0 0 1 98 152" fill="none" stroke="url(#g)" stroke-width="5"
+              stroke-linecap="round" opacity="0.22"/>
+        <g transform="translate(60 62) scale(0.72) translate(-60 -84)">
+          <use href="#pin" fill="url(#g)" mask="url(#mPlaneOut)"/>
+        </g>
+      </symbol>
+
+      <!-- 10 · the pin drawn as a wing, spark at the nose -->
+      <symbol id="m10" viewBox="0 0 120 168">
+        <use href="#pin" fill="url(#g)"/>
+        <g transform="translate(60 70) rotate(-38) scale(0.52) translate(-50 -50)">
+          <use href="#plane" fill="#fff" opacity="0.95"/>
+        </g>
+        <g transform="translate(93 30) scale(0.19) translate(-50 -44)">
+          <use href="#sp" fill="url(#g)"/>
+        </g>
+      </symbol>
+    </defs>
+  </svg>
+
+  <header>
+    <h1>Pin + plane, done properly</h1>
+    <p>
+      Back to what people already recognise. The pin and the aeroplane are drawn once, as
+      real geometry — a circular head with a true tangent taper, an airliner with swept
+      wings and a tailplane — and reused in all ten. That is the difference between this
+      and the icon you have: same idea, drawn instead of assembled.
+    </p>
+    <p>
+      The spark survives where it earns its place, at about a tenth of the mark. Loose
+      mark, app icon, then 44 / 28 / 18px and reversed on ink.
+    </p>
+  </header>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m1"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m1" class="knock" x="30" y="12" width="60" height="84"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m1"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m1"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m1"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m1"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">01</div>
+      <h2>Ascent</h2>
+      <p>Your logo, redrawn. The head is a true circle, the taper meets it on the tangent so there's no kink, and the aircraft is a real silhouette banking left rather than a clip-art jet.</p>
+      <div class="built"><b>This is the baseline</b> — everything else has to beat it.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m2"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m2" class="knock" x="30" y="12" width="60" height="84"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m2"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m2"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m2"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m2"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">02</div>
+      <h2>Ascent + spark</h2>
+      <p>The same, with a small spark cut ahead of the nose — the plane is flying towards an idea. Travel reads first, intelligence second, exactly in that order.</p>
+      <div class="built"><b>Detail:</b> spark is 10% of the mark's area. Any bigger and it takes over.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m3"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><g transform="translate(0 -24)"><use href="#m3" width="120" height="168"/></g></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m3"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m3"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m3"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m3"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">03</div>
+      <h2>Cut</h2>
+      <p>Pin and plane become a single hole in the tile — the plane is solid tile showing through the pin's void. Two levels of cut, which is what makes an icon look expensive.</p>
+      <div class="built"><b>Detail:</b> no gradient on the mark at all; the tile does everything.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m4"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m4" class="knock" x="28" y="14" width="64" height="90"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m4"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m4"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m4"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m4"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">04</div>
+      <h2>Fusion</h2>
+      <p>One shape that is both: a pin's head and point, with wings swept out of its sides. Nothing is placed inside anything — the travel reading is in the silhouette itself.</p>
+      <div class="built"><b>Detail:</b> the white dot is the pin's eye and the cockpit at once.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m5"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m5" class="knock" x="30" y="14" width="60" height="84"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m5"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m5"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m5"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m5"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">05</div>
+      <h2>Aircraft</h2>
+      <p>The plane alone, at full size, with a spark ahead of it where the destination is. No pin — for the case where the category is obvious and the mark should just be confident.</p>
+      <div class="built"><b>Risk:</b> aeroplane-only marks are crowded; this is the least ownable.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m6"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m6" class="knock" x="28" y="14" width="64" height="90"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m6"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m6"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m6"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m6"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">06</div>
+      <h2>Arrival</h2>
+      <p>The dashed route from your own background, arriving at the pin. The most literal of the set, and the one that needs the least explaining to anyone, ever.</p>
+      <div class="built"><b>Detail:</b> the dashes match the flight path already on the Home screen.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m7"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="#EEF0FE"/><use href="#m7" x="30" y="12" width="60" height="84"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m7"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m7"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m7"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m7"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">07</div>
+      <h2>Window</h2>
+      <p>The pin becomes an aperture onto somewhere: sky, a low sun, a plane crossing with its contrail. A destination held inside the shape of a destination.</p>
+      <div class="built"><b>Risk:</b> the richest and the first to muddy at 18px — needs a flat fallback.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m8"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m8" class="knock" x="28" y="16" width="64" height="90"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m8"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m8"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m8"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m8"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">08</div>
+      <h2>Here to there</h2>
+      <p>A faint pin you're leaving, a solid pin you're heading for, and the aircraft between them. The whole product in one diagram — origin, route, destination.</p>
+      <div class="built"><b>Risk:</b> three elements. Beautiful at 44px, mush at 18.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m9"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m9" class="knock" x="28" y="14" width="64" height="90"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m9"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m9"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m9"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m9"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">09</div>
+      <h2>Standing on the world</h2>
+      <p>The pin planted on a curved horizon with a second latitude behind it. Says "anywhere on earth" without drawing a single continent.</p>
+      <div class="built"><b>Detail:</b> two arcs only — a full globe would swallow the pin.</div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="pane"><svg viewBox="0 0 120 168" width="79" height="111"><use href="#m10"/></svg></div>
+        <div class="pane icon"><svg viewBox="0 0 120 120" width="104" height="104" filter="url(#drop)"><rect width="120" height="120" rx="27" fill="url(#gTile)"/><use href="#m10" class="knock" x="28" y="12" width="64" height="90"/></svg></div>
+      </div>
+      <div class="sizes">
+        <div class="slot"><svg viewBox="0 0 120 168" width="31" height="44"><use href="#m10"/></svg><span class="px">44</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="20" height="28"><use href="#m10"/></svg><span class="px">28</span></div>
+        <div class="slot"><svg viewBox="0 0 120 168" width="13" height="18"><use href="#m10"/></svg><span class="px">18</span></div>
+        <div class="slot"><span class="onink"><svg viewBox="0 0 120 168" width="19" height="27" class="knock"><use href="#m10"/></svg></span><span class="px">ink</span></div>
+      </div>
+      <div class="n">10</div>
+      <h2>Filled</h2>
+      <p>Solid pin, white aircraft laid over it rather than cut from it, and the spark outside the silhouette so the mark keeps a clean outline. The most robust to reproduce — embroidery, stamps, one colour.</p>
+      <div class="built"><b>Detail:</b> the only version whose outline survives a single-colour print.</div>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <h3>Read this as a ladder</h3>
+    <p>
+      <b>01</b> is your current logo with the drawing fixed — true tangents, a real aircraft,
+      correct optical weight. If nothing else here wins, ship this: it is the same brand,
+      minus the cheapness.
+    </p>
+    <p>
+      <b>02</b> is 01 plus your spark, at the ratio you asked for: travel first, a tenth of
+      AI second. That is the safest place to land.
+    </p>
+    <p>
+      <b>03 Cut</b> and <b>04 Fusion</b> are the two that would actually look like a 2026
+      brand. Cut makes the icon do the work with two levels of negative space; Fusion is the
+      only one where pin and plane are a single shape rather than one inside the other —
+      the most ownable thing on the sheet.
+    </p>
+    <p>
+      <b>07, 08</b> are richest and weakest small. <b>05</b> I'd avoid: plane-only marks are
+      the most crowded space in travel.
+    </p>
+  </div>
+</div>

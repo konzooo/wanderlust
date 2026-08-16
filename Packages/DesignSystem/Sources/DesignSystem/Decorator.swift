@@ -29,7 +29,7 @@ extension UITabBar {
 extension UISegmentedControl {
     /// Applies bold text + custom tint when a segment is selected
     /// and keeps the default system colour when it isn’t.
-    static func applyAppTint(_ tint: UIColor, fontSize: CGFloat = 14) {
+    static func applyAppTint(_ tint: UIColor, fontSize: CGFloat = 12) {
         let selected: [NSAttributedString.Key: Any] = [
             .foregroundColor: tint,
             .font: UIFont.boldSystemFont(ofSize: fontSize)

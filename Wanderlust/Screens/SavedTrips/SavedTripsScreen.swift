@@ -14,13 +14,13 @@ struct SavedTripsScreen: View {
     @State private var didLogView = false
 
     // Shortened labels so all three fit the segmented control on small
-    // devices and at larger Dynamic Type sizes ("My Group Trips" / "Shared
-    // with me" would truncate). The feature itself is still called "My Group
-    // Trips" everywhere else.
+    // devices and at larger Dynamic Type sizes ("My Group Trips" would
+    // truncate). The feature itself is still called "My Group Trips"
+    // everywhere else.
     private enum Segment: String, CaseIterable {
         case myTrips = "My Trips"
         case myGroupTrips = "Group Trips"
-        case shared = "Shared"
+        case shared = "Shared with me"
     }
 
     @MainActor
@@ -178,7 +178,7 @@ struct SavedTripsScreen: View {
             eyebrow: "My trips",
             symbol: "suitcase.rolling",
             title: "Your trips live here",
-            message: "Plan one and it stays on this device — itinerary, favourites and everything you saved along the way.",
+            message: "Plan one and it stays on this device — suggestions, favourites and everything you saved along the way.",
             actionTitle: "Plan a trip",
             action: { router.goToBasicInfo(resetStack: true) }
         )
@@ -237,10 +237,10 @@ struct SavedTripsScreen: View {
     /// all, so the segment is not a dead end.
     var sharedEmptyState: some View {
         DS.EmptyState(
-            eyebrow: "Shared",
+            eyebrow: "Shared with me",
             symbol: "paperplane",
-            title: "Trips friends send you",
-            message: "Open a link someone shares and their whole trip lands here — their favourites already marked.",
+            title: "Ask friends to share their trip",
+            message: "Their favourites land here, already marked.",
             secondaryTitle: "Join a group trip with a code",
             secondaryAction: { router.goToGroupCreate(segment: .join, resetStack: true) }
         )

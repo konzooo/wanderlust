@@ -9,6 +9,9 @@ struct ProfileTabScreen: View {
     @Environment(\.navigationTab) private var navigationTab
     @State private var createDNAPresented = false
 
+    @AppStorage(ProfilePreferenceKey.introductionDismissed) private var introDismissed = false
+    @State private var introPresented = false
+
     var body: some View {
         ZStack {
             AuroraBackground()
@@ -21,9 +24,6 @@ struct ProfileTabScreen: View {
                         .padding(.top, 28)
 
                     communitySection
-                        .padding(.top, 25)
-
-                    aboutSection
                         .padding(.top, 25)
 
                     versionFooter
@@ -40,9 +40,50 @@ struct ProfileTabScreen: View {
         .fullScreenCover(isPresented: $createDNAPresented) {
             TravellerDNAEditorScreen(profile: nil) { _ in }
         }
+        .sheet(isPresented: $introPresented) {
+            TravellerDNAIntroScreen(
+                onCreate: {
+                    introDismissed = true
+                    introPresented = false
+                    createDNAPresented = true
+                },
+                // A deferral, not a decision: nothing is persisted, and the
+                // launch-scoped guard below is what keeps "later" from meaning
+                // "again the next time you open this tab".
+                onMaybeLater: { introPresented = false },
+                onDontShowAgain: {
+                    introDismissed = true
+                    introPresented = false
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .onTabRootAppear(.profile, router: router) {
             AnalyticsTracker.shared.log(.screenViewed(.profiles))
+            presentIntroIfNeeded()
         }
+    }
+
+    /// The tab already shows `EmptyTravellerDNACard`, which is the affordance —
+    /// this is the explanation, and only for someone who has never made a
+    /// profile and has not turned it off.
+    private func presentIntroIfNeeded() {
+        let session = OnboardingSession.shared
+
+        guard library.profiles.isEmpty,
+              !introDismissed,
+              !session.didShowDNAIntroThisLaunch
+        else { return }
+
+        session.didShowDNAIntroThisLaunch = true
+        // Presented as a pop-up over the profile screen rather than the
+        // instant it appears, so the traveller sees the tab itself first.
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            introPresented = true
+        }
+        AnalyticsTracker.shared.log(.screenViewed(.travellerDNAIntro))
     }
 
     @ViewBuilder
@@ -103,40 +144,14 @@ struct ProfileTabScreen: View {
                 )
             }
             .buttonStyle(.plain)
-        }
-    }
 
-    private var aboutSection: some View {
-        ProfileMenuSection(title: "About") {
+            ProfileMenuDivider()
+
             Link(destination: Self.writeReviewURL) {
                 ProfileMenuRow(
                     symbol: "star",
                     title: "Rate Wanderlust",
                     subtitle: "Opens the App Store review sheet",
-                    accessory: .chevron
-                )
-            }
-            .buttonStyle(.plain)
-
-            ProfileMenuDivider()
-
-            Link(destination: Self.supportURL) {
-                ProfileMenuRow(
-                    symbol: "questionmark.circle",
-                    title: "Support",
-                    subtitle: "Answers to the usual questions",
-                    accessory: .chevron
-                )
-            }
-            .buttonStyle(.plain)
-
-            ProfileMenuDivider()
-
-            Link(destination: Self.privacyURL) {
-                ProfileMenuRow(
-                    symbol: "lock.shield",
-                    title: "Privacy",
-                    subtitle: "What stays on this device, and what doesn't",
                     accessory: .chevron
                 )
             }
@@ -153,9 +168,6 @@ struct ProfileTabScreen: View {
             .frame(maxWidth: .infinity)
             .accessibilityLabel("Wanderlust version \(Self.versionString)")
     }
-
-    private static let supportURL = URL(string: "https://wanderlust.get-catalyst.app/support")!
-    private static let privacyURL = URL(string: "https://wanderlust.get-catalyst.app/privacy")!
 
     /// `action=write-review` opens the App Store on the review sheet rather
     /// than dropping the traveller on the product page.

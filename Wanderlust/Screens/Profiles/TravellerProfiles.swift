@@ -430,16 +430,24 @@ private extension TravellerProfile {
 
 struct ProfileSelectionButton: View {
     @Binding var selection: UUID?
+    @EnvironmentObject private var router: NavigationRouter
     @ObservedObject private var library = TravellerProfileLibrary.shared
     @AppStorage(ProfilePreferenceKey.introductionDismissed) private var onboardingDismissed = false
     @State private var profilesPresented = false
     @State private var startCreating = false
     @State private var pickerPresented = false
+    @State private var introPresented = false
+    @State private var editorPresented = false
+    // "Maybe later" is a deferral, not a decision, so nothing persists to
+    // `onboardingDismissed` — but re-showing the popup on every single tap
+    // of this same visit reads as broken, not patient. Suppress it until the
+    // traveller leaves and returns to this tab.
+    @State private var introSuppressedForTab = false
 
     var body: some View {
         Button {
-            if library.profiles.isEmpty, !onboardingDismissed {
-                openProfiles(startsCreating: true)
+            if library.profiles.isEmpty, !onboardingDismissed, !introSuppressedForTab {
+                introPresented = true
             } else {
                 pickerPresented = true
             }
@@ -513,10 +521,13 @@ struct ProfileSelectionButton: View {
 
                 Divider().padding(.horizontal, 12)
                 Button {
-                    openProfiles(startsCreating: library.profiles.isEmpty)
+                    // Lands on the static "Create your Traveller DNA" screen
+                    // rather than jumping straight into the name field — the
+                    // traveller decides when to actually start the flow.
+                    openProfiles(startsCreating: false)
                 } label: {
                     Label(
-                        library.profiles.isEmpty ? "Create Traveller DNA" : "Manage Profiles",
+                        library.profiles.isEmpty ? "Create Traveller DNA" : "Manage Profile",
                         systemImage: library.profiles.isEmpty ? "plus" : "slider.horizontal.3"
                     )
                     .font(.kanit(15).weight(.medium))
@@ -539,6 +550,31 @@ struct ProfileSelectionButton: View {
                     }
                 )
             }
+        }
+        .fullScreenCover(isPresented: $introPresented) {
+            TravellerDNAIntroScreen(
+                onCreate: {
+                    onboardingDismissed = true
+                    introPresented = false
+                    editorPresented = true
+                },
+                onMaybeLater: {
+                    introPresented = false
+                    introSuppressedForTab = true
+                },
+                onDontShowAgain: {
+                    onboardingDismissed = true
+                    introPresented = false
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $editorPresented) {
+            TravellerDNAEditorScreen(profile: nil) { profile in
+                selection = profile.id
+            }
+        }
+        .onChange(of: router.selectedTab) { _, _ in
+            introSuppressedForTab = false
         }
         .onChange(of: library.profiles) { _, profiles in
             if let selection, !profiles.contains(where: { $0.id == selection }) {
@@ -619,71 +655,6 @@ struct ProfileSelectionButton: View {
     }
 }
 
-// MARK: - First-time introduction
-
-private struct TravellerDNAOnboardingScreen: View {
-    let onCreate: () -> Void
-    let onMaybeLater: () -> Void
-    let onDontShowAgain: () -> Void
-
-    var body: some View {
-        ZStack {
-            AuroraBackground()
-
-            ScrollView {
-                VStack(spacing: 13) {
-                    TravellerDNABlob(answers: [], animated: true, progress: 0)
-                        .frame(width: 175, height: 175)
-                        .padding(.top, 14)
-
-                    Text("Meet your Traveller DNA")
-                        .font(DS.Typography.displayRegular)
-                        .multilineTextAlignment(.center)
-
-                    Text("A lasting travel profile that helps Wanderlust understand how you like to explore.")
-                        .font(DS.Typography.subtitle)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 10)
-
-                    DS.GlassCard {
-                        VStack(alignment: .leading, spacing: 11) {
-                            onboardingPoint("Your lasting travel preferences")
-                            onboardingPoint("Trip answers always come first")
-                            onboardingPoint("Private, local, and optional")
-                        }
-                    }
-
-                    Button("Create my Traveller DNA", action: onCreate)
-                        .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-
-                    Button("Maybe later", action: onMaybeLater)
-                        .font(.kanit(15).weight(.medium))
-                        .foregroundStyle(Color.appTint)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(.white.opacity(0.66), in: RoundedRectangle(cornerRadius: 14))
-
-                    Button("Don’t show again", action: onDontShowAgain)
-                        .font(.kanit(13))
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 24)
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-
-    private func onboardingPoint(_ title: String) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.appTint)
-            Text(title)
-                .font(.kanit(14).weight(.medium))
-        }
-    }
-}
-
 // MARK: - Profile management
 
 struct ProfilesScreen: View {
@@ -701,7 +672,7 @@ struct ProfilesScreen: View {
     @State private var editorProfile: TravellerProfile?
     @State private var editorPresented = false
     @State private var onboardingPresented = false
-    @State private var startEditorAfterOnboarding = false
+    @State private var onboardingStartsEditor = false
     @State private var dismissAfterOnboarding = false
     @State private var deleteCandidate: TravellerProfile?
     @State private var showInfo = false
@@ -731,7 +702,7 @@ struct ProfilesScreen: View {
                     Button { showInfo = true } label: {
                         Image(systemName: "info.circle")
                     }
-                    .accessibilityLabel("About Traveller profiles")
+                    .accessibilityLabel("About Traveller DNA")
                 }
             }
         }
@@ -753,31 +724,33 @@ struct ProfilesScreen: View {
         .fullScreenCover(
             isPresented: $onboardingPresented,
             onDismiss: {
-                if startEditorAfterOnboarding {
-                    startEditorAfterOnboarding = false
-                    editorProfile = nil
-                    editorPresented = true
-                } else if dismissAfterOnboarding {
+                onboardingStartsEditor = false
+                if dismissAfterOnboarding {
                     dismissAfterOnboarding = false
                     dismiss()
                 }
             }
         ) {
-            TravellerDNAOnboardingScreen(
-                onCreate: {
-                    onboardingDismissed = true
-                    startEditorAfterOnboarding = true
-                    onboardingPresented = false
-                },
-                onMaybeLater: {
-                    dismissAfterOnboarding = startsCreating
-                    onboardingPresented = false
-                },
-                onDontShowAgain: {
-                    onboardingDismissed = true
-                    onboardingPresented = false
+            if onboardingStartsEditor {
+                TravellerDNAEditorScreen(profile: nil) { saved in
+                    onProfileCreated?(saved)
                 }
-            )
+            } else {
+                TravellerDNAIntroScreen(
+                    onCreate: {
+                        onboardingDismissed = true
+                        onboardingStartsEditor = true
+                    },
+                    onMaybeLater: {
+                        dismissAfterOnboarding = startsCreating
+                        onboardingPresented = false
+                    },
+                    onDontShowAgain: {
+                        onboardingDismissed = true
+                        onboardingPresented = false
+                    }
+                )
+            }
         }
         .fullScreenCover(isPresented: $editorPresented) {
             TravellerDNAEditorScreen(profile: editorProfile) { saved in
@@ -1054,7 +1027,8 @@ struct TravellerDNAEditorScreen: View {
                     nameFocused = false
                     return
                 }
-                try? await Task.sleep(nanoseconds: 180_000_000)
+                await Task.yield()
+                guard !Task.isCancelled else { return }
                 nameFocused = true
             }
         }
@@ -1081,7 +1055,7 @@ struct TravellerDNAEditorScreen: View {
     private var header: some View {
         VStack(spacing: page >= 0 ? 7 : 9) {
             if page >= 0 {
-                Text("Shape your Trip DNA")
+                Text("Shape your Traveller DNA")
                     .font(.kanit(26).weight(.semibold))
                 Text("Watch it come alive as you choose")
                     .font(.kanit(14))

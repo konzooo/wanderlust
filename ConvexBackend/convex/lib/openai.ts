@@ -75,6 +75,7 @@ export class OpenAIError extends Error {
     public readonly code: string,
     public readonly usage?: OpenAIUsage,
     public readonly durationMs?: number,
+    public readonly providerAttempts: number = 1,
   ) {
     super(code);
     this.name = "OpenAIError";

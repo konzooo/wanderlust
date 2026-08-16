@@ -19,8 +19,11 @@ function obj(properties: Record<string, unknown>, required: string[]): unknown {
   return { type: "object", additionalProperties: false, properties, required };
 }
 
-function arr(items: unknown): unknown {
-  return { type: "array", items };
+function arr(
+  items: unknown,
+  bounds?: { minItems?: number; maxItems?: number },
+): unknown {
+  return { type: "array", items, ...bounds };
 }
 
 const str = { type: "string" };
@@ -53,7 +56,13 @@ export const LINKABLE_TEXT = obj({ text: str, locations: arr(LOCATION) }, [
   "locations",
 ]);
 
-export const ITINERARY_SCHEMA = (() => {
+/**
+ * The itinerary is the one component whose array count is a hard product
+ * requirement. Base Structured Outputs models support `minItems`/`maxItems`,
+ * so bind the schema to this trip's requested duration instead of relying on
+ * prompt wording alone. Post-decode validation remains as a defensive check.
+ */
+export function itinerarySchema(expectedDurationDays?: number): unknown {
   const activity = LINKABLE_TEXT;
   const twoActivities = arr(activity);
   const description = obj(
@@ -65,16 +74,36 @@ export const ITINERARY_SCHEMA = (() => {
     "description",
     "secret_tip",
   ]);
+  const segmentBounds = itinerarySegmentBounds(expectedDurationDays);
   return obj(
     {
       name: strEnum(["travel_itinerary_schema"]),
       destination: str,
       title: str,
-      segments: arr(segment),
+      segments: arr(segment, segmentBounds),
     },
     ["name", "destination", "title", "segments"],
   );
-})();
+}
+
+/**
+ * Up to five days means one segment per day. Longer trips are deliberately
+ * grouped into two to five ranged segments so the response stays readable.
+ */
+export function itinerarySegmentBounds(
+  expectedDurationDays?: number,
+): { minItems?: number; maxItems?: number } {
+  if (expectedDurationDays == null || !Number.isFinite(expectedDurationDays)) {
+    return {};
+  }
+  const days = Math.max(1, Math.round(expectedDurationDays));
+  return days <= 5
+    ? { minItems: days, maxItems: days }
+    : { minItems: 2, maxItems: 5 };
+}
+
+/** Unbounded fallback for tooling that does not yet have trip input in hand. */
+export const ITINERARY_SCHEMA = itinerarySchema();
 
 /** Category IDs the app knows how to render (icon + section identity). */
 const DYNAMIC_CATEGORY_IDS = ["cafes", "vibe", "new", "rainy", "random"];
@@ -95,10 +124,10 @@ function category(ids: string[]): unknown {
  * substrings are matched against all three fields on the device, so a per-field
  * array would store the same places three times.
  *
- * "Exactly four" is NOT expressible here — strict Structured Outputs ignores
- * `minItems`/`maxItems`. The count is asked for in the prompt and enforced after
- * decode in `validation.ts`, which is the §3 rule for every conditional
- * constraint: schema what you can, validate the rest in application code.
+ * This optional, best-effort section intentionally stays permissive at the
+ * schema boundary. Its count is repaired after decode in `validation.ts`, so a
+ * slightly short response can be dropped without failing the required
+ * itinerary alongside it.
  */
 export const WORTH_IT_ITEM = obj(
   {

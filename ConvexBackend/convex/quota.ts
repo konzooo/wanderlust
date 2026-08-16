@@ -149,6 +149,8 @@ export const recordTelemetry = internalMutation({
     variant: v.optional(suggestionsVariant),
     maxOutputTokens: v.optional(v.number()),
     repairs: v.optional(v.number()),
+    /** Provider calls consumed by this logical component run (normally one). */
+    providerAttempts: v.optional(v.number()),
     /** Paid hosted-search actions reported by the Near You call. */
     webSearchCalls: v.optional(v.number()),
   },

@@ -1,13 +1,11 @@
 /**
  * Post-decode validation (§3).
  *
- *   npx tsx --test tests/
+ *   npx tsx --test tests/*.mts
  *
- * Strict Structured Outputs guarantees the shape and nothing else — not counts,
- * not lengths, not "this substring is really in that text". Everything asserted
- * here is a rule the schema cannot express, which is exactly why it has to be
- * enforced in code and exactly why it needs tests: a silently-skipped rule
- * looks identical to a rule the model happened to obey.
+ * Structured Outputs now owns the simple itinerary array bounds. These tests
+ * cover the semantic constraints and defensive checks that still belong in
+ * application code: a schema-conforming response can still be unusable.
  */
 
 import assert from "node:assert/strict";
@@ -40,7 +38,7 @@ const area = (name: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-// MARK: - Counts the schema cannot express
+// MARK: - Best-effort count repair
 
 test("worth-it caps the section at four cards and counts the truncation", () => {
   const report = emptyReport();

@@ -2,11 +2,10 @@
  * Post-decode validation for structured output.
  *
  * §3 of the plan: strict JSON Schema can express "this property exists and is a
- * string". It cannot express "between two and four of these", "between four and six",
- * "at most 28 characters", or "required only when X" — `minItems`, `maxItems`
- * and conditional subschemas are all ignored under `strict: true`. Every one of
- * those rules therefore has to be enforced here, in application code, **with a
- * defined fallback** rather than an exception.
+ * string". Base Structured Outputs models can enforce simple array bounds, and
+ * the required itinerary now uses that capability. Semantic rules, conditional
+ * constraints, link integrity, and graceful best-effort degradation still live
+ * here, **with a defined fallback** rather than an exception.
  *
  * The defined fallback is always the same shape: repair what is repairable,
  * count the repair so it lands in telemetry, and reject only when what came
@@ -16,7 +15,7 @@
  * be able to detect.
  */
 
-import type { OpenAIWebSource } from "./openai";
+import type { OpenAIUsage, OpenAIWebSource } from "./openai";
 import type { NearYouCandidate } from "./prompts";
 
 /** Maximum number of cards Worth-it/Skip shows (D7). */
@@ -36,9 +35,25 @@ const INTEREST_PROMPT_MAX_LENGTH = 40;
 const FIXED_INTEREST_CHIPS = ["running routes", "remote-work cafes", "climbing gyms"];
 
 export class ValidationError extends Error {
+  usage?: OpenAIUsage;
+  durationMs?: number;
+  providerAttempts = 1;
+
   constructor(public readonly code: string) {
     super(code);
     this.name = "ValidationError";
+  }
+
+  /** Preserve the spend behind a rejected structured response for telemetry. */
+  withMetrics(
+    usage: OpenAIUsage,
+    durationMs: number,
+    providerAttempts: number,
+  ): this {
+    this.usage = usage;
+    this.durationMs = durationMs;
+    this.providerAttempts = providerAttempts;
+    return this;
   }
 }
 

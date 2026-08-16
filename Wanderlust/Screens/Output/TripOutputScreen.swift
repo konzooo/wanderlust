@@ -354,10 +354,32 @@ struct TripOutputScreen: View {
     }
     
     var retryView: some View {
-        RetryErrorView(retryCount: $store.retryCount) {
+        RetryErrorView(
+            retryCount: $store.retryCount,
+            message: itineraryFailureMessage
+        ) {
             store.send(.retry)
         } restartAction: {
             router.popToRoot(on: navigationTab)
+        }
+    }
+
+    private var itineraryFailureMessage: String {
+        guard let error = store.itineraryResponse.error as? TripGenerationError else {
+            return "We couldn’t finish building your itinerary.\nPlease try again."
+        }
+
+        switch error {
+        case .transport:
+            return "We couldn’t reach the trip service.\nCheck your connection and try again."
+        case .installDailyLimit:
+            return "You’ve reached today’s trip-generation limit.\nPlease try again tomorrow."
+        case .serviceBusy:
+            return "Trip generation is busy right now.\nPlease try again shortly."
+        case .truncatedOutput:
+            return "Your itinerary came back incomplete.\nPlease try again."
+        case .deepDiveLimit, .duplicateDeepDive, .backend:
+            return "We couldn’t finish building your itinerary.\nPlease try again."
         }
     }
     

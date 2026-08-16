@@ -455,6 +455,10 @@ export async function callGroupComponent(
       nearYouCandidates: options?.nearYouCandidates,
       nearYouLocation: options?.nearYouLocation,
       variant: "split",
+      beforeValidationRetry: async () => {
+        // A corrective itinerary pass is another paid provider call.
+        await ctx.runMutation(internal.quota.reserveGlobalModelCall, {});
+      },
     });
     await ctx.runMutation(internal.quota.recordTelemetry, {
       component,
@@ -466,11 +470,15 @@ export async function callGroupComponent(
       variant: "split" as const,
       maxOutputTokens: result.maxOutputTokens,
       repairs: result.validation.repairs,
+      providerAttempts: result.providerAttempts,
       webSearchCalls: result.webSearchCalls,
     });
     return result;
   } catch (error) {
-    const usage = error instanceof OpenAIError ? error.usage : undefined;
+    const measuredError = error instanceof OpenAIError || error instanceof ValidationError
+      ? error
+      : undefined;
+    const usage = measuredError?.usage;
     await ctx.runMutation(internal.quota.recordTelemetry, {
       component,
       mode: "group" as const,
@@ -478,10 +486,11 @@ export async function callGroupComponent(
       cachedInputTokens: usage?.cachedInputTokens ?? 0,
       outputTokens: usage?.outputTokens ?? 0,
       durationMs:
-        (error instanceof OpenAIError ? error.durationMs : undefined) ??
+        measuredError?.durationMs ??
         Date.now() - startedAt,
       errorCode: errorCode(error),
       variant: "split" as const,
+      providerAttempts: measuredError?.providerAttempts ?? 1,
       webSearchCalls: 0,
     });
     throw error;

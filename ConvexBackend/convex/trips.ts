@@ -141,6 +141,16 @@ export const generateComponent = action({
         nearYouCandidates: component === "nearYou" ? nearYouCandidates : undefined,
         nearYouLocation: component === "nearYou" ? nearYouLocationContext : undefined,
         variant,
+        beforeValidationRetry: async () => {
+          // The corrective pass is a second paid provider call, so it consumes
+          // a second install/global attempt just like a traveller-tapped retry.
+          await ctx.runMutation(internal.quota.reserve, {
+            installToken: args.installToken,
+            tripKey: args.tripKey,
+            component: args.component,
+            label: interest,
+          });
+        },
       });
 
       await ctx.runMutation(internal.quota.recordTelemetry, {
@@ -153,6 +163,7 @@ export const generateComponent = action({
         variant,
         maxOutputTokens: result.maxOutputTokens,
         repairs: result.validation.repairs,
+        providerAttempts: result.providerAttempts,
         webSearchCalls: result.webSearchCalls,
       });
       if (reservation.slotId) {
@@ -168,7 +179,10 @@ export const generateComponent = action({
       // A truncation still burned every one of the output tokens it produced,
       // and that count is the whole basis for re-deriving the ceiling — so a
       // failed call records what it actually cost, not zeros.
-      const usage = error instanceof OpenAIError ? error.usage : undefined;
+      const measuredError = error instanceof OpenAIError || error instanceof ValidationError
+        ? error
+        : undefined;
+      const usage = measuredError?.usage;
       await ctx.runMutation(internal.quota.recordTelemetry, {
         component: args.component,
         mode: "solo" as const,
@@ -176,10 +190,11 @@ export const generateComponent = action({
         cachedInputTokens: usage?.cachedInputTokens ?? 0,
         outputTokens: usage?.outputTokens ?? 0,
         durationMs:
-          (error instanceof OpenAIError ? error.durationMs : undefined) ??
+          measuredError?.durationMs ??
           Date.now() - startedAt,
         errorCode: code,
         variant,
+        providerAttempts: measuredError?.providerAttempts ?? 1,
         webSearchCalls: 0,
       });
       // The traveller never received this, so it must not consume a cap.

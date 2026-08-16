@@ -250,6 +250,8 @@ export default defineSchema({
      * that has quietly stopped obeying its own counts becomes visible.
      */
     repairs: v.optional(v.number()),
+    /** One normally; two when bounded automatic correction was required. */
+    providerAttempts: v.optional(v.number()),
     /** Hosted web-search tool calls, absent for rows written before live discovery. */
     webSearchCalls: v.optional(v.number()),
     createdAt: v.number(),

@@ -10,7 +10,7 @@ import SwiftUI
 
 /// Shown when generating the itinerary fails.
 /// • The *Retry* button is always visible.
-/// • After two failed retries a *Restart* button fades-in, letting the user go back to the very first screen.
+/// • After a failed retry a *Restart* button fades-in, letting the user go back to the very first screen.
 public struct RetryErrorView: View {
     /// bind from the parent so the parent can bump it on every retry attempt
     @Binding var retryCount: Int
@@ -19,9 +19,17 @@ public struct RetryErrorView: View {
     let retryAction: () -> Void
     /// wipes the navigation stack
     let restartAction: () -> Void
+    /// Specific, actionable copy supplied by the feature that owns the error.
+    let message: String
     
-    public init(retryCount: Binding<Int>, retryAction: @escaping () -> Void, restartAction: @escaping () -> Void) {
+    public init(
+        retryCount: Binding<Int>,
+        message: String = "We couldn’t finish building your itinerary.\nPlease try again.",
+        retryAction: @escaping () -> Void,
+        restartAction: @escaping () -> Void
+    ) {
         self._retryCount   = retryCount
+        self.message = message
         self.retryAction = retryAction
         self.restartAction = restartAction
     }
@@ -44,7 +52,7 @@ public struct RetryErrorView: View {
                     .font(.kanitMedium(22))
                     .foregroundColor(.appTint)
                 
-                Text("We couldn’t load your itinerary.\nPlease check your connection and try again.")
+                Text(message)
                     .font(.kanit(16))
                     .multilineTextAlignment(.center)
                     .foregroundColor(.black.opacity(0.7))
@@ -56,7 +64,7 @@ public struct RetryErrorView: View {
                 Button("Retry", action: retryAction)
                     .buttonStyle(PrimaryButtonStyle(fullWidth: true))
                 
-                if retryCount >= 1 {              // fade-in after 2 failed tries
+                if retryCount >= 1 {
                     Button("Restart", action: restartAction)
                         .buttonStyle(SecondaryButtonStyle(fullWidth: true))
                         .transition(.opacity.combined(with: .move(edge: .bottom)))

@@ -6,6 +6,7 @@ import {
   NEAR_YOU_SCHEMA,
   WHERE_TO_STAY_SCHEMA,
   WORTH_IT_SCHEMA,
+  itinerarySchema,
   suggestionsSchema,
 } from "./schemas";
 import {
@@ -20,9 +21,11 @@ import {
 import {
   callOpenAI,
   NEAR_YOU_MODEL,
+  OpenAIError,
   WORTH_IT_MODEL,
   type OpenAIReasoningEffort,
   type OpenAIResult,
+  type OpenAIUsage,
 } from "./openai";
 import {
   emptyReport,
@@ -32,6 +35,7 @@ import {
   validateSuggestions,
   validateWhereToStayResponse,
   validateWorthItResponse,
+  ValidationError,
   type ValidationReport,
 } from "./validation";
 
@@ -219,8 +223,16 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
 export function componentSpec(
   component: Component,
   variant: SuggestionsVariant,
+  expectedDurationDays?: number,
 ): ComponentSpec & { promptOptions: PromptOptions } {
   const base = COMPONENTS[component];
+  if (component === "itinerary") {
+    return {
+      ...base,
+      schema: itinerarySchema(expectedDurationDays),
+      promptOptions: { extras: false, interestPrompts: false },
+    };
+  }
   if (component !== "suggestions") {
     return { ...base, promptOptions: { extras: false, interestPrompts: false } };
   }
@@ -240,15 +252,18 @@ export type ComponentResult = OpenAIResult & {
   validation: ValidationReport;
   /** The ceiling this call ran under, so telemetry can relate the two. */
   maxOutputTokens: number;
+  /** One normally; two when the bounded itinerary correction was needed. */
+  providerAttempts: number;
 };
 
 /**
  * Composes prompt + schema + ceiling for one component, makes the call, and
  * validates what comes back before anyone commits it.
  *
- * Validation lives here rather than at each entry point on purpose: strict mode
- * guarantees the *shape*, never the counts or the lengths, and a rule enforced
- * in one of the two entry points is a rule the other one silently doesn't have.
+ * Validation lives here rather than at each entry point on purpose. The
+ * duration-aware schema owns the itinerary count; application validation still
+ * owns semantic checks and best-effort repair. Keeping both here prevents solo
+ * and group generation from drifting apart.
  */
 export async function runComponent(args: {
   component: Component;
@@ -258,49 +273,141 @@ export async function runComponent(args: {
   nearYouCandidates?: NearYouCandidate[];
   nearYouLocation?: NearYouLocationContext;
   variant?: SuggestionsVariant;
+  /** Charges the second provider call before an automatic correction. */
+  beforeValidationRetry?: (error: ValidationError) => Promise<void>;
+  /** Deterministic test seam; production always uses `callOpenAI`. */
+  callProvider?: typeof callOpenAI;
 }): Promise<ComponentResult> {
   const variant = args.variant ?? SUGGESTIONS_VARIANT;
-  const spec = componentSpec(args.component, variant);
-
-  const result = await callOpenAI({
-    systemPrompt: buildSystemPrompt(
-      args.component,
-      args.input.mode,
-      spec.promptOptions,
-    ),
-    userPrompt: buildUserMessage(args.input, {
-      interest: args.interest,
-      alreadyRecommended: args.alreadyRecommended,
-      nearYouCandidates: args.nearYouCandidates,
-      nearYouLocation: args.nearYouLocation,
-    }),
-    schema: spec.schema,
-    schemaName: spec.schemaName,
-    maxOutputTokens: spec.maxOutputTokens,
-    ...(spec.model ? { model: spec.model } : {}),
-    ...(spec.reasoning ? { reasoning: spec.reasoning } : {}),
-    ...(args.component === "nearYou"
-      ? {
-        webSearch: {
-          maxToolCalls: NEAR_YOU_MAX_SEARCH_CALLS,
-          approximateLocation: {
-            city: args.nearYouLocation?.city ?? destination(args.input),
-          },
-        },
-      }
-      : {}),
+  const expectedDurationDays = durationDays(args.input);
+  const spec = componentSpec(args.component, variant, expectedDurationDays);
+  const provider = args.callProvider ?? callOpenAI;
+  const baseUserPrompt = buildUserMessage(args.input, {
+    interest: args.interest,
+    alreadyRecommended: args.alreadyRecommended,
+    nearYouCandidates: args.nearYouCandidates,
+    nearYouLocation: args.nearYouLocation,
   });
+  const accumulatedUsage = emptyUsage();
+  let accumulatedDurationMs = 0;
+  let providerAttempts = 0;
 
-  const validation = emptyReport();
-  const data = validate(
-    args.component,
-    result.data,
-    validation,
-    args.nearYouCandidates,
-    result.webSources,
-    durationDays(args.input),
-  );
-  return { ...result, data, validation, maxOutputTokens: spec.maxOutputTokens };
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    providerAttempts += 1;
+    let result: OpenAIResult;
+    try {
+      result = await provider({
+        systemPrompt: buildSystemPrompt(
+          args.component,
+          args.input.mode,
+          spec.promptOptions,
+        ),
+        userPrompt:
+          attempt === 1
+            ? baseUserPrompt
+            : itineraryCorrectionPrompt(baseUserPrompt, expectedDurationDays),
+        schema: spec.schema,
+        schemaName: spec.schemaName,
+        maxOutputTokens: spec.maxOutputTokens,
+        ...(spec.model ? { model: spec.model } : {}),
+        ...(spec.reasoning ? { reasoning: spec.reasoning } : {}),
+        ...(args.component === "nearYou"
+          ? {
+            webSearch: {
+              maxToolCalls: NEAR_YOU_MAX_SEARCH_CALLS,
+              approximateLocation: {
+                city: args.nearYouLocation?.city ?? destination(args.input),
+              },
+            },
+          }
+          : {}),
+      });
+    } catch (error) {
+      if (error instanceof OpenAIError && providerAttempts > 1) {
+        throw new OpenAIError(
+          error.code,
+          addUsage(accumulatedUsage, error.usage),
+          accumulatedDurationMs + (error.durationMs ?? 0),
+          providerAttempts,
+        );
+      }
+      throw error;
+    }
+
+    addUsageInPlace(accumulatedUsage, result.usage);
+    accumulatedDurationMs += result.durationMs;
+    const validation = emptyReport();
+    try {
+      const data = validate(
+        args.component,
+        result.data,
+        validation,
+        args.nearYouCandidates,
+        result.webSources,
+        expectedDurationDays,
+      );
+      return {
+        ...result,
+        data,
+        usage: accumulatedUsage,
+        durationMs: accumulatedDurationMs,
+        validation,
+        maxOutputTokens: spec.maxOutputTokens,
+        providerAttempts,
+      };
+    } catch (error) {
+      if (!(error instanceof ValidationError)) throw error;
+      error.withMetrics(
+        { ...accumulatedUsage },
+        accumulatedDurationMs,
+        providerAttempts,
+      );
+      if (!shouldRetryItinerary(args.component, error, attempt)) throw error;
+      await args.beforeValidationRetry?.(error);
+    }
+  }
+
+  throw new Error("unreachable_component_generation_state");
+}
+
+function shouldRetryItinerary(
+  component: Component,
+  error: ValidationError,
+  attempt: number,
+): boolean {
+  return component === "itinerary" &&
+    attempt === 1 &&
+    (error.code === "incomplete_itinerary" || error.code === "empty_itinerary");
+}
+
+function itineraryCorrectionPrompt(basePrompt: string, expectedDurationDays: number): string {
+  const days = Math.max(1, Math.round(expectedDurationDays));
+  const countRule = days <= 5
+    ? `Return exactly ${days} non-empty itinerary segments, one for each day.`
+    : "Return two to five non-empty ranged segments that cover every requested day.";
+  return `${basePrompt}\n\nCORRECTION\nThe previous itinerary did not cover the requested duration. Regenerate it from scratch. ${countRule}`;
+}
+
+function emptyUsage(): OpenAIUsage {
+  return {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+  };
+}
+
+function addUsageInPlace(total: OpenAIUsage, next: OpenAIUsage): void {
+  total.inputTokens += next.inputTokens;
+  total.cachedInputTokens += next.cachedInputTokens;
+  total.outputTokens += next.outputTokens;
+  total.reasoningTokens += next.reasoningTokens;
+}
+
+function addUsage(total: OpenAIUsage, next?: OpenAIUsage): OpenAIUsage {
+  const combined = { ...total };
+  if (next) addUsageInPlace(combined, next);
+  return combined;
 }
 
 function validate(

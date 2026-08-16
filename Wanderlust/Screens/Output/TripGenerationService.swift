@@ -94,6 +94,8 @@ enum TripGenerationError: Error, Equatable {
         case "quota_component_cap": self = .deepDiveLimit
         case "duplicate_deep_dive": self = .duplicateDeepDive
         case let c where c.hasPrefix("incomplete_"): self = .truncatedOutput
+        case "validation_incomplete_itinerary", "validation_empty_itinerary":
+            self = .truncatedOutput
         default: self = .backend(code: code)
         }
     }

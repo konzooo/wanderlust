@@ -27,6 +27,7 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertNil(trip.accommodation)
         XCTAssertTrue(trip.knowBeforeYouGoState.isAbsent)
         XCTAssertNil(trip.createdAt)
+        XCTAssertNil(trip.imageUrl)
     }
 
     /// A v1 file whose suggestions key was simply never written. "There are
@@ -112,6 +113,33 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertEqual(try roundTrip(original).createdAt, createdAt)
     }
 
+    func testSelectedImageURLSurvivesRoundTrip() throws {
+        let imageURL = "https://images.unsplash.com/photo-stable"
+        let original = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestions: .mock,
+            imageUrl: imageURL
+        )
+
+        XCTAssertEqual(try roundTrip(original).imageUrl, imageURL)
+    }
+
+    @MainActor
+    func testSavedTripRestoresItsSelectedImageWithoutSearchingAgain() throws {
+        let imageURL = try XCTUnwrap(URL(string: "https://images.unsplash.com/photo-stable"))
+        let trip = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestions: .mock,
+            imageUrl: imageURL.absoluteString
+        )
+
+        let state = TripOutputStateFactory.savedTrip(trip)
+
+        XCTAssertEqual(state.imageUrlResponse.data, imageURL)
+    }
+
     // MARK: - Merge-on-complete
 
     /// The rule the save policy rests on: a component still generating writes
@@ -182,6 +210,19 @@ final class TripPersistenceTests: XCTestCase {
         )
 
         XCTAssertEqual(edited.merged(over: stored).createdAt, originalDate)
+    }
+
+    func testMergePreservesStoredImageURLWhenAnEditHasNone() {
+        let imageURL = "https://images.unsplash.com/photo-stable"
+        let stored = Trip(
+            details: .mock,
+            itinerary: .mock,
+            suggestions: .mock,
+            imageUrl: imageURL
+        )
+        let edited = Trip(details: .mock, itinerary: .mock, suggestions: .mock)
+
+        XCTAssertEqual(edited.merged(over: stored).imageUrl, imageURL)
     }
 
     func testMyTripsOrdersNewestFirstAndLegacyTripsLast() {

@@ -79,6 +79,9 @@ class TripOutputStore: ObservableStore {
     private var lastCompletedNearYouAccommodation: CoarseAccommodation?
 
     private let imageService: ImageService
+    /// Suppresses late image-search responses when itinerary generation has
+    /// already issued a newer search using its normalized destination name.
+    private var imageRequestID = 0
 
     /// Which arm of the D15 experiment this store runs. Injectable so a test
     /// can exercise both without rebuilding, and so the eventual removal of the
@@ -172,8 +175,11 @@ class TripOutputStore: ObservableStore {
                 generate(component)
             }
 
-            // Always try to fetch Images
-            fetchDestinationImage()
+            // Saved trips restore their exact selected URL. A new/legacy trip
+            // resolves once; repeated appearances keep the existing choice.
+            if !state.imageUrlResponse.isLoaded {
+                fetchDestinationImage()
+            }
 
         case .retry:
             retryCount += 1
@@ -266,7 +272,7 @@ class TripOutputStore: ObservableStore {
                 // Unlike `.groupTrip` (no local file, favorite toggles are
                 // silently discarded), a shared trip IS a real local file —
                 // persist any favorite changes to the recipient's own copy.
-                persistReceivedTripFavorites()
+                persistReceivedTrip()
                 router?.pop(on: routerTab)
             } else if state.mode == .groupTrip {
                 persistGroupPersonalLayer()
@@ -1319,6 +1325,8 @@ extension TripOutputStore {
     /// intentionally call it a second time once generation normalizes the
     /// destination name.)
     func fetchDestinationImage() {
+        imageRequestID += 1
+        let requestID = imageRequestID
         let startedAt = Date()
         let attempt = retryCount + 1
         logGeneration(.tripGenerationStarted, component: "image", attempt: attempt)
@@ -1331,7 +1339,13 @@ extension TripOutputStore {
                 let destinationName = state.itineraryResponse.data?.destination ?? state.details.destination.name
                 let response = try await imageService.fetchImageURL(for: destinationName)
                 await MainActor.run {
+                    guard imageRequestID == requestID else { return }
                     state.imageUrlResponse = .loaded(response)
+                    if state.saved {
+                        reSaveTrip()
+                    } else if state.mode == .sharedTrip {
+                        persistReceivedTrip()
+                    }
                     logGeneration(
                         .tripGenerationSucceeded,
                         component: "image",
@@ -1342,6 +1356,7 @@ extension TripOutputStore {
             } catch {
                 // Handle any errors during the image fetch
                 await MainActor.run {
+                    guard imageRequestID == requestID else { return }
                     state.imageUrlResponse = .error(error)
                     logGeneration(
                         .tripGenerationFailed,
@@ -1408,7 +1423,8 @@ extension TripOutputStore {
             generationInput: effectiveNearYouRequest?.input,
             favorites: state.favorites,
             shareCode: state.shareCode,
-            tripKey: effectiveNearYouRequest?.tripKey
+            tripKey: effectiveNearYouRequest?.tripKey,
+            imageUrl: state.imageUrlResponse.data?.absoluteString
         )
     }
 
@@ -1659,9 +1675,9 @@ extension TripOutputStore {
         AnalyticsTracker.shared.log(.init(name, properties: properties))
     }
 
-    /// Saves the recipient's current favorite selections back onto their local
-    /// copy of a received shared trip. Fire-and-forget, mirroring `reSaveTrip`.
-    private func persistReceivedTripFavorites() {
+    /// Saves the recipient's local changes (favorites and a migrated image URL)
+    /// back onto their received trip. Fire-and-forget, mirroring `reSaveTrip`.
+    private func persistReceivedTrip() {
         guard state.shareCode != nil, let trip = currentTrip() else { return }
         Task {
             do {

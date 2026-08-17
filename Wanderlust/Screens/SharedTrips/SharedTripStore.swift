@@ -65,7 +65,8 @@ final class SharedTripStore: ObservableObject {
                     whereToStay: dto.whereToStay,
                     interestPrompts: dto.interestPrompts,
                     favorites: dto.favorites ?? .init(),
-                    shareCode: code
+                    shareCode: code,
+                    imageUrl: dto.imageUrl
                 )
                 try ReceivedSharedTripStorage.received().save(trip)
                 state.resolved = .loaded(Self.outputState(for: trip, mode: .sharedTrip))
@@ -117,6 +118,9 @@ final class SharedTripStore: ObservableObject {
         output.interestPrompts = trip.interestPrompts ?? []
         output.worthItDecisions = trip.worthItDecisions ?? [:]
         output.deepDives = trip.deepDives
+        if let imageURL = trip.imageUrl.flatMap(URL.init(string:)) {
+            output.imageUrlResponse = .loaded(imageURL)
+        }
         if mode == .savedTrip {
             output.accommodation = trip.accommodation
             output.nearYouResponse = trip.nearYouState.asyncValue

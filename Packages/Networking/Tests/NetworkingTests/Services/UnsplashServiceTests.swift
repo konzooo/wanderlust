@@ -2,6 +2,39 @@ import XCTest
 @testable import Networking
 
 final class UnsplashServiceTests: XCTestCase {
+
+    func testPersistentURLCacheNormalizesQueriesAndSurvivesInstances() throws {
+        let suiteName = "UnsplashURLCacheTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let expected = try XCTUnwrap(URL(string: "https://images.unsplash.com/photo-stable"))
+
+        PersistentUnsplashURLCache(userDefaults: defaults).store(
+            expected,
+            for: "  Barcelona,   SPAIN "
+        )
+        let restored = PersistentUnsplashURLCache(userDefaults: defaults)
+            .retrieve(for: "barcelona, spain")
+
+        XCTAssertEqual(restored, expected)
+    }
+
+    func testFetchUsesPersistentSelectionWithoutCallingUnsplashAgain() async throws {
+        struct UnexpectedNetworkCall: Error {}
+        let suiteName = "UnsplashURLCacheTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let cache = PersistentUnsplashURLCache(userDefaults: defaults)
+        let expected = try XCTUnwrap(URL(string: "https://images.unsplash.com/photo-stable"))
+        cache.store(expected, for: "Barcelona, Spain")
+        let client = MockNetworkClient(stub: .failure(UnexpectedNetworkCall()))
+        let sut = UnsplashService(apiClient: client, urlCache: cache)
+
+        let result = try await sut.fetchImageURL(for: "barcelona,   spain")
+
+        XCTAssertEqual(result, expected)
+        XCTAssertNil(client.capturedHeaders)
+    }
     
     func test_fetchImageURL_returnsImageURL() async throws {
         // Given

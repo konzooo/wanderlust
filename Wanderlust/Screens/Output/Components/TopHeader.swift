@@ -60,7 +60,7 @@ struct TopHeader: View {
         onShareTapped: (() -> Void)? = nil,
         onSaveTapped: (() -> Void)? = nil,
         onFavouritesTapped: (() -> Void)? = nil,
-        imageCache: any ImageCacheStrategy = InMemoryImageCacheStrategy.shared
+        imageCache: any ImageCacheStrategy = PersistentImageCacheStrategy.shared
     ) {
         self.imageUrlState = imageUrlState
         self.title = title
@@ -82,7 +82,8 @@ struct TopHeader: View {
             // Show appropriate view based on image URL state
             CacheDestinationImage(
                 cacheKey: title,
-                imageUrlState: imageUrlState
+                imageUrlState: imageUrlState,
+                imageCache: imageCache
             )
             .frame(height: maxHeight)
             // Bottom gradient for legibility.

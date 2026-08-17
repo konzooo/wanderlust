@@ -3,22 +3,22 @@
 //
 //  Created by Rodrigo Mato Castellano on 3/7/25.
 //
-import SwiftUI
+import Foundation
 
-public class InMemoryImageCacheStrategy: ObservableObject, ImageCacheStrategy {
-    nonisolated(unsafe) public static let shared: InMemoryImageCacheStrategy = .init()
-    
-    private var dynamicMemoryCache: [String: Image]
-    
-    private init(dynamicMemoryCache: [String : Image] = [:]) {
+public actor InMemoryImageCacheStrategy: ImageCacheStrategy {
+    public static let shared: InMemoryImageCacheStrategy = .init()
+
+    private var dynamicMemoryCache: [String: Data]
+
+    public init(dynamicMemoryCache: [String: Data] = [:]) {
         self.dynamicMemoryCache = dynamicMemoryCache
     }
 
-    public func store(_ image: Image, forKey key: String) {
-        dynamicMemoryCache[key] = image
+    public func store(_ data: Data, forKey key: String) {
+        dynamicMemoryCache[key] = data
     }
 
-    public func retrieve(forKey key: String) -> Image? {
+    public func retrieveData(forKey key: String) -> Data? {
         dynamicMemoryCache[key]
     }
 }

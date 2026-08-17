@@ -29,7 +29,9 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     ///   explicit manual regeneration after reopening a saved trip.
     /// - 5: the trip's creation date, used to keep My Trips newest-first without
     ///   letting later edits make an old trip look newly created.
-    public static let currentSchemaVersion = 5
+    /// - 6: the selected destination image URL, so reopening a trip never asks
+    ///   Unsplash to choose a different photo.
+    public static let currentSchemaVersion = 6
 
     public let id = UUID()
     public let schemaVersion: Int
@@ -112,6 +114,11 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
     /// before it existed; a caller that needs one mints it and re-saves.
     public var tripKey: String?
 
+    /// The exact Unsplash image selected for this trip. Optional for every
+    /// saved trip written before schema v6; those trips resolve once through
+    /// the URL cache and acquire this field on their next save.
+    public var imageUrl: String?
+
     /// The generated suggestions, if there are any. Kept as the primary
     /// read path so the rest of the app is unaffected by the state change;
     /// reach for ``suggestionsState`` when absent-vs-failed matters.
@@ -140,6 +147,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         favorites: Favorites = .init(),
         shareCode: String? = nil,
         tripKey: String? = nil,
+        imageUrl: String? = nil,
         createdAt: Date? = Date(),
         schemaVersion: Int = Trip.currentSchemaVersion
     ) {
@@ -160,6 +168,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         self.favorites = favorites
         self.shareCode = shareCode
         self.tripKey = tripKey
+        self.imageUrl = imageUrl
     }
 
     /// Convenience for the many callers that hold a plain optional — a `nil`
@@ -173,6 +182,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         favorites: Favorites = .init(),
         shareCode: String? = nil,
         tripKey: String? = nil,
+        imageUrl: String? = nil,
         createdAt: Date? = Date()
     ) {
         self.init(
@@ -183,6 +193,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
             favorites: favorites,
             shareCode: shareCode,
             tripKey: tripKey,
+            imageUrl: imageUrl,
             createdAt: createdAt
         )
     }
@@ -214,6 +225,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         case favorites
         case shareCode
         case tripKey
+        case imageUrl
     }
 
     public init(from decoder: Decoder) throws {
@@ -262,6 +274,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         favorites = try container.decodeIfPresent(Favorites.self, forKey: .favorites) ?? .init()
         shareCode = try container.decodeIfPresent(String.self, forKey: .shareCode)
         tripKey = try container.decodeIfPresent(String.self, forKey: .tripKey)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -283,6 +296,7 @@ public struct Trip: Identifiable, Codable, Equatable, Hashable, Sendable {
         try container.encode(favorites, forKey: .favorites)
         try container.encodeIfPresent(shareCode, forKey: .shareCode)
         try container.encodeIfPresent(tripKey, forKey: .tripKey)
+        try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
     }
 }
 
@@ -317,6 +331,7 @@ public extension Trip {
             favorites: favorites,
             shareCode: shareCode ?? stored.shareCode,
             tripKey: tripKey ?? stored.tripKey,
+            imageUrl: imageUrl ?? stored.imageUrl,
             createdAt: stored.createdAt ?? createdAt
         )
     }

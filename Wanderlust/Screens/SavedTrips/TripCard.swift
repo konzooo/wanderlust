@@ -13,9 +13,23 @@ import Networking
 
 struct TripCard: View {
     let trip: Trip
-    @State private var imageUrlState: AsyncValue<URL> = .initial
+    let onImageURLResolved: (URL) -> Void
+    @State private var imageUrlState: AsyncValue<URL>
 
     private let imageService = UnsplashService()
+
+    init(
+        trip: Trip,
+        onImageURLResolved: @escaping (URL) -> Void = { _ in }
+    ) {
+        self.trip = trip
+        self.onImageURLResolved = onImageURLResolved
+        if let rawURL = trip.imageUrl, let url = URL(string: rawURL) {
+            _imageUrlState = State(initialValue: .loaded(url))
+        } else {
+            _imageUrlState = State(initialValue: .initial)
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -77,6 +91,7 @@ struct TripCard: View {
                 )
                 await MainActor.run {
                     imageUrlState = .loaded(url)
+                    onImageURLResolved(url)
                 }
             } catch {
                 await MainActor.run {

@@ -135,6 +135,9 @@ enum TripOutputStateFactory {
         state.deepDives = trip.deepDives
         state.accommodation = trip.accommodation
         state.nearYouResponse = trip.nearYouState.asyncValue
+        if let imageURL = trip.imageUrl.flatMap(URL.init(string:)) {
+            state.imageUrlResponse = .loaded(imageURL)
+        }
         state.manualGenerationRequest = TripGenerationRequest(
             tripKey: trip.tripKey ?? TripKey.mint(),
             input: trip.generationInput

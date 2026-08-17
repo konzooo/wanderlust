@@ -4,15 +4,15 @@
 //  Created by Rodrigo Mato Castellano on 3/7/25.
 //
 
-import SwiftUI
+import Foundation
 
-/// Protocol defining methods for caching and retrieving Image objects.
-/// Adopting the Strategy pattern, we can switch out the storage mechanism
-/// (in-memory, disk-based, database, third-party etc.) without changing the repository’s usage.
-public protocol ImageCacheStrategy: ObservableObject {
-    /// Saves an Image object for a given key.
-    func store(_ image: Image, forKey key: String)
+/// Stores the original downloaded image bytes rather than a `SwiftUI.Image`.
+/// Keeping bytes makes a cache durable: renderers can decode them again after
+/// the process has been terminated.
+public protocol ImageCacheStrategy: Sendable {
+    /// Saves image bytes for a stable logical key.
+    func store(_ data: Data, forKey key: String) async
 
-    /// Retrieves (decodes) an Image object for a given key, or nil if not found.
-    func retrieve(forKey key: String) -> Image?
+    /// Retrieves image bytes for a key, or `nil` on a cache miss.
+    func retrieveData(forKey key: String) async -> Data?
 }

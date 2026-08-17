@@ -35,7 +35,14 @@ struct GroupJoinScreen: View {
             AnalyticsTracker.shared.log(.screenViewed(.groupJoin))
         }
         .onChange(of: store.state.joinedGroupId) { _, groupId in
-            if let groupId { router.goToGroupSwipe(groupId, resetStack: true) }
+            guard let groupId else { return }
+            // Nothing left to swipe on an already-planned trip — go straight to
+            // the dashboard, which renders the finished result.
+            if store.state.isViewOnlyJoin {
+                router.goToGroupDashboard(groupId, resetStack: true)
+            } else {
+                router.goToGroupSwipe(groupId, resetStack: true)
+            }
         }
     }
 
@@ -47,23 +54,20 @@ struct GroupJoinScreen: View {
                 .padding(.top, 8)
                 .padding(.bottom, 18)
 
-            if dto.status != .collecting {
-                closedState
-            } else {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        rosterCard(dto)
-                        if let errorMessage = store.state.errorMessage {
-                            Text(errorMessage).font(DS.Typography.subtitle).foregroundColor(.red)
-                        }
+            ScrollView {
+                VStack(spacing: 16) {
+                    if dto.status != .collecting { alreadyPlannedNotice }
+                    rosterCard(dto)
+                    if let errorMessage = store.state.errorMessage {
+                        Text(errorMessage).font(DS.Typography.subtitle).foregroundColor(.red)
                     }
-                    .padding(.horizontal, 20)
                 }
-
-                joinButton
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                .padding(.horizontal, 20)
             }
+
+            joinButton
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
         }
     }
 
@@ -85,7 +89,9 @@ struct GroupJoinScreen: View {
                     Text("\(dto.members.count) member\(dto.members.count == 1 ? "" : "s")")
                         .font(.kanit(12)).foregroundColor(Color.appTint)
                 }
-                Text("Select your name below")
+                Text(store.state.isViewOnlyJoin
+                     ? "Tap the name the organizer saved for you"
+                     : "Select your name below")
                     .font(.kanit(13)).foregroundColor(Color(.systemGray))
 
                 VStack(spacing: 10) {
@@ -94,7 +100,8 @@ struct GroupJoinScreen: View {
                     }
                 }
 
-                addYourselfControl
+                // Only while collecting: see `addSelf` in `convex/groups.ts`.
+                if !store.state.isViewOnlyJoin { addYourselfControl }
             }
         }
     }
@@ -159,7 +166,7 @@ struct GroupJoinScreen: View {
                 ProgressView().tint(.white)
             } else {
                 HStack(spacing: 6) {
-                    Text("Start with your preferences")
+                    Text(store.state.isViewOnlyJoin ? "See the trip" : "Start with your preferences")
                     Image(systemName: "arrow.right")
                 }
             }
@@ -168,17 +175,21 @@ struct GroupJoinScreen: View {
         .buttonStyle(PrimaryButtonStyle(fullWidth: true))
     }
 
-    private var closedState: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "lock.fill").font(.system(size: 40)).foregroundStyle(Color(.systemGray2))
-            Text("This trip already started").font(DS.Typography.displayLight)
-            Text("The organizer has already generated the group trip, so it can't be joined.")
-                .font(DS.Typography.subtitle).foregroundColor(Color(.systemGray))
-                .multilineTextAlignment(.center)
-            Spacer()
+    private var alreadyPlannedNotice: some View {
+        DS.GlassCard {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundStyle(Color.appTint)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("This trip is already planned")
+                        .font(.kanit(15))
+                    Text("Tap your name to see it. Preferences are closed, so joining now won't change what the group got.")
+                        .font(.kanit(13))
+                        .foregroundColor(Color(.systemGray))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
-        .padding(.horizontal, 32)
     }
 
     private var invalidCodeState: some View {

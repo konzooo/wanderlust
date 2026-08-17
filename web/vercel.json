@@ -5,12 +5,16 @@
       "destination": "/privacy.html"
     },
     {
+      "source": "/support",
+      "destination": "/support.html"
+    },
+    {
       "source": "/join/:code",
-      "destination": "https://affable-pika-176.convex.site/join?code=:code"
+      "destination": "https://clean-bulldog-349.convex.site/join?code=:code"
     },
     {
       "source": "/t/:code",
-      "destination": "https://affable-pika-176.convex.site/t?code=:code"
+      "destination": "https://clean-bulldog-349.convex.site/t?code=:code"
     }
   ],
   "headers": [

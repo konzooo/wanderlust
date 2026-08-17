@@ -148,6 +148,7 @@
 		EB1C12E35EA1BF6C1A59DD0F /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = DE4D79994C3CA95E87EFB613 /* ConvexMobile */; };
 		F16301D3AAB415962565DB9E /* GroupTripMembersStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C1A45E246D034167EB10D5 /* GroupTripMembersStore.swift */; };
 		F69681D32D326ECF00E76538 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F65888532CB087B100E421A1 /* Assets.xcassets */; };
+		2984D3625E56D13F96721B5B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6AAF91FBA6DFF3B19FF1D276 /* PrivacyInfo.xcprivacy */; };
 		FA57A0012D2C3DD700E5C85E /* TripPlanningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */; };
 		AA2000010000000000000001 /* TripGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000020000000000000002 /* TripGenerationService.swift */; };
 		AA4000010000000000000001 /* TripGenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4000020000000000000002 /* TripGenerationCoordinator.swift */; };
@@ -223,6 +224,7 @@
 		5D37CABD2D2C3DC800E5C85E /* TripOutputScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripOutputScreen.swift; sourceTree = "<group>"; };
 		5D37CABF2D2C3DD700E5C85E /* TripOutputStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripOutputStore.swift; sourceTree = "<group>"; };
 		5D3916332DA434B900D944D8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6AAF91FBA6DFF3B19FF1D276 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		5D4536B32D80DF7100490001 /* SegmentItineraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentItineraryView.swift; sourceTree = "<group>"; };
 		5D4E8B462DE8D4F500EFBAF5 /* FeedbackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackStore.swift; sourceTree = "<group>"; };
 		5D4EFFB02CB05B0E007E3FF2 /* Wanderlust.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wanderlust.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -581,6 +583,7 @@
 				5DB3AF572D9C7B80004D22E2 /* AppIcon.appiconset */,
 				5D4EFFB32CB05B0E007E3FF2 /* WanderlustApp.swift */,
 				5D3916332DA434B900D944D8 /* Info.plist */,
+				6AAF91FBA6DFF3B19FF1D276 /* PrivacyInfo.xcprivacy */,
 				F65888532CB087B100E421A1 /* Assets.xcassets */,
 				5D4EFFB92CB05B0F007E3FF2 /* Wanderlust.entitlements */,
 			);
@@ -935,6 +938,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2984D3625E56D13F96721B5B /* PrivacyInfo.xcprivacy in Resources */,
 				F69681D32D326ECF00E76538 /* Assets.xcassets in Resources */,
 				AA7600010000000000000001 /* EvalSamples.json in Resources */,
 				5DB3AF582D9C7B80004D22E2 /* 1024.png in Resources */,
@@ -1288,9 +1292,9 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = app.kk.wanderlust;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wanderlust.client;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
@@ -1339,9 +1343,9 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = app.kk.wanderlust;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wanderlust.client;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;

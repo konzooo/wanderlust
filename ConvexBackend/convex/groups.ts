@@ -219,6 +219,33 @@ export const joinResolve = query({
 });
 
 /**
+ * Late joining is allowed through `claimSlot` only — deliberately **not**
+ * through `addSelf`. The asymmetry is a security boundary, not an oversight.
+ *
+ * The friend who answers late is still going on the trip, and blocking them
+ * used to lock them out of the result entirely: `getGroup` needs a member token
+ * and only these two mutations mint one, so "you replied too slowly" meant "you
+ * can never see the itinerary". That is worth fixing.
+ *
+ * But it may not be fixed by letting a *code* mint a token after generation.
+ * An invite code is five digits — 100k combinations, enumerable in minutes —
+ * and `randomInviteCode` is only safe at that length because the code alone
+ * opens the join screen and never unlocks trip content (see `lib/codes.ts`,
+ * which contrasts it with the 122-bit share code that *is* a read capability).
+ * An open `addSelf` would have turned every invite code into exactly such a
+ * capability, permanently.
+ *
+ * `claimSlot` does not, because it cannot invent membership: it can only take a
+ * slot the admin typed a real person's name into, it works once, and taking one
+ * is visible in the roster. So the late friend gets in, and a guessed code
+ * still buys nothing on a group whose slots are all claimed.
+ *
+ * A late joiner cannot *change* the trip either — `submitPreferences` keeps its
+ * `collecting`-only guard, so they land as `skipped`, the status generation
+ * already gives members who did not answer in time.
+ */
+
+/**
  * Joiner claims one of the admin's pre-seeded (unclaimed) slots. Atomic: Convex
  * serializes the transaction, so of two concurrent claims exactly one wins and
  * the other sees the slot already claimed.
@@ -233,9 +260,6 @@ export const claimSlot = mutation({
     if (!group) {
       throw new ConvexError("Group not found");
     }
-    if (group.status !== "collecting") {
-      throw new ConvexError("Group is closed");
-    }
     const member = await ctx.db.get(args.memberId);
     if (!member || member.groupId !== args.groupId) {
       throw new ConvexError("Member not found");
@@ -247,13 +271,25 @@ export const claimSlot = mutation({
     const memberToken = newToken();
     await ctx.db.patch(args.memberId, {
       memberTokenHash: await hashToken(memberToken),
+      // A slot still marked `pending` after collecting closed can no longer be
+      // filled in, so it becomes `skipped` on claim. One already marked
+      // `skipped` by generation is left exactly as it is.
+      ...(member.status === "pending" && group.status !== "collecting"
+        ? { status: "skipped" as const }
+        : {}),
     });
 
     return { memberId: args.memberId, memberToken };
   },
 });
 
-/** Joiner adds themselves as a brand-new, already-claimed slot. */
+/**
+ * Joiner adds themselves as a brand-new, already-claimed slot.
+ *
+ * Stays `collecting`-only. This is the mutation that could mint a membership —
+ * and therefore a read token — out of nothing but a five-digit code, so it must
+ * close when collecting closes. Late arrivals come in through `claimSlot`.
+ */
 export const addSelf = mutation({
   args: {
     groupId: v.id("groups"),

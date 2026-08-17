@@ -1,17 +1,24 @@
 # App Store relaunch checklist
 
-## New record
+## Transferred record
 
-- App Store name: `Wanderlust: Unique Trips`
-- Fallback 1: `Wanderlust: Travel Your Way`
-- Fallback 2: `Wanderlust: Made for You`
-- Bundle ID: `app.kk.wanderlust`
-- SKU: `wanderlust-ios-2026`
-- Version/build: `1.0.0 (1)`
+Apple transferred the original listing to team `JVC4H9U29T` on 2026-08-14. This
+ships as a **new version of the existing app**, not a new record — so the bundle
+ID is fixed forever at the value the original app shipped with, and the version
+must climb past the `1.2.2` already on the store.
+
+- Apple ID: `6746957492`
+- App Store name: `Wanderlust: Travel Inspiration` (rename to `Wanderlust: Unique Trips` with this version)
+- Bundle ID: `com.wanderlust.client` — **immutable, do not change**
+- SKU: `com.wandrlust.app` (inherited, cannot be edited)
+- Previous store version: `1.2.2`
+- Version/build: `2.0.0 (1)`
 - Device display name: `Wanderlust`
 - Privacy URL: `https://wanderlust.get-catalyst.app/privacy`
+- Support URL: `https://wanderlust.get-catalyst.app/support`
 
-The old listing cannot be reused without an account transfer. This project is intentionally configured as a new App Store record.
+The AASA `appIDs` entry must stay in sync with the bundle ID
+(`JVC4H9U29T.com.wanderlust.client`) or Universal Links break silently.
 
 ## Amplitude handoff
 
@@ -34,10 +41,27 @@ Declare third-party SDK behavior as well as app behavior:
 
 Review the answers against the final binary and Apple’s current guidance before submission: <https://developer.apple.com/app-store/app-privacy-details/>.
 
+## Convex: promote dev to prod before every release
+
+Release builds talk to `prod:clean-bulldog-349`; Debug builds talk to
+`dev:affable-pika-176` (gated in `ConvexConfiguration`). Prod does **not**
+inherit anything from dev automatically, so run both of these — functions and
+environment variables drift independently, and a missing env var fails at
+runtime, not at deploy time:
+
+```bash
+cd ConvexBackend && npx convex deploy -y && npx convex env list --prod
+```
+
+Compare that output against `npx convex env list`. Any key on dev and missing on
+prod must be set with `npx convex env set <KEY> <value> --prod`.
+
 ## Final checks
 
-- Deploy `web/privacy.html` so `/privacy` returns the policy over HTTPS.
-- Verify the archive contains `app.kk.wanderlust`, `1.0.0 (1)`, the intended entitlements, and Amplitude’s `PrivacyInfo.xcprivacy`.
+- Deploy `web/privacy.html` and `web/support.html` so `/privacy` and `/support` return over HTTPS.
+- Verify the archive contains `com.wanderlust.client`, `2.0.0 (1)`, the intended entitlements, and Amplitude’s `PrivacyInfo.xcprivacy`.
+- Install the store build of `1.2.2` first, then build over it, and confirm saved trips and Traveller DNA profiles survive the upgrade.
 - Verify the archive contains no Firebase frameworks/packages and no `GoogleService-Info.plist`.
 - Confirm screenshots, description, support URL, privacy URL, category, age rating, export compliance, and review notes.
-- Verify TestFlight analytics before submitting build `1.0.0 (1)`.
+- Verify TestFlight analytics before submitting build `2.0.0 (1)`.
+- Mint fresh App Review invite codes on **prod** and put them in the review notes. A code is only demoable while its group is `collecting`; once generation runs the group flips to `ready` and the reviewer can no longer join it.

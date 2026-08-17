@@ -155,12 +155,25 @@ extension GroupJoinStore {
         /// Set on success; the screen observes this to navigate into swiping.
         var joinedGroupId: String?
 
+        /// True once the group has been planned. Joining is still allowed — the
+        /// late friend gets to read the trip — but there are no preferences left
+        /// to give, so the screen says so and hands off to the dashboard rather
+        /// than the swipe flow.
+        var isViewOnlyJoin: Bool {
+            guard case let .loaded(dto) = resolved else { return false }
+            return dto.status != .collecting
+        }
+
         var canJoin: Bool {
-            guard case let .loaded(dto) = resolved, dto.status == .collecting else { return false }
+            guard case .loaded = resolved else { return false }
             switch selection {
             case .existing:
                 return true
             case .new:
+                // Adding a brand-new name is closed once the trip is planned:
+                // it is the one path that turns a guessed invite code into a
+                // read token. Late arrivals claim their seeded slot instead.
+                guard !isViewOnlyJoin else { return false }
                 return !newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             case .none:
                 return false

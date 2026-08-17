@@ -4,9 +4,25 @@ import CoreModels
 import Foundation
 
 enum ConvexConfiguration {
-    /// Convex dev deployment. There is only one environment today; once a
-    /// production deployment exists this should gate on the build configuration.
-    static let deploymentURL = "https://affable-pika-176.convex.cloud"
+    /// Which Convex deployment this build talks to.
+    ///
+    /// Gated on the build configuration rather than hand-edited, because the
+    /// failure mode of a hand-edited URL is silent and expensive: a Release
+    /// build accidentally left on dev ships every real traveller's group trip
+    /// into a deployment that `npx convex dev` overwrites at will.
+    ///
+    /// The consequence to remember: **dev and prod are separate databases with
+    /// separate environment variables.** A schema change, a new function, or a
+    /// new API key added to dev does not exist in prod until `npx convex deploy`
+    /// and `npx convex env set --prod` are run for it. Archiving a release
+    /// without that is the one way this goes wrong.
+    static let deploymentURL = {
+        #if DEBUG
+        "https://affable-pika-176.convex.cloud"   // dev:affable-pika-176
+        #else
+        "https://clean-bulldog-349.convex.cloud"  // prod:clean-bulldog-349
+        #endif
+    }()
 }
 
 /// Thin wrapper around the Convex client for the Group Trips backend.

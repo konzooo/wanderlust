@@ -4,11 +4,16 @@
 <dict>
 	<key>AmplitudeAPIKey</key>
 	<string>$(AMPLITUDE_API_KEY)</string>
+	<!-- The app only talks HTTPS — standard, exempt encryption — so this
+	     answers Apple's export-compliance question once instead of on every
+	     upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>app.kk.wanderlust.grouptrip</string>
+			<string>com.wanderlust.client.grouptrip</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<!-- Dev/testing scheme for group invite deep links

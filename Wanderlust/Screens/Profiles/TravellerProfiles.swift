@@ -1109,6 +1109,7 @@ struct TravellerDNAEditorScreen: View {
                     .textInputAutocapitalization(.words)
                     .focused($nameFocused)
                     .submitLabel(.next)
+                    .doubleTapToSelectAll()
                     .padding(14)
                     .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 14))
                     .onChange(of: name) { _, value in
@@ -1352,6 +1353,7 @@ private struct EntryListEditor: View {
                             draft = String(value.prefix(100))
                         }
                         .onSubmit(add)
+                        .doubleTapToSelectAll()
                     Button(action: add) {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 28))

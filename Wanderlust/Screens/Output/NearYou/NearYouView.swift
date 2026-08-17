@@ -321,6 +321,7 @@ struct NearYouView: View {
                     .submitLabel(.done)
                     .focused($isAddressFocused)
                     .onSubmit(handleKeyboardSubmit)
+                    .doubleTapToSelectAll()
                     .onChange(of: address) { _, value in
                         if selectedSuggestion?.searchText != value {
                             selectedSuggestion = nil

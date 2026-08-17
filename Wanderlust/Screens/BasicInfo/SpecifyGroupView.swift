@@ -121,6 +121,7 @@ struct SpecifyGroupView: View {
             TextField("e.g. 35", text: $averageAgeText)
                 .font(.kanit(17).weight(.medium))
                 .keyboardType(.numberPad)
+                .doubleTapToSelectAll()
                 .padding(.vertical, 12)
                 .padding(.horizontal, 14)
                 .background(Color.white.opacity(0.9))

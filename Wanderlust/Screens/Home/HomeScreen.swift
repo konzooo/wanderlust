@@ -154,11 +154,7 @@ struct HomeScreen: View {
                     .focused($askFieldFocused)
                     .onSubmit(planTrip)
                     .accessibilityLabel("Trip destination")
-                    // A double tap natively selects one word only. A destination
-                    // is usually replaced wholesale, so extend it to everything.
-                    .simultaneousGesture(
-                        TapGesture(count: 2).onEnded { selectWholeQuery() }
-                    )
+                    .doubleTapToSelectAll()
             }
 
             Button(action: planTrip) {
@@ -298,18 +294,6 @@ struct HomeScreen: View {
         case .seeAll:
             router.goToTabRoot(.trips)
         }
-    }
-
-    /// Selects the full query in whichever field is first responder, so a double
-    /// tap marks the whole destination rather than a single word.
-    private func selectWholeQuery() {
-        guard !store.state.destinationQuery.isEmpty else { return }
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.selectAll(_:)),
-            to: nil,
-            from: nil,
-            for: nil
-        )
     }
 
     private func planTrip() {

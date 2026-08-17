@@ -10,6 +10,22 @@ extension View {
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
         )
     }
+
+    /// A double tap on a plain SwiftUI `TextField` natively selects one word
+    /// only. Most of this app's fields hold a single short value that's
+    /// replaced wholesale rather than word-edited, so this extends a double
+    /// tap to select everything — one tap, one delete, instead of a chain of
+    /// backspaces. Goes through the responder chain, so it reaches whichever
+    /// field is first responder without needing a focus binding.
+    func doubleTapToSelectAll() -> some View {
+        simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.selectAll(_:)), to: nil, from: nil, for: nil
+                )
+            }
+        )
+    }
 }
 
 /// A text field where a **double-tap selects the entire contents** (so one

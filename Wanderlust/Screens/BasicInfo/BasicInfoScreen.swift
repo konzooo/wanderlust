@@ -163,6 +163,7 @@ extension BasicInfoScreen {
                 .font(.kanit(17).weight(.medium))
                 .foregroundColor(.black)
                 .focused($destinationFocused)
+                .doubleTapToSelectAll()
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 14)

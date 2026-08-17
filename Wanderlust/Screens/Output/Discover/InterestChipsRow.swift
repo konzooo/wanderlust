@@ -156,6 +156,7 @@ struct InterestChipsRow: View {
                 .submitLabel(.search)
                 .focused($fieldIsFocused)
                 .onSubmit(submitCustom)
+                .doubleTapToSelectAll()
                 .padding(.horizontal, 12)
                 .frame(height: 44)
                 .background(

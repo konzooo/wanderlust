@@ -80,5 +80,9 @@ enum DesignPlayground {
 #endif
 
     /// Registry of in-progress design explorations. Add/remove entries here.
-    static let variants: [DesignVariant] = homeLogoVariants + tripHeaderVariants + outputVariants
+    /// The welcome flow went through four rounds here before shipping as
+    /// `WelcomeScreen` — see the Debug Menu's "Reset onboarding" to preview it
+    /// again rather than re-adding an entry for it.
+    static let variants: [DesignVariant] =
+        homeLogoVariants + tripHeaderVariants + outputVariants
 }

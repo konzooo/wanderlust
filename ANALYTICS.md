@@ -38,7 +38,13 @@ Amplitude owns install, update, app open, background, and session events.
 |---|---|---|
 | `screen_viewed` | `screen_name` | `entry_point` |
 
-Canonical screens: `home`, `basic_info`, `questionnaire`, `trip_output`, `saved_trips`, `profiles`, `feedback`, `group_create`, `group_members`, `group_join`, `group_questionnaire`, `group_dashboard`, and `shared_trip`.
+Canonical screens: `home`, `basic_info`, `questionnaire`, `trip_output`, `saved_trips`, `profiles`, `feedback`, `group_create`, `group_members`, `group_join`, `group_questionnaire`, `group_dashboard`, `shared_trip`, `welcome`, `group_intro`, `joiner_intro`, and `traveller_dna_intro`.
+
+The four onboarding screens are one-shot introductions, so their volume is a
+count of new users rather than of sessions. `welcome` is logged once per page
+with `entry_point` set to `page_promise`, `page_setup`, `page_advice`, or
+`page_favourites` — the drop-off across the first-launch flow is the gap
+between those four counts, and no separate completion event is emitted.
 
 ### Solo planning and results
 

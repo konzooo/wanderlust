@@ -81,9 +81,18 @@ struct ReducedMotionSplash: View {
 /// `bloom` scales and fades the blobs in from the centre; `drift` is a
 /// continuous 0...1 phase that keeps them slowly moving so the backdrop is
 /// never a frozen image behind a moving logo.
-struct SplashAurora: View {
-    var bloom: Double
-    var drift: Double
+///
+/// Public because the onboarding flow opens on the same aurora the splash ends
+/// on: at `bloom: 1` this is the app's own backdrop density, so splash and
+/// welcome are one continuous scene rather than two that cut.
+public struct SplashAurora: View {
+    public var bloom: Double
+    public var drift: Double
+
+    public init(bloom: Double, drift: Double) {
+        self.bloom = bloom
+        self.drift = drift
+    }
 
     private struct Blob {
         let color: Color
@@ -105,7 +114,7 @@ struct SplashAurora: View {
              travel: CGSize(width: 18, height: -28), blur: 90)
     ]
 
-    var body: some View {
+    public var body: some View {
         ZStack {
             LinearGradient(
                 colors: [Color.gradientTop, Color.white, Color.gradientBottom],
@@ -136,11 +145,16 @@ struct SplashAurora: View {
 }
 
 /// Drives a slow, never-ending drift phase for the aurora.
-struct DriftingAurora<Content: View>: View {
-    var bloom: Double
-    @ViewBuilder var content: (Double) -> Content
+public struct DriftingAurora<Content: View>: View {
+    public var bloom: Double
+    @ViewBuilder public var content: (Double) -> Content
 
-    var body: some View {
+    public init(bloom: Double, @ViewBuilder content: @escaping (Double) -> Content) {
+        self.bloom = bloom
+        self.content = content
+    }
+
+    public var body: some View {
         TimelineView(.animation) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             // 14s loop: slow enough to read as atmosphere, not as motion.

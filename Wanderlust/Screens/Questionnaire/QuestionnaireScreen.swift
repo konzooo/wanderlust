@@ -276,6 +276,24 @@ struct QuestionnaireScreen: View {
 enum OnboardingPreferenceKey {
     static let questionnaireCardsDismissed = "onboarding.questionnaireCards.dismissed"
     static let newTripOutputPermanentlyDismissed = "onboarding.newTripOutput.permanentlyDismissed"
+    /// First-launch welcome flow. Also set silently when a deep link opens the
+    /// app, so an invited joiner is never shown the general pitch.
+    static let welcomeCompleted = "onboarding.welcome.completed"
+    /// "Planning together" — the explainer at the group create/join entry.
+    static let groupIntroDismissed = "onboarding.groupIntro.dismissed"
+    /// The invited-joiner intro, shown once the invite resolves.
+    static let joinerIntroDismissed = "onboarding.joinerIntro.dismissed"
+
+    /// Every flag above plus the profile introduction, for the debug reset and
+    /// the UI-testing launch argument.
+    static let all: [String] = [
+        questionnaireCardsDismissed,
+        newTripOutputPermanentlyDismissed,
+        welcomeCompleted,
+        groupIntroDismissed,
+        joinerIntroDismissed,
+        ProfilePreferenceKey.introductionDismissed
+    ]
 }
 
 private struct QuestionnaireCardOnboardingOverlay: View {

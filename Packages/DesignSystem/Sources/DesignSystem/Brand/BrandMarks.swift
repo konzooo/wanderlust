@@ -128,12 +128,38 @@ public struct PinPlaneMark: View {
     }
 }
 
+// MARK: - Flight path
+
+/// The dashed curve that sweeps across `AuroraBackground` — a literal "path"
+/// tracing the backdrop, echoing "Your unique path starts here".
+///
+/// It enters and leaves off-canvas on both sides, so it reads as a segment of
+/// something longer rather than a stroke that starts and stops. Stroked with
+/// `.trim(to:)` it draws itself, which is what the welcome flow uses it for.
+public struct FlightPathShape: Shape {
+    public init() {}
+
+    public func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX - 30, y: rect.height * 0.32))
+        path.addCurve(
+            to: CGPoint(x: rect.maxX + 30, y: rect.height * 0.7),
+            control1: CGPoint(x: rect.width * 0.32, y: rect.height * 0.06),
+            control2: CGPoint(x: rect.width * 0.68, y: rect.height * 0.5)
+        )
+        return path
+    }
+}
+
 #if DEBUG
 #Preview("Marks") {
     VStack(spacing: 40) {
         PinPlaneMark(size: 90)
         PlaneShape().fill(Color.appTint).frame(width: 60, height: 60)
         PinShape().stroke(Color.appTint, lineWidth: 2).frame(width: 60, height: 71)
+        FlightPathShape()
+            .stroke(Color.appTint, style: StrokeStyle(lineWidth: 1.5, dash: [2, 9]))
+            .frame(height: 120)
     }
     .padding()
 }

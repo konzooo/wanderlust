@@ -21,6 +21,13 @@ public extension AnalyticsEvent {
         case groupQuestionnaire = "group_questionnaire"
         case groupDashboard = "group_dashboard"
         case sharedTrip = "shared_trip"
+        // Onboarding. `welcome` carries the page as its entry point, so the
+        // drop-off across the three pages falls out of `screen_viewed` without
+        // a bespoke event.
+        case welcome = "welcome"
+        case groupIntro = "group_intro"
+        case joinerIntro = "joiner_intro"
+        case travellerDNAIntro = "traveller_dna_intro"
     }
 
     static func screenViewed(_ screen: Screen, entryPoint: String? = nil) -> Self {

@@ -9,6 +9,9 @@ struct GroupJoinScreen: View {
 
     @EnvironmentObject var router: NavigationRouter
 
+    @AppStorage(OnboardingPreferenceKey.joinerIntroDismissed) private var introDismissed = false
+    @State private var showsIntro = false
+
     init(code: String) {
         self.store = GroupJoinStore(code: code)
     }
@@ -24,7 +27,28 @@ struct GroupJoinScreen: View {
                 invalidCodeState
             case let .loaded(dto):
                 content(dto)
+
+                // Held back until the invite resolves so it can name the trip,
+                // and never shown over a spinner or a dead code — a bad invite
+                // should reach `invalidCodeState` with nothing in the way.
+                if showsIntro {
+                    JoinerIntroOverlay(
+                        groupName: dto.name,
+                        destination: dto.destination,
+                        onContinue: {
+                            introDismissed = true
+                            showsIntro = false
+                        }
+                    )
+                    .transition(.opacity)
+                }
             }
+        }
+        .animation(.easeOut(duration: 0.25), value: showsIntro)
+        .onChange(of: store.state.resolved.isLoaded, initial: true) { _, isLoaded in
+            guard isLoaded, !introDismissed, !showsIntro else { return }
+            showsIntro = true
+            AnalyticsTracker.shared.log(.screenViewed(.joinerIntro))
         }
         .cleanTopInsets()
         .navigationBarBackButtonHidden(true)

@@ -9,6 +9,13 @@ struct GroupTripCreateScreen: View {
 
     @EnvironmentObject var router: NavigationRouter
 
+    /// Every create-and-join entry point in the app routes through this screen —
+    /// Home's group card and code row, the Trips empty state, the `+` menu — so
+    /// gating the explainer here covers all of them with one hook. Opening an
+    /// existing group goes to the dashboard instead and correctly gets nothing.
+    @AppStorage(OnboardingPreferenceKey.groupIntroDismissed) private var introDismissed = false
+    @State private var showsIntro = false
+
     @MainActor
     init(store: GroupTripCreateStore? = nil) {
         _store = StateObject(wrappedValue: store ?? GroupTripCreateStore())
@@ -57,7 +64,19 @@ struct GroupTripCreateScreen: View {
                         .padding(.bottom, 8)
                 }
             }
+
+            if showsIntro {
+                GroupIntroOverlay(
+                    onGotIt: { showsIntro = false },
+                    onDontShowAgain: {
+                        introDismissed = true
+                        showsIntro = false
+                    }
+                )
+                .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.2), value: showsIntro)
         .cleanTopInsets()
         .toolbar {
             if #available(iOS 26.0, *) {
@@ -92,6 +111,12 @@ struct GroupTripCreateScreen: View {
         }
         .onAppear {
             AnalyticsTracker.shared.log(.screenViewed(.groupCreate))
+
+            if !introDismissed, !showsIntro {
+                showsIntro = true
+                AnalyticsTracker.shared.log(.screenViewed(.groupIntro))
+            }
+
             guard !didInitializeProfileSelection else { return }
             didInitializeProfileSelection = true
             store.state.selectedProfileID = TravellerProfileLibrary.shared.defaultSelectionID

@@ -130,7 +130,7 @@ struct SavedTripsScreen: View {
         DS.EmptyState(
             eyebrow: "Group trips",
             symbol: "person.3",
-            title: "Plan one together",
+            title: "Many preferences. One trip.",
             message: "Everyone swipes on their own, and the trip is built from what the group actually agrees on.",
             actionTitle: "Create a group trip",
             action: { router.goToGroupCreate(resetStack: true) },
@@ -177,8 +177,8 @@ struct SavedTripsScreen: View {
         DS.EmptyState(
             eyebrow: "My trips",
             symbol: "suitcase.rolling",
-            title: "Your trips live here",
-            message: "Plan one and it stays on this device — suggestions, favourites and everything you saved along the way.",
+            title: "No trips yet",
+            message: "Where are you going next? It's time to get some inspiration and local tips.",
             actionTitle: "Plan a trip",
             action: { router.goToBasicInfo(resetStack: true) }
         )

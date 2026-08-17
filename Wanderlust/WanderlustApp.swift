@@ -20,13 +20,31 @@ struct WanderlustApp: App {
     /// free — returning from the background does not bring it back.
     @State private var showSplash = true
 
+    @AppStorage(OnboardingPreferenceKey.welcomeCompleted) private var welcomeCompleted = false
+
     init() {
         DS.applyUniformDesign()
 
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-ui-testing-reset-profiles") {
+        let arguments = ProcessInfo.processInfo.arguments
+
+        if arguments.contains("-ui-testing-reset-profiles") {
             TravellerProfileLibrary.shared.resetForUITesting()
             UserDefaults.standard.removeObject(forKey: ProfilePreferenceKey.introductionDismissed)
+        }
+
+        // Tests that drive the app proper must not have to walk the welcome
+        // flow first — `testTravellerDNAEntryFromNewTrip` taps a Home chip
+        // within seconds of launch. Suppress rather than reset: resetting is
+        // what the argument below is for.
+        if arguments.contains("-ui-testing") || arguments.contains("-ui-testing-reset-profiles") {
+            UserDefaults.standard.set(true, forKey: OnboardingPreferenceKey.welcomeCompleted)
+        }
+
+        if arguments.contains("-ui-testing-reset-onboarding") {
+            OnboardingPreferenceKey.all.forEach {
+                UserDefaults.standard.removeObject(forKey: $0)
+            }
         }
 #endif
 
@@ -35,10 +53,37 @@ struct WanderlustApp: App {
         // API key to install any more — model calls happen behind the backend.
         _ = InstallIdentity.token()
     }
+
+#if DEBUG
+    /// The Design Playground entry named by `-design-variant <id>`, if any.
+    private static var requestedDesignVariant: DesignVariant? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-design-variant"),
+              arguments.index(after: flag) < arguments.endIndex
+        else { return nil }
+
+        let id = arguments[arguments.index(after: flag)]
+        return DesignPlayground.variants.first { $0.id == id }
+    }
+#endif
     
     var body: some Scene {
         WindowGroup {
             ZStack {
+#if DEBUG
+                // `-design-variant <id>` boots straight into one Design
+                // Playground entry. The playground is otherwise behind a
+                // triple-tap on the Home logo, which a human can do and an
+                // automated screenshot run cannot.
+                if let variant = Self.requestedDesignVariant {
+                    NavigationStack { variant.destination }
+                        .preferredColorScheme(.light)
+                        .environmentObject(navigationRouter)
+                        .environmentObject(metricsTracker)
+                        .zIndex(3)
+                }
+#endif
+
                 RootTabView()
                 .preferredColorScheme(.light)
                 .environmentObject(navigationRouter)
@@ -46,8 +91,10 @@ struct WanderlustApp: App {
                 .onOpenURL { url in
                     // A deep link means the user is heading somewhere specific.
                     // Get out of the way rather than making them watch the
-                    // animation first.
+                    // animation first — and that includes the welcome flow: an
+                    // invited joiner gets the invite, not the general pitch.
                     showSplash = false
+                    welcomeCompleted = true
                     navigationRouter.handleDeepLink(url)
                 }
 
@@ -60,6 +107,18 @@ struct WanderlustApp: App {
                     // meant for Home during the cross-fade would feel broken.
                     .allowsHitTesting(false)
                     .zIndex(1)
+                }
+
+                // Gated on the splash being finished rather than raced against
+                // `onOpenURL`: the deep link arrives well inside the splash's
+                // window, so by the time this can appear the flag is already set
+                // and there is no welcome flash on an invite.
+                if !showSplash, !welcomeCompleted {
+                    WelcomeScreen {
+                        withAnimation(.easeInOut(duration: 0.4)) { welcomeCompleted = true }
+                    }
+                    .transition(.opacity)
+                    .zIndex(2)
                 }
             }
             

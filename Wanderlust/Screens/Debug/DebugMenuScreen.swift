@@ -12,6 +12,7 @@ import SwiftUI
 
 struct DebugMenuScreen: View {
     @AppStorage(DebugSettings.useMockTripDataKey) private var useMockTripData = false
+    @State private var didResetOnboarding = false
 
     var body: some View {
         List {
@@ -20,6 +21,18 @@ struct DebugMenuScreen: View {
                     Label("Mock trip data (no API)", systemImage: "ladybug.fill")
                 }
                 .tint(Color.appTint)
+            }
+
+            Section {
+                Button(action: resetOnboarding) {
+                    Label(
+                        didResetOnboarding ? "Onboarding reset" : "Reset onboarding",
+                        systemImage: didResetOnboarding ? "checkmark.circle.fill" : "arrow.counterclockwise"
+                    )
+                }
+                .disabled(didResetOnboarding)
+            } footer: {
+                Text("Clears the welcome, group, joiner, questionnaire, trip output and Traveller DNA flags. The welcome flow is gated on cold launch, so quit and relaunch to see it.")
             }
 
             Section {
@@ -43,6 +56,14 @@ struct DebugMenuScreen: View {
         }
         .navigationTitle("Debug Menu")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func resetOnboarding() {
+        OnboardingPreferenceKey.all.forEach {
+            UserDefaults.standard.removeObject(forKey: $0)
+        }
+        OnboardingSession.shared.reset()
+        didResetOnboarding = true
     }
 }
 

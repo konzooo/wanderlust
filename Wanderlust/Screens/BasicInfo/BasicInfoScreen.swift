@@ -303,19 +303,6 @@ struct AuroraBackground: View {
     }
 }
 
-private struct FlightPathShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX - 30, y: rect.height * 0.32))
-        path.addCurve(
-            to: CGPoint(x: rect.maxX + 30, y: rect.height * 0.7),
-            control1: CGPoint(x: rect.width * 0.32, y: rect.height * 0.06),
-            control2: CGPoint(x: rect.width * 0.68, y: rect.height * 0.5)
-        )
-        return path
-    }
-}
-
 #Preview {
     NavigationStack {
         BasicInfoScreen()

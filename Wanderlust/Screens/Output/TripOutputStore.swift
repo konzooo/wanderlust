@@ -582,7 +582,9 @@ extension TripOutputStore {
     }
 
     /// Storage keeps dives separate for provenance and cap accounting (§10),
-    /// while the feed renders them inline as additional dynamic categories.
+    /// while the feed renders them inline as additional dynamic categories —
+    /// ahead of the model's own sections, since a dive is something the
+    /// traveller asked for by name and should not have to scroll to find.
     var suggestionsWithDeepDives: AsyncValue<Trip.Suggestions> {
         switch state.suggestionsResponse {
         case .initial:
@@ -593,7 +595,7 @@ extension TripOutputStore {
             return .error(error)
         case .loaded(let suggestions):
             return .loaded(Trip.Suggestions(
-                dynamicSuggestions: suggestions.dynamicSuggestions + (state.deepDives ?? []),
+                dynamicSuggestions: Array((state.deepDives ?? []).reversed()) + suggestions.dynamicSuggestions,
                 staticSuggestions: suggestions.staticSuggestions
             ))
         }

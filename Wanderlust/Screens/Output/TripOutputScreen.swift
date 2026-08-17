@@ -44,7 +44,7 @@ struct TripOutputScreen: View {
         // - Drawer menu
         .conditional(!store.state.itineraryResponse.isLoading) { view in
             view
-                .ignoresSafeArea(edges: .vertical)
+                .ignoresSafeArea(.container, edges: .vertical)
                 .toolbar {
                     if #available(iOS 26.0, *) {
                         ToolbarItem(placement: .navigationBarLeading) {
@@ -240,6 +240,7 @@ struct TripOutputScreen: View {
             TravelTipsView(
                 suggestions: store.suggestionsWithDeepDives,
                 favorites: favoritesBinding,
+                deepDiveLoadingInterest: store.deepDiveInFlightInterest,
                 onRetry: canRetry ? { store.send(.retryComponent(.suggestions)) } : nil
             ) {
                 // This is the end of the suggestions feed, not a second view

@@ -32,6 +32,7 @@ import {
   validateDeepDive,
   validateItinerary,
   validateNearYou,
+  NEAR_YOU_MAX_PROPOSALS,
   validateSuggestions,
   validateWhereToStayResponse,
   validateWorthItResponse,
@@ -40,6 +41,7 @@ import {
 } from "./validation";
 
 export type { Component } from "./prompts";
+export { NEAR_YOU_MAX_PROPOSALS } from "./validation";
 
 /** Wire validator for the component name. Shared by every entry point. */
 export const generationComponent = v.union(
@@ -78,9 +80,6 @@ export const suggestionsVariant = v.union(
 
 /** The measured default. Changing this changes what every new trip generates. */
 export const SUGGESTIONS_VARIANT: SuggestionsVariant = "split";
-
-/** Request one broad hosted search; one action can return many source URLs. */
-export const NEAR_YOU_MAX_SEARCH_CALLS = 1;
 
 /**
  * The components a solo trip generates on open, for a given variant.
@@ -311,16 +310,10 @@ export async function runComponent(args: {
         maxOutputTokens: spec.maxOutputTokens,
         ...(spec.model ? { model: spec.model } : {}),
         ...(spec.reasoning ? { reasoning: spec.reasoning } : {}),
-        ...(args.component === "nearYou"
-          ? {
-            webSearch: {
-              maxToolCalls: NEAR_YOU_MAX_SEARCH_CALLS,
-              approximateLocation: {
-                city: args.nearYouLocation?.city ?? destination(args.input),
-              },
-            },
-          }
-          : {}),
+        // Near You deliberately runs with no tools. It proposes places from
+        // model knowledge and MapKit verifies each one on the client, which is
+        // both cheaper and a stricter factual gate than a hosted search whose
+        // results the model could still paraphrase loosely.
       });
     } catch (error) {
       if (error instanceof OpenAIError && providerAttempts > 1) {
@@ -434,7 +427,7 @@ function validate(
     case "whereToStay":
       return validateWhereToStayResponse(data, report);
     case "nearYou":
-      return validateNearYou(data, report, nearYouCandidates ?? [], webSources);
+      return validateNearYou(data, report);
   }
 }
 

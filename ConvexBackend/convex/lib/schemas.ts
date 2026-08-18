@@ -253,55 +253,33 @@ export const DEEP_DIVE_SCHEMA = obj({ title: str, texts: arr(LINKABLE_TEXT) }, [
 ]);
 
 /**
- * Grounded Near You selection (§7).
+ * One place the model believes is near the traveller's address.
  *
- * There is deliberately no venue name, category, coordinate, distance, time or
- * map-link field in model output. The model can only return an opaque candidate
- * ID the client supplied and prose explaining why it fits. The client then
- * reattaches that ID to its original MapKit value.
+ * It is a *proposal*, not a fact. Every entry is resolved against MapKit and
+ * given a real walking route on the client before the traveller sees it;
+ * anything that fails to resolve or falls outside the radius is discarded.
+ * That gate is also what filters invented venues, so the model is asked for
+ * precision in `name`/`locationHint` rather than for restraint.
+ *
+ * There is deliberately still no distance, walking-time, coordinate or
+ * map-link field: those remain MapKit's to author. `accessNote` may carry a
+ * recurring rhythm or an access caveat, never a computed journey time.
  */
-const NEAR_YOU_PICK = obj({ candidateID: str, explanation: str }, [
-  "candidateID",
-  "explanation",
-]);
-
-const NEAR_YOU_SECTION = obj({ title: str, picks: arr(NEAR_YOU_PICK) }, [
-  "title",
-  "picks",
-]);
-
-/**
- * A current, sourced discovery that need not already exist as an Apple Maps
- * POI. It deliberately has no distance/time field: only MapKit may author
- * those facts. `accessNote` may summarize sourced access context without
- * pretending it is a live route calculation.
- */
-const NEAR_YOU_LIVE_FIND = obj(
+const NEAR_YOU_PROPOSAL = obj(
   {
     name: str,
     category: str,
     locationHint: str,
     explanation: str,
     accessNote: nullableStr,
-    sourceTitle: str,
-    sourceURL: str,
   },
-  [
-    "name",
-    "category",
-    "locationHint",
-    "explanation",
-    "accessNote",
-    "sourceTitle",
-    "sourceURL",
-  ],
+  ["name", "category", "locationHint", "explanation", "accessNote"],
 );
 
 export const NEAR_YOU_SCHEMA = obj(
   {
-    sections: arr(NEAR_YOU_SECTION),
-    liveFinds: arr(NEAR_YOU_LIVE_FIND),
+    places: arr(NEAR_YOU_PROPOSAL),
     sparseMessage: nullableStr,
   },
-  ["sections", "liveFinds", "sparseMessage"],
+  ["places", "sparseMessage"],
 );

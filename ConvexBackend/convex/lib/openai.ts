@@ -13,11 +13,18 @@
 /** Single provider/model selection point for the whole backend. */
 export const OPENAI_MODEL = "gpt-4o-mini";
 /**
- * Near You is the one component where current local discovery is the product,
- * not merely background knowledge. Terra keeps the search pass inexpensive
- * while giving it a stronger editorial model than the default mini call.
+ * Near You proposes named places from model knowledge and MapKit then verifies
+ * every one, so the expensive half of the old design — a forced hosted web
+ * search on a mid-tier model — bought accuracy the verification pass now
+ * provides for free. Luna is the cheap tier, which matters because this
+ * component deliberately over-requests: roughly double the places the screen
+ * needs, since the map gate discards whatever cannot be found.
+ *
+ * What is genuinely lost is one-off timeliness — a pop-up opening this week.
+ * Recurring rhythms a host would actually mention ("Saturday morning market")
+ * are stable enough to sit in model knowledge.
  */
-export const NEAR_YOU_MODEL = "gpt-5.6-terra";
+export const NEAR_YOU_MODEL = "gpt-5.6-luna";
 /**
  * Worth It is a compact judgment task: it benefits from stronger taste and
  * personalization, but does not need the deeper reasoning budget of Sol.

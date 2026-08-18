@@ -73,6 +73,38 @@ struct NearYouDiscovery: Equatable, Hashable, Sendable {
     var isSparse: Bool { editorialCandidates.count < 4 }
 }
 
+/// One place the model proposed, before anything has been verified about it.
+struct NearYouProposal: Equatable, Hashable, Sendable {
+    let name: String
+    let category: String
+    let locationHint: String
+    let explanation: String
+    let accessNote: String?
+}
+
+/// The outcome of checking a batch of proposals against the map.
+///
+/// The three counts are kept alongside the survivors because the ratio between
+/// them is the health signal for the whole feature: a survival rate that falls
+/// means the model has drifted from naming real, findable places, and that is
+/// invisible from the finished screen alone.
+struct NearYouVerification: Equatable, Sendable {
+    /// Survivors, paired with the model's reason for recommending each.
+    let places: [(candidate: Trip.NearYouCandidate, proposal: NearYouProposal)]
+    let proposed: Int
+    /// Found on the map at all — the hallucination filter.
+    let resolved: Int
+    /// Found *and* inside the walking radius — what the traveller actually sees.
+    var survived: Int { places.count }
+
+    static func == (lhs: NearYouVerification, rhs: NearYouVerification) -> Bool {
+        lhs.proposed == rhs.proposed
+            && lhs.resolved == rhs.resolved
+            && lhs.places.map(\.candidate) == rhs.places.map(\.candidate)
+            && lhs.places.map(\.proposal) == rhs.places.map(\.proposal)
+    }
+}
+
 enum NearYouMapError: Error, Equatable {
     case emptyQuery
     case noResults
@@ -98,6 +130,22 @@ protocol NearYouMapServicing {
 
     /// Finds real candidates and computes walking routes for each one.
     func discover(around centre: NearYouSearchCentre) async throws -> NearYouDiscovery
+
+    /// The transport/grocery/pharmacy layer only. Solo Near You needs this
+    /// without the editorial category sweep, because the model now proposes the
+    /// editorial places and ``resolve(proposals:around:)`` verifies them.
+    func discoverPractical(around centre: NearYouSearchCentre) async throws -> NearYouDiscovery
+
+    /// Turns model-proposed place names into grounded candidates.
+    ///
+    /// This is the gate the whole redesign rests on: each proposal is looked up
+    /// by name near the traveller, and kept only if MapKit both finds it and can
+    /// produce a real walking route. A place that does not exist cannot resolve,
+    /// so hallucinations are filtered by reality rather than by another model.
+    func resolve(
+        proposals: [NearYouProposal],
+        around centre: NearYouSearchCentre
+    ) async -> NearYouVerification
 }
 
 extension NearYouMapServicing {
@@ -271,6 +319,93 @@ struct MapKitNearYouService: NearYouMapServicing {
             )
         }
 
+        let practicalLayer = await practicalLayer(around: coordinate)
+
+        if successfulSearches == 0 && practicalLayer.practical.isEmpty {
+            throw NearYouMapError.discoveryFailed
+        }
+
+        return NearYouDiscovery(
+            editorialCandidates: Array(
+                editorial
+                    .sorted { $0.distanceMetres < $1.distanceMetres }
+                    .prefix(36)
+            ),
+            practical: practicalLayer.practical,
+            unavailablePracticalKinds: practicalLayer.unavailable
+        )
+    }
+
+    func discoverPractical(around centre: NearYouSearchCentre) async throws -> NearYouDiscovery {
+        let coordinate = CLLocationCoordinate2D(
+            latitude: centre.latitude,
+            longitude: centre.longitude
+        )
+        guard Self.isValid(coordinate) else { throw NearYouMapError.missingCoordinates }
+
+        let layer = await practicalLayer(around: coordinate)
+        return NearYouDiscovery(
+            editorialCandidates: [],
+            practical: layer.practical,
+            unavailablePracticalKinds: layer.unavailable
+        )
+    }
+
+    func resolve(
+        proposals: [NearYouProposal],
+        around centre: NearYouSearchCentre
+    ) async -> NearYouVerification {
+        let coordinate = CLLocationCoordinate2D(
+            latitude: centre.latitude,
+            longitude: centre.longitude
+        )
+        guard Self.isValid(coordinate) else {
+            return .init(places: [], proposed: proposals.count, resolved: 0)
+        }
+
+        var seen = Set<UUID>()
+        var places: [(candidate: Trip.NearYouCandidate, proposal: NearYouProposal)] = []
+        var resolved = 0
+
+        for proposal in proposals {
+            // The hint is what makes this findable: "Bar Cañete, Carrer de la
+            // Unió 17" resolves where the bare name would match a chain
+            // elsewhere in the city. The region keeps the match local.
+            let query = "\(proposal.name), \(proposal.locationHint)"
+            guard let item = try? await search(
+                query: query,
+                region: Self.region(around: coordinate, span: 0.06)
+            ).first else { continue }
+            resolved += 1
+
+            let seeds = [SearchSeed(item: item, category: proposal.category)]
+            let routed = await routedCandidates(
+                deduplicating: seeds,
+                excluding: seen,
+                from: coordinate
+            )
+            guard let candidate = routed.first else { continue }
+            guard candidate.walkingMinutes <= Self.maxWalkingMinutes else { continue }
+            seen.insert(candidate.id)
+            places.append((candidate, proposal))
+        }
+
+        return .init(
+            places: places.sorted { $0.candidate.distanceMetres < $1.candidate.distanceMetres },
+            proposed: proposals.count,
+            resolved: resolved
+        )
+    }
+
+    /// The walking-radius contract. A place the model liked but that turns out
+    /// to be half an hour away is not "near you" in any sense the traveller
+    /// meant, so it is dropped rather than shown with an honest but useless
+    /// walking time.
+    private static let maxWalkingMinutes = 10
+
+    private func practicalLayer(
+        around coordinate: CLLocationCoordinate2D
+    ) async -> (practical: [Trip.NearYouPracticalPlace], unavailable: Set<Trip.NearYouPracticalKind>) {
         var practical: [Trip.NearYouPracticalPlace] = []
         var unavailable = Set<Trip.NearYouPracticalKind>()
         for definition in Self.practicalQueries {
@@ -302,20 +437,7 @@ struct MapKitNearYouService: NearYouMapServicing {
                 unavailable.insert(definition.kind)
             }
         }
-
-        if successfulSearches == 0 && practical.isEmpty {
-            throw NearYouMapError.discoveryFailed
-        }
-
-        return NearYouDiscovery(
-            editorialCandidates: Array(
-                editorial
-                    .sorted { $0.distanceMetres < $1.distanceMetres }
-                    .prefix(36)
-            ),
-            practical: practical.sorted { $0.kind.rawValue < $1.kind.rawValue },
-            unavailablePracticalKinds: unavailable
-        )
+        return (practical.sorted { $0.kind.rawValue < $1.kind.rawValue }, unavailable)
     }
 
     // MARK: - Search and routing

@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  COMPONENTS,
-  NEAR_YOU_MAX_SEARCH_CALLS,
-} from "../convex/lib/components";
+import { COMPONENTS } from "../convex/lib/components";
 import {
   buildSystemPrompt,
   buildUserMessage,
@@ -12,6 +9,7 @@ import {
 } from "../convex/lib/prompts";
 import {
   emptyReport,
+  NEAR_YOU_MAX_PROPOSALS,
   validateNearYou,
   ValidationError,
 } from "../convex/lib/validation";
@@ -51,42 +49,45 @@ const input: TripInput = {
   },
 };
 
-test("Near You prompt receives candidates but never the exact accommodation input", () => {
+test("Near You prompt carries the coarse area and never the exact address", () => {
   const exactAddress = "Carrer de Mallorca 166, 2A";
   const message = buildUserMessage(input, {
     nearYouCandidates: candidates,
     nearYouLocation: { area: "Eixample", city: "Barcelona" },
   });
 
-  assert.match(message, /Grounded Cafe/);
-  assert.match(message, /distanceMetres=430/);
+  assert.match(message, /area=Eixample/);
+  assert.match(message, /city=Barcelona/);
+
+  // The privacy boundary that predates this redesign and outlives it.
   assert.equal(message.includes(exactAddress), false);
   assert.equal(message.includes("latitude"), false);
   assert.equal(message.includes("longitude"), false);
   assert.equal(message.includes("mapURL"), false);
-  assert.match(message, /area=Eixample/);
+
+  // The model now proposes places instead of picking from a supplied sweep, so
+  // a candidate list must not leak back into the prompt and re-anchor it.
+  assert.equal(message.includes("Grounded Cafe"), false);
+  assert.equal(message.includes("distanceMetres"), false);
 });
 
-test("live search is required, not stored, and Near You requests one broad search", () => {
+test("Near You runs tool-free on the cheap tier and never carries the address", () => {
   const body = buildOpenAIRequestBody({
-    systemPrompt: "local friend",
+    systemPrompt: "local host",
     userPrompt: "coarse area only",
     schema: { type: "object" },
     schemaName: "near_you",
     maxOutputTokens: 2048,
     model: NEAR_YOU_MODEL,
-    webSearch: {
-      maxToolCalls: NEAR_YOU_MAX_SEARCH_CALLS,
-      approximateLocation: { city: "Barcelona" },
-    },
   });
-  assert.equal(body.model, "gpt-5.6-terra");
+  assert.equal(body.model, "gpt-5.6-luna");
   assert.equal(body.store, false);
-  assert.equal(body.tool_choice, "required");
-  assert.equal(body.max_tool_calls, 1);
-  assert.deepEqual(body.include, ["web_search_call.action.sources"]);
+  // The verification pass replaced the forced search, so none of the hosted
+  // web-search wiring may come back without a deliberate decision.
+  assert.equal(body.tool_choice, undefined);
+  assert.equal(body.tools, undefined);
+  assert.equal(body.max_tool_calls, undefined);
   assert.equal(JSON.stringify(body).includes("Carrer de Mallorca"), false);
-  assert.equal(NEAR_YOU_MAX_SEARCH_CALLS, 1, "Near You requests one broad search action");
 });
 
 test("search telemetry counts paid searches, not page navigation", () => {
@@ -100,144 +101,100 @@ test("search telemetry counts paid searches, not page navigation", () => {
   }), 2);
 });
 
-test("live finds must reference a source consulted by web search", () => {
-  const raw = {
-    sections: [],
-    liveFinds: [
-      {
-        name: "Temporary Design Market",
-        category: "Pop-up market",
-        locationHint: "Ciutat Vella, Barcelona",
-        explanation: "A timely fit for independent design and an unhurried afternoon.",
-        accessNote: "Check the organizer's date before setting out.",
-        sourceTitle: "Organizer",
-        sourceURL: "https://events.example/market?utm_source=search",
-      },
-      {
-        name: "Invented Market",
-        category: "Market",
-        locationHint: "Barcelona",
-        explanation: "Unsupported.",
+test("proposals are capped so one runaway answer cannot flood the verifier", () => {
+  const report = emptyReport();
+  const result = validateNearYou(
+    {
+      places: Array.from({ length: 40 }, (_, i) => ({
+        name: `Place ${i}`,
+        category: "Cafe",
+        locationHint: `Carrer ${i}`,
+        explanation: "Quiet enough to read in.",
         accessNote: null,
-        sourceTitle: "Unknown",
-        sourceURL: "https://invented.invalid/event",
-      },
-    ],
-    sparseMessage: null,
+      })),
+      sparseMessage: null,
+    },
+    report,
+  );
+  assert.equal((result.places as unknown[]).length, NEAR_YOU_MAX_PROPOSALS);
+  assert.ok(report.repairs > 0);
+});
+
+test("the same venue proposed twice costs only one slot and one lookup", () => {
+  const place = {
+    name: "Bar Cañete",
+    category: "Tapas bar",
+    locationHint: "Carrer de la Unió 17",
+    explanation: "Counter seating suits eating alone.",
+    accessNote: null,
   };
   const report = emptyReport();
-  const result = validateNearYou(raw, report, [], [
-    { url: "https://events.example/market", title: "Organizer" },
-  ]);
-  assert.equal((result.liveFinds as unknown[]).length, 1);
-  assert.equal((result.liveFinds as any[])[0].name, "Temporary Design Market");
-  assert.equal(report.repairs, 2, "drops the unsupported find and adds an honest sparse note");
-});
-
-test("solo live finds receive a durable ID before client decoding", () => {
-  const id = "33333333-3333-4333-8333-333333333333";
-  const stamped = stampMissingStableIds({
-    sections: [],
-    liveFinds: [{
-      name: "Temporary Design Market",
-      category: "Pop-up market",
-      locationHint: "Barcelona",
-      explanation: "A current independent-design find.",
-      accessNote: null,
-      sourceTitle: "Organizer",
-      sourceURL: "https://events.example/market",
-    }],
-    sparseMessage: null,
-  }, () => id) as any;
-
-  assert.equal(stamped.liveFinds[0].id, id);
-  assert.deepEqual(JSON.parse(JSON.stringify(stamped)), stamped);
-});
-
-test("Near You output cannot introduce an unknown candidate ID", () => {
-  assert.throws(
-    () =>
-      validateNearYou(
-        {
-          sections: [
-            {
-              title: "Your kind of morning",
-              picks: [
-                {
-                  candidateID: "99999999-9999-9999-9999-999999999999",
-                  explanation: "Fits a slow start and a strong coffee preference.",
-                },
-              ],
-            },
-          ],
-          sparseMessage: null,
-        },
-        emptyReport(),
-        candidates,
-      ),
-    (error: unknown) =>
-      error instanceof ValidationError &&
-      error.code === "unknown_near_you_candidate",
+  const result = validateNearYou(
+    { places: [place, { ...place, name: "bar cañete " }], sparseMessage: null },
+    report,
   );
+  assert.equal((result.places as unknown[]).length, 1);
+  assert.equal(report.repairs, 1);
 });
 
 test("model-authored distance or walking claims are dropped before display", () => {
   const report = emptyReport();
   const result = validateNearYou(
     {
-      sections: [
+      places: [
         {
-          title: "Easy first stop",
-          picks: [
-            {
-              candidateID: candidates[0].id,
-              explanation: "A six minute walk for a quiet coffee.",
-            },
-          ],
+          name: "Federal Café",
+          category: "Cafe",
+          locationHint: "Carrer del Parlament 39",
+          explanation: "Just a two minute walk from your door.",
+          accessNote: null,
         },
         {
-          title: "Under a ten minute walk",
-          picks: [
-            {
-              candidateID: candidates[1].id,
-              explanation: "Fits a quiet start and an independent-place preference.",
-            },
-          ],
+          name: "Mercat de la Concepció",
+          category: "Market",
+          locationHint: "Carrer d'Aragó 313",
+          explanation: "The flower stalls are the reason to go early.",
+          accessNote: "Liveliest on Saturday mornings.",
         },
       ],
-      liveFinds: [],
       sparseMessage: null,
     },
     report,
-    candidates,
   );
-
-  assert.deepEqual(result.sections, []);
-  assert.equal(report.repairs, 4, "drops unsafe prose and adds an honest sparse note");
+  const places = result.places as Record<string, unknown>[];
+  assert.equal(places.length, 1, "the entry claiming a walking time is dropped");
+  assert.equal(places[0].name, "Mercat de la Concepció");
+  assert.equal(places[0].accessNote, "Liveliest on Saturday mornings.");
 });
 
-test("sparse candidate sets stay sparse and gain an honest note", () => {
+test("a recurring rhythm survives but an invented journey time does not", () => {
+  const report = emptyReport();
   const result = validateNearYou(
     {
-      sections: [
+      places: [
         {
-          title: "One real fit",
-          picks: [
-            {
-              candidateID: candidates[0].id,
-              explanation: "Matches a relaxed morning and independent places.",
-            },
-          ],
+          name: "Plaça de la Vila de Gràcia",
+          category: "Square",
+          locationHint: "Carrer de Jesús",
+          explanation: "Where the neighbourhood sits once the heat drops.",
+          accessNote: "Ten minutes on foot from the flat.",
         },
       ],
       sparseMessage: null,
     },
-    emptyReport(),
-    candidates.slice(0, 1),
+    report,
   );
+  const places = result.places as Record<string, unknown>[];
+  assert.equal(places.length, 1, "the recommendation itself is kept");
+  assert.equal(places[0].accessNote, null, "the journey-time claim is stripped");
+  assert.ok(report.repairs > 0);
+});
 
-  assert.equal((result.sections as unknown[]).length, 1);
-  assert.equal(typeof result.sparseMessage, "string");
+test("an answer with no usable place is a failure, not an empty screen", () => {
+  assert.throws(
+    () => validateNearYou({ places: [], sparseMessage: null }, emptyReport()),
+    ValidationError,
+  );
 });
 
 test("Near You stays solo-manual and does not alter the deep-dive cap", () => {
@@ -246,5 +203,5 @@ test("Near You stays solo-manual and does not alter the deep-dive cap", () => {
   assert.equal(GROUP_COMPONENTS.includes("nearYou" as never), false);
   assert.equal(GROUP_COMPONENTS.includes("worthIt"), true);
   assert.equal(GROUP_COMPONENTS.includes("whereToStay"), true);
-  assert.match(buildSystemPrompt("nearYou", "solo"), /supplied candidate/i);
+  assert.match(buildSystemPrompt("nearYou", "solo"), /checked against a map/i);
 });

@@ -701,6 +701,49 @@ extension TripOutputStore {
         }
     }
 
+    /// Groups verified places into the section shape the screen already renders.
+    ///
+    /// The model no longer authors section titles — it returns a flat list, and
+    /// grouping happens here because a title written before verification could
+    /// end up describing an empty section once the map gate has run. Category
+    /// is the grouping key, and sections stay in nearest-first order so the
+    /// closest thing is always the first thing read.
+    private static func assemble(
+        verification: NearYouVerification,
+        practical: NearYouDiscovery,
+        sparseMessage: String?
+    ) -> Trip.NearYou {
+        var order: [String] = []
+        var grouped: [String: [Trip.NearYouPick]] = [:]
+        for place in verification.places {
+            let key = place.proposal.category.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = key.isEmpty ? "Around you" : key
+            if grouped[title] == nil { order.append(title) }
+            grouped[title, default: []].append(
+                .init(candidate: place.candidate, explanation: place.proposal.explanation)
+            )
+        }
+
+        let sections = order.compactMap { title -> Trip.NearYouSection? in
+            guard let picks = grouped[title], !picks.isEmpty else { return nil }
+            return .init(title: title, picks: picks)
+        }
+
+        // Say so when the gate thinned the list, rather than presenting four
+        // survivors as though they were the whole neighbourhood.
+        let note = sparseMessage ?? (verification.survived < 4
+            ? "Only a few places here could be verified with a real walking route, so this list is intentionally short."
+            : nil)
+
+        return Trip.NearYou(
+            sections: sections,
+            liveFinds: [],
+            practical: practical.practical,
+            unavailablePracticalKinds: practical.unavailablePracticalKinds,
+            sparseMessage: note
+        )
+    }
+
     private func retryNearYou(reuseDiscovery: Bool) {
         guard let accommodation = state.accommodation else { return }
         beginNearYou(
@@ -741,11 +784,16 @@ extension TripOutputStore {
         nearYouTask = Task { [weak self] in
             guard let self else { return }
             do {
+                // Only the transport/grocery/pharmacy layer comes from MapKit
+                // up front now. The editorial half arrives as model proposals
+                // and is verified afterwards, so the old seven-category sweep
+                // — up to 20 searches and 80 routes to then discard most of it
+                // — is gone from both the solo and group paths.
                 let discovery: NearYouDiscovery
                 if let existingDiscovery {
                     discovery = existingDiscovery
                 } else {
-                    discovery = try await nearYouMapService.discover(around: centre)
+                    discovery = try await nearYouMapService.discoverPractical(around: centre)
                 }
                 try Task.checkCancellation()
                 lastNearYouDiscovery = discovery
@@ -756,14 +804,35 @@ extension TripOutputStore {
                           let memberToken = groupCredentials?.memberToken else {
                         throw TripGenerationError.backend(code: "missing_group_capability")
                     }
-                    let result = try await groupNearYouService.generateGroupNearYou(
+                    // Same propose-then-verify shape as solo, split across two
+                    // calls because only this device can run MapKit: the group's
+                    // operation is reserved by `propose` and released by the
+                    // commit, so a second member cannot race in between.
+                    let proposal = try await groupNearYouService.proposeGroupNearYou(
                         groupId: groupId,
                         memberToken: memberToken,
-                        payload: GroupNearYouActionPayload(
-                            accommodation: centre.accommodation,
-                            discovery: discovery,
-                            researchArea: centre.researchArea ?? state.details.destination.name,
-                            replace: replacingGroupNearYou
+                        researchArea: centre.researchArea ?? state.details.destination.name,
+                        replace: replacingGroupNearYou
+                    )
+                    try Task.checkCancellation()
+
+                    let verification = await nearYouMapService.resolve(
+                        proposals: proposal.proposals,
+                        around: centre
+                    )
+                    try Task.checkCancellation()
+                    NearYouStats.record(verification)
+
+                    let result = try await groupNearYouService.commitGroupNearYou(
+                        groupId: groupId,
+                        memberToken: memberToken,
+                        operationVersion: proposal.operationVersion,
+                        previousSuccessfulCount: proposal.previousSuccessfulCount,
+                        accommodation: centre.accommodation,
+                        nearYou: Self.assemble(
+                            verification: verification,
+                            practical: discovery,
+                            sparseMessage: proposal.sparseMessage
                         )
                     )
                     try Task.checkCancellation()
@@ -778,7 +847,6 @@ extension TripOutputStore {
                     }
                     let payload = try await nearYouService.generate(
                         request,
-                        candidates: discovery.editorialCandidates,
                         location: NearYouLocationContext(
                             area: centre.researchArea ?? state.details.destination.name,
                             city: state.details.destination.name
@@ -786,19 +854,21 @@ extension TripOutputStore {
                         alreadyRecommended: context
                     )
                     try Task.checkCancellation()
-                    let grounded = try payload.materialize(discovery: discovery)
-                    if discovery.editorialCandidates.count + grounded.liveFinds.count < 4,
-                       grounded.sparseMessage == nil {
-                        output = Trip.NearYou(
-                            sections: grounded.sections,
-                            liveFinds: grounded.liveFinds,
-                            practical: grounded.practical,
-                            unavailablePracticalKinds: grounded.unavailablePracticalKinds,
-                            sparseMessage: "Only a few real places here have a verified walking route, so this list is intentionally short."
-                        )
-                    } else {
-                        output = grounded
-                    }
+
+                    // The gate: nothing the model named reaches the traveller
+                    // until MapKit has found it and produced a real walking
+                    // route to it.
+                    let verification = await nearYouMapService.resolve(
+                        proposals: payload.proposals,
+                        around: centre
+                    )
+                    try Task.checkCancellation()
+                    NearYouStats.record(verification)
+                    output = Self.assemble(
+                        verification: verification,
+                        practical: discovery,
+                        sparseMessage: payload.sparseMessage
+                    )
                 }
 
                 state.nearYouResponse = .loaded(output)

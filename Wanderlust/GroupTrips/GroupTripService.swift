@@ -204,25 +204,44 @@ final class GroupTripService {
         }
     }
 
-    /// Any member may set the one shared grounded Near You result. The payload
-    /// has no raw address field; MapKit has already resolved it locally.
-    func generateGroupNearYou(
+    /// Any member may set the one shared Near You result, in two steps: the
+    /// model proposes here, the device verifies each place against MapKit, and
+    /// `commitGroupNearYou` persists only what survived. Neither call carries a
+    /// raw address — MapKit resolved that locally before either ran.
+    func proposeGroupNearYou(
         groupId: String,
         memberToken: String,
-        payload: GroupNearYouActionPayload
-    ) async throws -> GroupNearYouResultDTO {
+        researchArea: String,
+        replace: Bool
+    ) async throws -> GroupNearYouProposalDTO {
         do {
-            return try await client.action("groupNearYou:generate", with: [
+            return try await client.action("groupNearYou:propose", with: [
                 "groupId": groupId,
                 "memberToken": memberToken,
-                "accommodation": payload.accommodation,
-                "candidates": payload.candidates.map { $0 as (any ConvexEncodable)? },
-                "practical": payload.practical.map { $0 as (any ConvexEncodable)? },
-                "unavailablePracticalKinds": payload.unavailablePracticalKinds.map {
-                    $0 as (any ConvexEncodable)?
-                },
-                "researchArea": payload.researchArea,
-                "replace": payload.replace
+                "researchArea": researchArea,
+                "replace": replace
+            ])
+        } catch let error as ClientError {
+            throw TripGenerationService.mapped(error)
+        }
+    }
+
+    func commitGroupNearYou(
+        groupId: String,
+        memberToken: String,
+        operationVersion: Int,
+        previousSuccessfulCount: Int,
+        accommodation: CoarseAccommodation,
+        nearYou: Trip.NearYou
+    ) async throws -> GroupNearYouResultDTO {
+        do {
+            return try await client.mutation("groupNearYou:commitVerified", with: [
+                "groupId": groupId,
+                "memberToken": memberToken,
+                "operationVersion": Double(operationVersion),
+                "previousSuccessfulCount": Double(previousSuccessfulCount),
+                "accommodation": GroupNearYouAccommodationInput(accommodation),
+                "nearYou": nearYou
             ])
         } catch let error as ClientError {
             throw TripGenerationService.mapped(error)

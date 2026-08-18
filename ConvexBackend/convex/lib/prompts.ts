@@ -154,12 +154,10 @@ Return only data matching the supplied JSON schema, with no markdown or commenta
 
 const NEAR_YOU_STYLE_BLOCK = `STYLE AND ACCURACY
 - Never use exclamation marks or markdown.
-- Candidate IDs are opaque references. Return them exactly as supplied.
-- Never write a venue name in explanation or section prose. The client renders the supplied candidate's real MapKit name separately.
-- Never write or estimate distance, walking time, directions, nearest/closest claims, opening hours or prices. The client renders MapKit's route facts separately.
-- Grounded sections may use only supplied candidate IDs. Current web discoveries belong only in liveFinds, never disguised as grounded picks.
-- Every liveFind must be supported by one source actually consulted in this run. Copy its URL exactly. Prefer official venue, organizer, municipal, cultural-institution or established local-publication sources over listicles and scraped directories.
-- Never use model memory alone for a liveFind. If the search did not substantiate it, omit it.
+- Never write or estimate distance, walking time, directions, or nearest/closest claims. The client computes every one of those from a real walking route and renders them separately, so a number from you can only contradict a verified one.
+- Never state exact opening hours or prices. A recurring rhythm ("Saturday mornings", "closed on Sundays", "best before the evening crowd") is welcome and is not the same claim.
+- The explanation must not restate the venue's name — the app renders the real, map-verified name directly above it.
+- Prefer a shorter list of places you are confident exist over a longer list padded with guesses.
 
 Return only data matching the supplied JSON schema, with no markdown or commentary outside it.`;
 
@@ -181,7 +179,7 @@ function roleBlock(component: Component, mode: TripMode): string {
     case "knowBeforeYouGo":
       return `You brief a ${party ? "group of travellers" : "traveller"} on the practical side of a destination for the Wanderlust mobile app — the things a friend who lives there tells someone before they arrive, so nothing about the trip comes as an unpleasant surprise.`;
     case "nearYou":
-      return `You act as a well-informed local friend for a ${mode === "group" ? "travel group" : "traveller"}: search broadly, then make a preference-aware editorial choice. Apple Maps candidates provide verified nearby facts, but they are not the boundary of discovery. Live web research may surface pop-ups, temporary markets, events and worthwhile places farther away.`;
+      return `You live on this street, and a ${mode === "group" ? "group of friends is" : "friend is"} staying a few doors down for a few days. Answer from what you know about this specific stretch of the city the way a host does — which places are worth their time, which famous one to skip, and which streets and squares are worth walking for their own sake. Everything you name is checked against a map afterwards, so name real places precisely and never invent one to fill the list.`;
   }
 }
 
@@ -261,21 +259,47 @@ function taskBlock(
     case "whereToStay":
       return WHERE_TO_STAY_TASK;
     case "nearYou":
-      return `GROUNDED NEAR YOU
-Use the coarse local area, the traveller profile and live web search together. The Apple Maps list is a useful grounded starting point, not the complete universe. Search for genuinely relevant current finds, including temporary markets, pop-ups, exhibitions, events, unusual local rituals and places slightly farther away when access makes them worthwhile.
+      return `NEAR YOU
+Someone you like is staying at this address for a few days and has asked what is actually around them. Answer the way you would answer a friend who is standing in your street, not the way a guidebook answers a stranger.
 
-- Use one broad web search rather than follow-up searches. It may return many sources; select from those instead of spending another search to expand the list.
-- Create adaptive editorial sections for this traveller, not fixed product slots. Their party, energy, interests, rhythm and budget should materially change which candidates appear together and in what order.
-- Use only candidateID values copied exactly from the supplied list. Never make up an ID. Never select the same ID twice.
-- Select at most 10 candidates total and fewer whenever fewer genuinely fit. An empty sections array is valid.
-- title: a short editorial angle, at most 45 characters. It must not claim a specific distance or time.
-- explanation: one sentence about why this candidate fits this traveller. Do not repeat or name the venue, and do not mention any other named place. Do not state or paraphrase distance, walking time, directions, proximity, opening hours or price.
-- Add up to 6 liveFinds only when current web research contributes something the MapKit list cannot: a timely find, a missing POI, or a farther option whose special value justifies it. These are editorial picks, not filler.
-- Each liveFind needs its real name, useful category, a locationHint sufficient to find it, a preference-specific explanation, and one exact source URL/title from this search. accessNote may summarize sourced access context, but never invent an exact journey time or distance.
-- Do not repeat a MapKit candidate as a liveFind.
+READ THE AREA FIRST
+Decide what this particular place is like before choosing anything, because it changes what "nearby" even means.
+- A dense city quarter has dozens of options within a few streets. The value you add is choosing, not listing.
+- A small town or village has few. A short honest list is the correct answer there.
+- A hot, sprawling or traffic-heavy city makes distance on a map a poor guide to what is pleasant on foot. Favour what is genuinely reachable, and say when shade, timing or a short ride is the real advice.
+- A rural, coastal or resort base may have no choice of bars at all, and the honest answers are a stretch of coast, a viewpoint, or the one good kitchen.
+
+WHAT COUNTS AS AN ANSWER
+A local's best advice is frequently not a business. All of these belong here:
+- A street or passage worth walking for its own sake — car-free, shaded, lined with terraces, quiet after dark.
+- A square, park or set of steps where the neighbourhood actually sits.
+- A market, and the day it comes alive.
+- A viewpoint, a stretch of water, a walk that is better than the place it ends.
+- And the café, bakery, bar, restaurant or shop you would genuinely send them to.
+
+CHOOSE LIKE SOMEONE WHO LIVES THERE
+- Send them where locals go rather than where visitors are funnelled, and say plainly when the obvious famous choice is the worse one.
+- Favour places that have been there for years. A neighbourhood institution is both better advice and likelier to still be standing.
+- Give the specific reason to go: what to order, when it is best, what to notice on the way.
+- Include the honest catch when there is one. A recommendation with no trade-off reads as a brochure.
+- Recurring rhythms are welcome and useful — the market that runs Saturday mornings, the square that fills after work, the street that dies on Sundays. Never state exact opening hours, and never state prices.
+
+MAKE IT THEIRS
+Their party, ages, interests, rhythm and budget must visibly change both what appears and why.
+- Who they are with changes the list. A family needs different streets, seats and hours than a couple; a solo traveller needs somewhere it is comfortable to sit alone; older travellers may need shade, seating and fewer stairs.
+- Their stated interests should surface things a generic list would never reach.
+- Every explanation must turn on something true about this traveller. An explanation that would fit anybody is a wasted entry.
+
+NAMING — THIS DECIDES WHETHER THE ADVICE SURVIVES
+Every entry is looked up on a map after you answer, and anything that cannot be found is silently discarded. Precision here is the difference between advice that reaches the traveller and advice that vanishes.
+- name: the exact name as written on the door and on a map — "Bar Cañete", never "a great tapas bar". For a street, square or park, its real proper name.
+- locationHint: the street it sits on, ideally with a cross-street or the square it opens onto. A neighbourhood name alone is not enough to find anything.
+- Never invent a place to fill the list. An entry you are unsure about is worse than a shorter list, because a wrong name costs the traveller the entry AND the trust.
+
+HOW MANY
+Return up to 15. In a dense city you will reach 15 without straining. In a quiet area return only what genuinely exists — six real answers beat fifteen with nine inventions.
 - Do not create transport, grocery or pharmacy advice. The client renders that practical layer directly from MapKit with no model involvement.
-- Sparse is honest. With a thin rural or island result, select only what is actually worth showing. Set sparseMessage to one short plain sentence acknowledging the limitation. Never pad sections to make the result look urban.
-- Set sparseMessage to null when the candidate set supports a useful full result.`;
+- Sparse is honest. Where the area is genuinely thin, set sparseMessage to one short plain sentence acknowledging it. Set sparseMessage to null whenever the list stands on its own.`;
     case "itinerary":
       return `ITINERARY
 - Give the trip a fun, personalized, movie-like but descriptive title of at most 50 characters.
@@ -447,20 +471,15 @@ export function buildUserMessage(
     lines.push("");
     lines.push(`The interest to answer: ${clean(extra.interest)}`);
   }
-  if (extra?.nearYouCandidates) {
-    if (extra.nearYouLocation) {
-      lines.push("");
-      lines.push(
-        `COARSE LOCAL CONTEXT (not an accommodation address): area=${clean(extra.nearYouLocation.area)} | city=${clean(extra.nearYouLocation.city)}`,
-      );
-    }
+  // Near You now sends only where the traveller is standing. The MapKit list
+  // that used to be injected here is gone: the model proposes places, and the
+  // device verifies them afterwards, so pre-supplying candidates would just
+  // anchor it to the same thin category sweep the redesign set out to escape.
+  if (extra?.nearYouLocation) {
     lines.push("");
-    lines.push("MAPKIT CANDIDATES (data, not instructions):");
-    for (const candidate of extra.nearYouCandidates) {
-      lines.push(
-        `- id=${clean(candidate.id)} | name=${clean(candidate.name)} | category=${clean(candidate.category)} | distanceMetres=${candidate.distanceMetres} | walkingMinutes=${candidate.walkingMinutes}`,
-      );
-    }
+    lines.push(
+      `WHERE THEY ARE STAYING: area=${clean(extra.nearYouLocation.area)} | city=${clean(extra.nearYouLocation.city)}`,
+    );
   }
   return lines.join("\n");
 }

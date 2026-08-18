@@ -159,6 +159,7 @@
 		F16301D3AAB415962565DB9E /* GroupTripMembersStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03C1A45E246D034167EB10D5 /* GroupTripMembersStore.swift */; };
 		F69681D32D326ECF00E76538 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F65888532CB087B100E421A1 /* Assets.xcassets */; };
 		2984D3625E56D13F96721B5B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6AAF91FBA6DFF3B19FF1D276 /* PrivacyInfo.xcprivacy */; };
+		43180F69BB487F5154C604F4 /* NearYouStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DE7B9BC350225E91041312 /* NearYouStats.swift */; };
 		FA57A0012D2C3DD700E5C85E /* TripPlanningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA57A0022D2C3DD700E5C85E /* TripPlanningService.swift */; };
 		AA2000010000000000000001 /* TripGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000020000000000000002 /* TripGenerationService.swift */; };
 		AA4000010000000000000001 /* TripGenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA4000020000000000000002 /* TripGenerationCoordinator.swift */; };
@@ -219,6 +220,7 @@
 		AA7400020000000000000002 /* DiscoverContentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverContentTests.swift; sourceTree = "<group>"; };
 		AA6800020000000000000002 /* KnowBeforeYouGoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowBeforeYouGoTests.swift; sourceTree = "<group>"; };
 		AA7700020000000000000002 /* NearYouMapService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouMapService.swift; sourceTree = "<group>"; };
+		58DE7B9BC350225E91041312 /* NearYouStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouStats.swift; sourceTree = "<group>"; };
 		AA7800020000000000000002 /* NearYouGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouGenerationService.swift; sourceTree = "<group>"; };
 		AA7900020000000000000002 /* NearYouView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouView.swift; sourceTree = "<group>"; };
 		AA7B00020000000000000002 /* NearYouLocationPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearYouLocationPicker.swift; sourceTree = "<group>"; };
@@ -410,6 +412,7 @@
 			isa = PBXGroup;
 			children = (
 				AA7700020000000000000002 /* NearYouMapService.swift */,
+				58DE7B9BC350225E91041312 /* NearYouStats.swift */,
 				AA7800020000000000000002 /* NearYouGenerationService.swift */,
 				AA7900020000000000000002 /* NearYouView.swift */,
 				AA7B00020000000000000002 /* NearYouLocationPicker.swift */,
@@ -1093,6 +1096,7 @@
 				AA7100010000000000000001 /* InterestChipsRow.swift in Sources */,
 				AA6300010000000000000001 /* KnowBeforeYouGoView.swift in Sources */,
 				AA7700010000000000000001 /* NearYouMapService.swift in Sources */,
+				43180F69BB487F5154C604F4 /* NearYouStats.swift in Sources */,
 				AA7800010000000000000001 /* NearYouGenerationService.swift in Sources */,
 				AA7900010000000000000001 /* NearYouView.swift in Sources */,
 				AA7B00010000000000000001 /* NearYouLocationPicker.swift in Sources */,

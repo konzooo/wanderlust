@@ -41,92 +41,60 @@ struct NearYouLocationContext: Codable, Equatable, Sendable {
 
 extension NearYouLocationContext: ConvexEncodable {}
 
-/// Grounded selections may return only client-issued candidate IDs and prose.
-/// Separately, sourced live finds can name a web discovery but have no venue
-/// coordinate, distance, duration or map-link field for the model to fill in.
-struct NearYouSelectionPayload: Decodable, Equatable, Sendable {
-    struct Section: Decodable, Equatable, Sendable {
-        let title: String
-        let picks: [Pick]
-    }
-
-    struct Pick: Decodable, Equatable, Sendable {
-        let candidateID: UUID
+/// What the model returns now: named places it believes are near the traveller,
+/// each with the hint the device needs to find it on a map.
+///
+/// Nothing here is trusted. `materialize` is deliberately absent — a payload
+/// cannot become a `Trip.NearYou` on its own, because every place must first
+/// survive ``NearYouMapServicing/resolve(proposals:around:)``.
+struct NearYouProposalPayload: Decodable, Equatable, Sendable {
+    struct Place: Decodable, Equatable, Sendable {
+        let name: String
+        let category: String
+        let locationHint: String
         let explanation: String
+        let accessNote: String?
     }
 
-    let sections: [Section]
-    let liveFinds: [Trip.NearYouLiveFind]
+    let places: [Place]
     let sparseMessage: String?
 
-    init(
-        sections: [Section],
-        liveFinds: [Trip.NearYouLiveFind] = [],
-        sparseMessage: String?
-    ) {
-        self.sections = sections
-        self.liveFinds = liveFinds
+    init(places: [Place], sparseMessage: String? = nil) {
+        self.places = places
         self.sparseMessage = sparseMessage
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sections, liveFinds, sparseMessage
+        case places, sparseMessage
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        sections = try container.decode([Section].self, forKey: .sections)
-        liveFinds = try container.decodeIfPresent(
-            [Trip.NearYouLiveFind].self, forKey: .liveFinds
-        ) ?? []
+        places = try container.decodeIfPresent([Place].self, forKey: .places) ?? []
         sparseMessage = try container.decodeIfPresent(String.self, forKey: .sparseMessage)
     }
 
-    /// Reattaches model choices to the original grounded values. Unknown IDs
-    /// fail the whole focused component: silently dropping one would disguise a
-    /// responsibility-boundary violation as an ordinary sparse result.
-    func materialize(discovery: NearYouDiscovery) throws -> Trip.NearYou {
-        let candidates = Dictionary(
-            uniqueKeysWithValues: discovery.editorialCandidates.map { ($0.id, $0) }
-        )
-        var used = Set<UUID>()
-        var groundedSections: [Trip.NearYouSection] = []
-
-        for section in sections {
-            var picks: [Trip.NearYouPick] = []
-            for selection in section.picks {
-                guard let candidate = candidates[selection.candidateID] else {
-                    throw NearYouSelectionError.unknownCandidateID(selection.candidateID)
-                }
-                guard used.insert(selection.candidateID).inserted else { continue }
-                picks.append(.init(candidate: candidate, explanation: selection.explanation))
-            }
-            if !picks.isEmpty {
-                groundedSections.append(.init(title: section.title, picks: picks))
-            }
+    var proposals: [NearYouProposal] {
+        places.map {
+            NearYouProposal(
+                name: $0.name,
+                category: $0.category,
+                locationHint: $0.locationHint,
+                explanation: $0.explanation,
+                accessNote: $0.accessNote
+            )
         }
-
-        return Trip.NearYou(
-            sections: groundedSections,
-            liveFinds: liveFinds,
-            practical: discovery.practical,
-            unavailablePracticalKinds: discovery.unavailablePracticalKinds,
-            sparseMessage: sparseMessage
-        )
     }
 }
 
-enum NearYouSelectionError: Error, Equatable {
-    case unknownCandidateID(UUID)
-}
-
 protocol NearYouGenerating {
+    /// No candidates are sent any more: supplying them would anchor the model
+    /// to the same narrow category sweep the redesign exists to escape.
     func generate(
         _ request: TripGenerationRequest,
-        candidates: [Trip.NearYouCandidate],
         location: NearYouLocationContext,
         alreadyRecommended: [String]
-    ) async throws -> NearYouSelectionPayload
+    ) async throws -> NearYouProposalPayload
 }
 
 struct BackendNearYouService: NearYouGenerating {
@@ -134,15 +102,14 @@ struct BackendNearYouService: NearYouGenerating {
 
     func generate(
         _ request: TripGenerationRequest,
-        candidates: [Trip.NearYouCandidate],
         location: NearYouLocationContext,
         alreadyRecommended: [String]
-    ) async throws -> NearYouSelectionPayload {
+    ) async throws -> NearYouProposalPayload {
         try await service.generate(
             .nearYou,
             for: request,
             alreadyRecommended: alreadyRecommended,
-            nearYouCandidates: candidates.map(NearYouBackendCandidate.init),
+            nearYouCandidates: nil,
             nearYouLocation: location
         )
     }
@@ -153,25 +120,27 @@ struct MockNearYouService: NearYouGenerating {
 
     func generate(
         _ request: TripGenerationRequest,
-        candidates: [Trip.NearYouCandidate],
         location: NearYouLocationContext,
         alreadyRecommended: [String]
-    ) async throws -> NearYouSelectionPayload {
+    ) async throws -> NearYouProposalPayload {
         try? await Task.sleep(nanoseconds: delayNanoseconds)
-        let picks = candidates.prefix(4).map {
-            NearYouSelectionPayload.Pick(
-                candidateID: $0.id,
-                explanation: "A strong match for the way you like to travel."
-            )
-        }
-        return NearYouSelectionPayload(
-            sections: picks.isEmpty
-                ? []
-                : [.init(title: "A good first wander", picks: picks)],
-            liveFinds: [],
-            sparseMessage: candidates.count < 4
-                ? "There are only a few genuinely useful places within reach here."
-                : nil
+        return NearYouProposalPayload(
+            places: [
+                .init(
+                    name: "Mercat de la Concepció",
+                    category: "Market",
+                    locationHint: "Carrer d'Aragó 313",
+                    explanation: "The flower stalls are the reason to come early.",
+                    accessNote: "Liveliest on Saturday mornings."
+                ),
+                .init(
+                    name: "Federal Café",
+                    category: "Café",
+                    locationHint: "Carrer del Parlament 39",
+                    explanation: "Comfortable to sit alone with a book for an hour.",
+                    accessNote: nil
+                )
+            ]
         )
     }
 }
@@ -240,30 +209,41 @@ struct GroupNearYouAccommodationInput: Codable, Equatable, Sendable {
 
 extension GroupNearYouAccommodationInput: ConvexEncodable {}
 
-/// Exact address input is structurally absent. It exists only in the transient
-/// store action that asks MapKit to resolve a centre.
-struct GroupNearYouActionPayload: Codable, Equatable, Sendable {
-    let accommodation: GroupNearYouAccommodationInput
-    let candidates: [GroupNearYouGroundedCandidate]
-    let practical: [GroupNearYouPracticalInput]
-    let unavailablePracticalKinds: [String]
-    let researchArea: String
-    let replace: Bool
+/// The verified result is sent back whole rather than re-flattened into wire
+/// structs: it is already exactly the shape every member's client decodes, so
+/// mirroring it here would only create a second definition to keep in step.
+extension Trip.NearYou: @retroactive ConvexEncodable {}
 
-    init(
-        accommodation: CoarseAccommodation,
-        discovery: NearYouDiscovery,
-        researchArea: String,
-        replace: Bool
-    ) {
-        self.accommodation = GroupNearYouAccommodationInput(accommodation)
-        candidates = discovery.editorialCandidates.map(GroupNearYouGroundedCandidate.init)
-        practical = discovery.practical.map(GroupNearYouPracticalInput.init)
-        unavailablePracticalKinds = discovery.unavailablePracticalKinds
-            .map(\.rawValue)
-            .sorted()
-        self.researchArea = researchArea
-        self.replace = replace
+/// What the group's proposal call returns before anything is verified.
+///
+/// It carries the operation bookkeeping straight back to `commitVerified`
+/// untouched: the device is a courier for those numbers, and the backend
+/// re-checks them so a stale second attempt cannot overwrite a fresher result.
+struct GroupNearYouProposalDTO: Decodable, Equatable, Sendable {
+    let places: [NearYouProposalPayload.Place]
+    let sparseMessage: String?
+    let setBy: String
+    private let operationVersionRaw: Double
+    private let previousSuccessfulCountRaw: Double
+    var operationVersion: Int { Int(operationVersionRaw) }
+    var previousSuccessfulCount: Int { Int(previousSuccessfulCountRaw) }
+
+    var proposals: [NearYouProposal] {
+        places.map {
+            NearYouProposal(
+                name: $0.name,
+                category: $0.category,
+                locationHint: $0.locationHint,
+                explanation: $0.explanation,
+                accessNote: $0.accessNote
+            )
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case places, sparseMessage, setBy
+        case operationVersionRaw = "operationVersion"
+        case previousSuccessfulCountRaw = "previousSuccessfulCount"
     }
 }
 
@@ -293,9 +273,22 @@ struct GroupNearYouResultDTO: Decodable, Equatable, Sendable {
 }
 
 protocol GroupNearYouGenerating {
-    func generateGroupNearYou(
+    /// Ask the model for places. Reserves the group's Near You operation, so a
+    /// caller that gets a payload back owes it either a commit or a timeout.
+    func proposeGroupNearYou(
         groupId: String,
         memberToken: String,
-        payload: GroupNearYouActionPayload
+        researchArea: String,
+        replace: Bool
+    ) async throws -> GroupNearYouProposalDTO
+
+    /// Persist what MapKit actually confirmed, for every member to read.
+    func commitGroupNearYou(
+        groupId: String,
+        memberToken: String,
+        operationVersion: Int,
+        previousSuccessfulCount: Int,
+        accommodation: CoarseAccommodation,
+        nearYou: Trip.NearYou
     ) async throws -> GroupNearYouResultDTO
 }

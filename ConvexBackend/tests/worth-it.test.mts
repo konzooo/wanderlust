@@ -28,10 +28,12 @@ test("Worth It uses Luna without spending tokens on hidden reasoning", () => {
   assert.deepEqual(body.reasoning, { effort: "none" });
 });
 
-test("Near You remains on Terra", () => {
+test("Near You runs on the cheap tier now that MapKit verifies its output", () => {
   const spec = componentSpec("nearYou", "split");
   assert.equal(spec.model, NEAR_YOU_MODEL);
-  assert.equal(spec.model, "gpt-5.6-terra");
+  // Terra paid for a hosted web search whose accuracy the on-device
+  // verification pass now provides for free — see NEAR_YOU_MODEL.
+  assert.equal(spec.model, "gpt-5.6-luna");
 });
 
 test("Worth It prompt uses a calibrated personal verdict instead of forced negativity", () => {

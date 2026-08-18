@@ -35,6 +35,10 @@ public enum AnalyticsEventName: String, CaseIterable, Sendable {
     case tripGenerationStarted = "trip_generation_started"
     case tripGenerationSucceeded = "trip_generation_succeeded"
     case tripGenerationFailed = "trip_generation_failed"
+    /// How many Near You proposals survived MapKit verification. Counts only —
+    /// never a place name, so this stays a health signal and not a record of
+    /// where anyone stayed.
+    case nearYouVerified = "near_you_verified"
     case tripResultViewed = "trip_result_viewed"
     case tripSaved = "trip_saved"
     case tripDeleted = "trip_deleted"
@@ -146,6 +150,8 @@ public struct AnalyticsEvent: Equatable, Sendable {
             ["component", "attempt", "trip_mode", "duration_ms"]
         case .tripGenerationFailed:
             ["component", "attempt", "trip_mode", "duration_ms", "error_category"]
+        case .nearYouVerified:
+            ["proposed", "resolved", "survived"]
         case .tripResultViewed, .groupResultViewed:
             ["trip_type"]
         case .tripSaved, .tripDeleted:

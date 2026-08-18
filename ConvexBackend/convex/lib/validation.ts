@@ -366,144 +366,94 @@ export function validateDeepDive(
 }
 
 /**
- * Grounded Near You: every selected ID must belong to the supplied MapKit set.
- * Unknown IDs are a hard component failure, not a repair; silently dropping
- * one would disguise a responsibility-boundary violation as sparse output.
+ * Near You deliberately over-requests. Every proposal must survive a MapKit
+ * resolution and a real walking route on the client, and whatever fails either
+ * check is discarded — so asking for the number the screen wants guarantees a
+ * thin screen. Roughly double leaves room for the gate to do its work, and
+ * costs almost nothing on the cheap model tier.
+ */
+export const NEAR_YOU_MAX_PROPOSALS = 15;
+
+/**
+ * Near You proposals.
+ *
+ * The model no longer picks from a supplied candidate set — it names places
+ * from its own knowledge and the client resolves each against MapKit. So the
+ * old hard failure on an unknown ID has no equivalent here: an entry that does
+ * not exist simply fails to resolve on the device and disappears. What this
+ * pass still owns is shape, and the one boundary the model can violate in
+ * prose — claiming a distance or walking time that only MapKit may author.
  */
 export function validateNearYou(
   data: unknown,
   report: ValidationReport,
-  candidates: NearYouCandidate[],
-  webSources: OpenAIWebSource[] = [],
 ): Record<string, unknown> {
   if (!isRecord(data)) throw new ValidationError("invalid_near_you_shape");
 
-  const allowed = new Set(candidates.map((candidate) => candidate.id));
-  const used = new Set<string>();
-  const rawSections = Array.isArray(data.sections) ? data.sections : [];
-  const sections: Record<string, unknown>[] = [];
-  let selectedCount = 0;
+  const rawPlaces = Array.isArray(data.places) ? data.places : [];
+  const places: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
 
-  for (const rawSection of rawSections) {
-    if (!isRecord(rawSection) || !nonEmptyString(rawSection.title)) {
-      report.repairs += 1;
-      continue;
-    }
-    if (containsMapFactClaim(rawSection.title)) {
-      // Never render model-authored proximity as a grounded fact. Dropping the
-      // noncompliant editorial group preserves independently sourced live finds
-      // and the deterministic MapKit practical layer from the same response.
-      report.repairs += 1;
-      continue;
-    }
-    const rawPicks = Array.isArray(rawSection.picks) ? rawSection.picks : [];
-    const picks: Record<string, unknown>[] = [];
-    for (const rawPick of rawPicks) {
-      if (
-        !isRecord(rawPick) ||
-        !nonEmptyString(rawPick.candidateID) ||
-        !nonEmptyString(rawPick.explanation)
-      ) {
-        report.repairs += 1;
-        continue;
-      }
-      const candidateID = rawPick.candidateID.trim();
-      if (!allowed.has(candidateID)) {
-        throw new ValidationError("unknown_near_you_candidate");
-      }
-      if (containsMapFactClaim(rawPick.explanation)) {
-        report.repairs += 1;
-        continue;
-      }
-      if (used.has(candidateID) || selectedCount >= 10) {
-        report.repairs += 1;
-        continue;
-      }
-      used.add(candidateID);
-      selectedCount += 1;
-      picks.push({
-        candidateID,
-        explanation: rawPick.explanation.trim(),
-      });
-    }
-    if (picks.length > 0) {
-      sections.push({ title: rawSection.title.trim(), picks });
-    } else if (rawPicks.length > 0) {
-      report.repairs += 1;
-    }
-  }
-
-  let sparseMessage =
-    typeof data.sparseMessage === "string" && data.sparseMessage.trim().length > 0
-      ? data.sparseMessage.trim()
-      : null;
-  if (sparseMessage && containsMapFactClaim(sparseMessage)) {
-    sparseMessage = null;
-    report.repairs += 1;
-  }
-  const sourcesByURL = new Map(
-    webSources
-      .map((source) => [canonicalSourceURL(source.url), source] as const)
-      .filter(([url]) => url.length > 0),
-  );
-  const candidateNames = new Set(
-    candidates.map((candidate) => candidate.name.trim().toLocaleLowerCase()),
-  );
-  const seenLiveFinds = new Set<string>();
-  const rawLiveFinds = Array.isArray(data.liveFinds) ? data.liveFinds : [];
-  const liveFinds: Record<string, unknown>[] = [];
-  for (const rawFind of rawLiveFinds) {
-    if (liveFinds.length >= 6) {
+  for (const rawPlace of rawPlaces) {
+    if (places.length >= NEAR_YOU_MAX_PROPOSALS) {
       report.repairs += 1;
       continue;
     }
     if (
-      !isRecord(rawFind) ||
-      !nonEmptyString(rawFind.name) ||
-      !nonEmptyString(rawFind.category) ||
-      !nonEmptyString(rawFind.locationHint) ||
-      !nonEmptyString(rawFind.explanation) ||
-      !nonEmptyString(rawFind.sourceTitle) ||
-      !nonEmptyString(rawFind.sourceURL) ||
-      !(rawFind.accessNote === null || typeof rawFind.accessNote === "string")
+      !isRecord(rawPlace) ||
+      !nonEmptyString(rawPlace.name) ||
+      !nonEmptyString(rawPlace.category) ||
+      !nonEmptyString(rawPlace.locationHint) ||
+      !nonEmptyString(rawPlace.explanation)
     ) {
       report.repairs += 1;
       continue;
     }
-    const name = rawFind.name.trim().slice(0, 160);
-    const normalizedName = name.toLocaleLowerCase();
-    const sourceURL = rawFind.sourceURL.trim();
-    const consultedSource = sourcesByURL.get(canonicalSourceURL(sourceURL));
-    if (
-      candidateNames.has(normalizedName) ||
-      seenLiveFinds.has(normalizedName) ||
-      !consultedSource
-    ) {
+
+    // Two entries for the same venue waste one of the traveller's slots and
+    // one MapKit resolution, so collapse them before either is spent.
+    const key = `${rawPlace.name.trim().toLowerCase()}|${rawPlace.locationHint
+      .trim()
+      .toLowerCase()}`;
+    if (seen.has(key)) {
       report.repairs += 1;
       continue;
     }
-    seenLiveFinds.add(normalizedName);
-    liveFinds.push({
-      name,
-      category: rawFind.category.trim().slice(0, 80),
-      locationHint: rawFind.locationHint.trim().slice(0, 200),
-      explanation: rawFind.explanation.trim().slice(0, 600),
-      accessNote:
-        typeof rawFind.accessNote === "string" && rawFind.accessNote.trim()
-          ? rawFind.accessNote.trim().slice(0, 300)
-          : null,
-      sourceTitle: (consultedSource.title ?? rawFind.sourceTitle).trim().slice(0, 200),
-      sourceURL: consultedSource.url,
+    seen.add(key);
+
+    // A model-authored distance would sit next to a real routed one and
+    // contradict it. Drop the claim, keep the recommendation.
+    const explanation = containsMapFactClaim(rawPlace.explanation)
+      ? ""
+      : rawPlace.explanation.trim();
+    if (explanation === "") {
+      report.repairs += 1;
+      continue;
+    }
+
+    const rawAccess =
+      nonEmptyString(rawPlace.accessNote) && !containsMapFactClaim(rawPlace.accessNote)
+        ? rawPlace.accessNote.trim().slice(0, 200)
+        : null;
+    if (rawAccess === null && nonEmptyString(rawPlace.accessNote)) {
+      report.repairs += 1;
+    }
+
+    places.push({
+      name: rawPlace.name.trim().slice(0, 120),
+      category: rawPlace.category.trim().slice(0, 60),
+      locationHint: rawPlace.locationHint.trim().slice(0, 160),
+      explanation: explanation.slice(0, 400),
+      accessNote: rawAccess,
     });
   }
 
-  if (candidates.length + liveFinds.length < 4 && sparseMessage === null) {
-    sparseMessage =
-      "The verified local result is limited here, so the list is intentionally short.";
-    report.repairs += 1;
-  }
+  if (places.length === 0) throw new ValidationError("empty_near_you");
 
-  return { sections, liveFinds, sparseMessage };
+  const sparseMessage =
+    nonEmptyString(data.sparseMessage) ? data.sparseMessage.trim().slice(0, 200) : null;
+
+  return { places, sparseMessage };
 }
 
 function canonicalSourceURL(raw: string): string {

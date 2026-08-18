@@ -1,12 +1,11 @@
 import { ConvexError, v } from "convex/values";
-import { action, internalMutation } from "./_generated/server";
+import { action, internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { callGroupComponent } from "./generate";
 import { collectAlreadyRecommended } from "./groupDeepDives";
-import type { GroupTripInput, NearYouCandidate } from "./lib/prompts";
+import type { GroupTripInput } from "./lib/prompts";
 import { tokenMatchesHash } from "./lib/tokens";
-import { MAX_NEAR_YOU_CANDIDATES } from "./lib/validators";
 
 const OPERATION_TTL_MS = 5 * 60 * 1_000;
 const MAX_PRACTICAL = 3;
@@ -20,21 +19,7 @@ const accommodationValidator = v.object({
   precision: v.union(v.literal("address"), v.literal("neighbourhood")),
 });
 
-const groundedCandidateValidator = v.object({
-  id: v.string(),
-  name: v.string(),
-  category: v.string(),
-  latitude: v.number(),
-  longitude: v.number(),
-  distanceMetres: v.number(),
-  walkingMinutes: v.number(),
-  mapURL: v.string(),
-});
 
-const practicalValidator = v.object({
-  kind: v.union(v.literal("transport"), v.literal("grocery"), v.literal("pharmacy")),
-  candidate: groundedCandidateValidator,
-});
 
 type GroundedCandidate = {
   id: string;
@@ -203,23 +188,27 @@ export const commit = internalMutation({
   },
 });
 
-/** Shared Near You. `researchArea` is client-derived coarse locality, never raw input. */
-export const generate = action({
+/**
+ * Shared Near You, first half.
+ *
+ * Verification has to happen on a device — only the phone has MapKit — so the
+ * group flow can no longer be one server round trip. This reserves the
+ * operation and returns the model's *proposals*; nothing is persisted until the
+ * caller comes back through `commitVerified` with places MapKit has confirmed.
+ * A caller that dies in between leaves the operation reserved, which the
+ * existing `OPERATION_TTL_MS` already reclaims.
+ *
+ * `researchArea` is client-derived coarse locality, never raw input.
+ */
+export const propose = action({
   args: {
     groupId: v.id("groups"),
     memberToken: v.string(),
-    accommodation: accommodationValidator,
-    candidates: v.array(groundedCandidateValidator),
-    practical: v.array(practicalValidator),
-    unavailablePracticalKinds: v.array(
-      v.union(v.literal("transport"), v.literal("grocery"), v.literal("pharmacy")),
-    ),
     /** Locality/neighbourhood only, derived after local address resolution. */
     researchArea: v.string(),
     replace: v.boolean(),
   },
   handler: async (ctx, args): Promise<unknown> => {
-    validateInput(args.accommodation, args.candidates, args.practical);
     const researchArea = args.researchArea.trim().slice(0, 160);
     if (!researchArea) throw new ConvexError("invalid_near_you_location");
     const begun = await ctx.runMutation(internal.groupNearYou.begin, {
@@ -230,27 +219,19 @@ export const generate = action({
 
     try {
       await ctx.runMutation(internal.quota.reserveGlobalModelCall, {});
-      const modelCandidates = args.candidates.map(modelCandidate);
       const result = await callGroupComponent(ctx, "nearYou", begun.input, {
         alreadyRecommended: begun.alreadyRecommended,
-        nearYouCandidates: modelCandidates,
         nearYouLocation: { area: researchArea, city: begun.input.destination },
       });
-      const nearYou = materializeGroupNearYou(
-        result.data,
-        args.candidates,
-        args.practical,
-        args.unavailablePracticalKinds,
-      );
-
-      return await ctx.runMutation(internal.groupNearYou.commit, {
-        groupId: args.groupId,
+      const data = result.data as { places?: unknown; sparseMessage?: unknown };
+      return {
         operationVersion: begun.operationVersion,
         previousSuccessfulCount: begun.successfulCount,
-        accommodation: args.accommodation,
-        nearYou,
         setBy: begun.setBy,
-      });
+        places: Array.isArray(data.places) ? data.places : [],
+        sparseMessage:
+          typeof data.sparseMessage === "string" ? data.sparseMessage : null,
+      };
     } catch (error) {
       await ctx.runMutation(internal.groupNearYou.fail, {
         groupId: args.groupId,
@@ -262,139 +243,66 @@ export const generate = action({
   },
 });
 
-export function modelCandidate(candidate: GroundedCandidate): NearYouCandidate {
-  return {
-    id: candidate.id,
-    name: candidate.name,
-    category: candidate.category,
-    distanceMetres: candidate.distanceMetres,
-    walkingMinutes: candidate.walkingMinutes,
-  };
-}
-
-export function materializeGroupNearYou(
-  rawSelection: unknown,
-  candidates: GroundedCandidate[],
-  practical: Practical[],
-  unavailablePracticalKinds: string[],
-  makeID: () => string = () => crypto.randomUUID(),
-): unknown {
-  if (typeof rawSelection !== "object" || rawSelection === null) {
-    throw new ConvexError("invalid_near_you_selection");
-  }
-  const selection = rawSelection as {
-    sections?: Array<{
-      title?: unknown;
-      picks?: Array<{ candidateID?: unknown; explanation?: unknown }>;
-    }>;
-    sparseMessage?: unknown;
-    liveFinds?: Array<{
-      id?: unknown;
-      name?: unknown;
-      category?: unknown;
-      locationHint?: unknown;
-      explanation?: unknown;
-      accessNote?: unknown;
-      sourceTitle?: unknown;
-      sourceURL?: unknown;
-    }>;
-  };
-  const byID = new Map(candidates.map((candidate) => [candidate.id, candidate]));
-  const used = new Set<string>();
-  const sections = (selection.sections ?? []).flatMap((section) => {
-    if (typeof section.title !== "string" || !Array.isArray(section.picks)) return [];
-    const picks = section.picks.flatMap((pick) => {
-      if (typeof pick.candidateID !== "string" || typeof pick.explanation !== "string") {
-        return [];
+/**
+ * Shared Near You, second half: persist what the device actually verified.
+ *
+ * The content is client-supplied, which is a real widening — but the same was
+ * already true of the MapKit candidates and practical layer this replaces, and
+ * it stays gated behind a member capability token. What is *not* trusted from
+ * the client is who is writing: `setBy` is re-derived from the token here
+ * rather than accepted as an argument.
+ */
+export const commitVerified = mutation({
+  args: {
+    groupId: v.id("groups"),
+    memberToken: v.string(),
+    operationVersion: v.number(),
+    previousSuccessfulCount: v.number(),
+    accommodation: accommodationValidator,
+    nearYou: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const group = await ctx.db.get(args.groupId);
+    if (!group) throw new ConvexError("Group not found");
+    const members = await ctx.db
+      .query("members")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .collect();
+    let viewer: Doc<"members"> | undefined;
+    for (const member of members) {
+      if (await tokenMatchesHash(args.memberToken, member.memberTokenHash)) {
+        viewer = member;
+        break;
       }
-      const candidate = byID.get(pick.candidateID);
-      if (!candidate) throw new ConvexError("unknown_near_you_candidate");
-      if (!used.add(pick.candidateID)) return [];
-      return [{ candidate, explanation: pick.explanation }];
-    });
-    return picks.length === 0 ? [] : [{ id: makeID(), title: section.title, picks }];
-  });
-  const liveFinds = (selection.liveFinds ?? []).flatMap((find) => {
-    if (
-      typeof find.name !== "string" ||
-      typeof find.category !== "string" ||
-      typeof find.locationHint !== "string" ||
-      typeof find.explanation !== "string" ||
-      !(find.accessNote === null || typeof find.accessNote === "string") ||
-      typeof find.sourceTitle !== "string" ||
-      typeof find.sourceURL !== "string"
-    ) return [];
-    return [{
-      id: typeof find.id === "string" && UUID_PATTERN.test(find.id) ? find.id : makeID(),
-      name: find.name,
-      category: find.category,
-      locationHint: find.locationHint,
-      explanation: find.explanation,
-      accessNote: find.accessNote,
-      sourceTitle: find.sourceTitle,
-      sourceURL: find.sourceURL,
-    }];
-  });
-  const sparseMessage =
-    candidates.length + liveFinds.length < 4 && typeof selection.sparseMessage !== "string"
-      ? "Only a few verified local finds surfaced here, so this list is intentionally short."
-      : (selection.sparseMessage ?? null);
-  return { sections, liveFinds, practical, unavailablePracticalKinds, sparseMessage };
-}
+    }
+    if (!viewer) throw new ConvexError("Not authorized");
 
-function validateInput(
-  accommodation: Accommodation,
-  candidates: GroundedCandidate[],
-  practical: Practical[],
-) {
-  if (
-    !accommodation.label.trim() ||
-    accommodation.label.length > 160 ||
-    !validCoordinate(accommodation.latitude, accommodation.longitude) ||
-    Math.abs(accommodation.latitude * 1_000 - Math.round(accommodation.latitude * 1_000)) > 1e-7 ||
-    Math.abs(accommodation.longitude * 1_000 - Math.round(accommodation.longitude * 1_000)) > 1e-7
-  ) {
-    throw new ConvexError("invalid_coarse_accommodation");
-  }
-  if (candidates.length > MAX_NEAR_YOU_CANDIDATES || practical.length > MAX_PRACTICAL) {
-    throw new ConvexError("too_many_near_you_candidates");
-  }
-  const ids = new Set<string>();
-  for (const candidate of [...candidates, ...practical.map((item) => item.candidate)]) {
     if (
-      !UUID_PATTERN.test(candidate.id) ||
-      !candidate.name.trim() ||
-      candidate.name.length > 160 ||
-      candidate.category.length > 80 ||
-      !validCoordinate(candidate.latitude, candidate.longitude) ||
-      !Number.isFinite(candidate.distanceMetres) ||
-      candidate.distanceMetres < 0 ||
-      !Number.isFinite(candidate.walkingMinutes) ||
-      candidate.walkingMinutes < 1 ||
-      !isAppleMapsURL(candidate.mapURL)
+      group.nearYouOperationVersion !== args.operationVersion ||
+      group.nearYouOperationState?.state !== "generating" ||
+      successfulNearYouCount(group) !== args.previousSuccessfulCount
     ) {
-      throw new ConvexError("invalid_grounded_candidate");
+      throw new ConvexError("stale_group_near_you");
     }
-    if (candidates.includes(candidate) && !ids.add(candidate.id)) {
-      throw new ConvexError("duplicate_near_you_candidate");
-    }
-  }
-}
 
-function validCoordinate(latitude: number, longitude: number) {
-  return Number.isFinite(latitude) && Number.isFinite(longitude) &&
-    latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180 &&
-    !(latitude === 0 && longitude === 0);
-}
+    const generationCount = args.previousSuccessfulCount + 1;
+    await ctx.db.patch(group._id, {
+      accommodation: args.accommodation,
+      nearYou: args.nearYou,
+      nearYouSetBy: viewer.name,
+      nearYouGenerationCount: generationCount,
+      nearYouOperationState: { state: "ready" },
+      nearYouOperationStartedAt: undefined,
+    });
+    return {
+      accommodation: args.accommodation,
+      nearYou: args.nearYou,
+      nearYouSetBy: viewer.name,
+      generationCount,
+    };
+  },
+});
 
-function isAppleMapsURL(raw: string) {
-  try {
-    const url = new URL(raw);
-    return url.protocol === "https:" && url.hostname === "maps.apple.com";
-  } catch {
-    return false;
-  }
-}
 
 function safeErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

@@ -24,6 +24,34 @@ struct DebugMenuScreen: View {
             }
 
             Section {
+                if let pooled = NearYouStats.pooledSurvivalRate {
+                    LabeledContent("Survival rate") {
+                        Text(percent(pooled))
+                            .foregroundStyle(pooled < 0.5 ? Color.red : Color.primary)
+                    }
+                } else {
+                    Text("No Near You runs recorded yet")
+                        .font(.kanit(13))
+                        .foregroundColor(Color(.systemGray))
+                }
+
+                ForEach(NearYouStats.recent().prefix(5)) { run in
+                    LabeledContent {
+                        Text(percent(run.survivalRate))
+                            .font(.kanit(13))
+                            .foregroundColor(Color(.systemGray))
+                    } label: {
+                        Text("\(run.proposed) proposed → \(run.resolved) found → \(run.survived) shown")
+                            .font(.kanit(13))
+                    }
+                }
+            } header: {
+                Text("Near You verification")
+            } footer: {
+                Text("Share of model-proposed places that MapKit could find and route to within the walking radius. A low found count means the names or hints are vague; a healthy found count with few shown means the model knows the city but not this street.")
+            }
+
+            Section {
                 Button(action: resetOnboarding) {
                     Label(
                         didResetOnboarding ? "Onboarding reset" : "Reset onboarding",
@@ -56,6 +84,10 @@ struct DebugMenuScreen: View {
         }
         .navigationTitle("Debug Menu")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func percent(_ value: Double) -> String {
+        "\(Int((value * 100).rounded()))%"
     }
 
     private func resetOnboarding() {

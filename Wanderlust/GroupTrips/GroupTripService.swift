@@ -280,6 +280,7 @@ struct GenerationCostRow: Decodable, Equatable, Identifiable, Sendable {
     /// Nil where the row predates model recording or names an unpriced model.
     let costUSD: Double?
 
+    var durationMs: Int { Int(durationMsRaw) }
     var inputTokens: Int { Int(inputTokensRaw) }
     var cachedInputTokens: Int { Int(cachedInputTokensRaw) }
     var outputTokens: Int { Int(outputTokensRaw) }

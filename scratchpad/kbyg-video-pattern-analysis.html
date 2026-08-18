@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KBYG Video Pattern Analysis</title>
+  <style>
+    :root {
+      --paper: #f3efe6;
+      --surface: #fffdf8;
+      --ink: #1d211e;
+      --muted: #6b6e67;
+      --line: #d9d4c8;
+      --coral: #eb6545;
+      --coral-soft: #f8ded5;
+      --teal: #0f7069;
+      --teal-soft: #dcedea;
+      --yellow: #f1c84d;
+      --shadow: 0 16px 50px rgba(42, 39, 31, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(29, 33, 30, .035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 100% 28px;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; }
+
+    .masthead {
+      padding: 42px clamp(20px, 5vw, 76px) 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(243, 239, 230, .93);
+    }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(40px, 7vw, 78px);
+      font-weight: 500;
+      letter-spacing: -.045em;
+      line-height: .96;
+    }
+    .dek {
+      max-width: 850px;
+      margin: 20px 0 0;
+      color: #4f534e;
+      font-size: clamp(16px, 2vw, 20px);
+      line-height: 1.55;
+    }
+    .method-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .method-strip span { display: inline-flex; align-items: center; gap: 7px; }
+    .method-strip i { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); }
+
+    .tabs-wrap {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 253, 248, .96);
+      backdrop-filter: blur(12px);
+    }
+    .tabs {
+      display: flex;
+      min-width: max-content;
+      padding: 0 clamp(12px, 4vw, 64px);
+    }
+    .tab {
+      position: relative;
+      border: 0;
+      background: transparent;
+      padding: 18px 16px 16px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 750;
+    }
+    .tab:hover { color: var(--ink); }
+    .tab[aria-selected="true"] { color: var(--ink); }
+    .tab[aria-selected="true"]::after {
+      position: absolute;
+      right: 14px;
+      bottom: -1px;
+      left: 14px;
+      height: 3px;
+      background: var(--coral);
+      content: "";
+    }
+    .analysis-tab { color: var(--teal); }
+
+    main { padding: 0 clamp(16px, 4vw, 64px) 80px; }
+    .video-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding: 34px 0 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    .video-kicker { color: var(--coral); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .video-hero h2 {
+      max-width: 890px;
+      margin: 8px 0 10px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 4vw, 50px);
+      font-weight: 500;
+      line-height: 1.03;
+    }
+    .video-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 13px; }
+    .source-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--ink);
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .source-button:hover { background: var(--ink); color: var(--surface); }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 275px minmax(0, 1fr);
+      gap: clamp(28px, 5vw, 72px);
+      align-items: start;
+      padding-top: 28px;
+    }
+    .sidebar {
+      position: sticky;
+      top: 76px;
+      max-height: calc(100vh - 96px);
+      overflow: auto;
+      padding: 0 10px 28px 0;
+      scrollbar-width: thin;
+    }
+    .search {
+      width: 100%;
+      height: 42px;
+      margin-bottom: 16px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      outline: 0;
+      background: var(--surface);
+    }
+    .search:focus { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+    .side-label { margin: 0 0 8px 10px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .side-link {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 10px;
+      border: 0;
+      border-left: 2px solid transparent;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.25;
+    }
+    .side-link:hover { border-left-color: var(--coral); background: rgba(255,255,255,.48); }
+    .side-time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11px; }
+
+    .content { min-width: 0; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin: 0 0 18px;
+      padding: 0;
+      color: var(--muted);
+      font-size: 12px;
+      list-style: none;
+    }
+    .legend span { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; }
+    .legend .transcript { background: var(--teal); }
+    .legend .volatile { background: var(--yellow); }
+    .legend .commercial { background: var(--coral); }
+
+    .chapter {
+      margin: 0 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 253, 248, .9);
+      box-shadow: 0 2px 0 rgba(29,33,30,.025);
+      scroll-margin-top: 80px;
+    }
+    .chapter[open] { border-color: #bdb7aa; box-shadow: var(--shadow); }
+    .chapter[hidden] { display: none; }
+    .chapter summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 20px;
+      cursor: pointer;
+      list-style: none;
+    }
+    .chapter summary::-webkit-details-marker { display: none; }
+    .chapter-title { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+    .chapter-title h3 { margin: 0; font-size: 18px; line-height: 1.25; }
+    .domain {
+      padding: 4px 7px;
+      border-radius: 3px;
+      background: var(--teal-soft);
+      color: var(--teal);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .chevron { color: var(--coral); font-size: 22px; transition: transform .18s ease; }
+    .chapter[open] .chevron { transform: rotate(45deg); }
+    .chapter-body { padding: 0 20px 20px; border-top: 1px solid var(--line); }
+    .flags { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 4px; }
+    .flag { padding: 4px 7px; border-radius: 3px; font-size: 10px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+    .flag.volatile { background: #fff0b8; color: #725b00; }
+    .flag.commercial { background: var(--coral-soft); color: #92351f; }
+    .notes { margin: 14px 0 0; padding-left: 22px; }
+    .notes li { padding: 5px 0 5px 5px; line-height: 1.55; }
+    .notes li::marker { color: var(--coral); }
+    .timestamp { display: inline-block; margin-left: 6px; color: var(--teal); font-size: 11px; font-weight: 800; text-decoration: none; }
+    .timestamp:hover { text-decoration: underline; }
+    .empty { padding: 30px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
+
+    .analysis { max-width: 1220px; margin: 0 auto; padding-top: 34px; }
+    .analysis-hero { display: grid; grid-template-columns: 1.35fr .65fr; gap: 28px; align-items: stretch; }
+    .analysis-title, .verdict {
+      padding: clamp(24px, 4vw, 44px);
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .analysis-title h2 { margin: 0 0 16px; font: 500 clamp(34px, 5vw, 58px)/1 Georgia, serif; letter-spacing: -.035em; }
+    .analysis-title p { max-width: 760px; margin: 0; color: #4f534e; font-size: 18px; line-height: 1.6; }
+    .verdict { background: var(--teal); color: white; }
+    .verdict small { display: block; margin-bottom: 14px; opacity: .72; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .verdict strong { display: block; font: 500 28px/1.15 Georgia, serif; }
+    .verdict p { margin: 18px 0 0; color: rgba(255,255,255,.78); line-height: 1.55; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-top: 0; background: var(--surface); }
+    .stat { padding: 20px; border-right: 1px solid var(--line); }
+    .stat:last-child { border-right: 0; }
+    .stat b { display: block; font: 500 30px/1 Georgia, serif; }
+    .stat span { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .analysis-section { margin-top: 46px; }
+    .analysis-section > h3 { margin: 0 0 8px; font: 500 34px/1.1 Georgia, serif; }
+    .section-intro { max-width: 830px; margin: 0 0 22px; color: var(--muted); line-height: 1.55; }
+    .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .theme-card { padding: 22px; border: 1px solid var(--line); background: var(--surface); }
+    .theme-card .num { color: var(--coral); font: 500 30px/1 Georgia, serif; }
+    .theme-card h4 { margin: 16px 0 8px; font-size: 17px; }
+    .theme-card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .matrix-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); }
+    table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 12px 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; }
+    th:first-child, td:first-child { position: sticky; left: 0; z-index: 1; min-width: 190px; background: var(--surface); text-align: left; }
+    th { background: #ece7dc; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    th:last-child, td:last-child { border-right: 0; }
+    .yes { color: var(--teal); font-weight: 900; }
+    .partial { color: #9b7200; font-weight: 900; }
+    .no { color: #aaa69d; }
+    .matrix-key { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; color: var(--muted); font-size: 12px; }
+    .split { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .list-card { padding: 24px; border-top: 4px solid var(--teal); background: var(--surface); box-shadow: var(--shadow); }
+    .list-card.coral { border-top-color: var(--coral); }
+    .list-card h4 { margin: 0 0 12px; font-size: 18px; }
+    .list-card ul, .list-card ol { margin: 0; padding-left: 20px; }
+    .list-card li { padding: 6px 0; color: #4f534e; line-height: 1.48; }
+    .blueprint { display: grid; grid-template-columns: 260px 1fr; border: 1px solid var(--line); background: var(--surface); }
+    .blueprint-rail { padding: 24px; background: var(--ink); color: white; }
+    .blueprint-rail h4 { margin: 0 0 16px; font: 500 24px/1.1 Georgia, serif; }
+    .blueprint-rail p { margin: 0; color: rgba(255,255,255,.66); font-size: 13px; line-height: 1.55; }
+    .blueprint-body { padding: 24px; }
+    .layers { display: grid; gap: 10px; }
+    .layer { display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 15px 0; border-bottom: 1px solid var(--line); }
+    .layer:last-child { border-bottom: 0; }
+    .layer b { color: var(--teal); font-size: 13px; }
+    .layer p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .callout { margin-top: 18px; padding: 18px 20px; border-left: 4px solid var(--yellow); background: #fff7d9; line-height: 1.55; }
+    .corpus-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .corpus-item { padding: 18px; border: 1px solid var(--line); background: var(--surface); }
+    .corpus-item b { display: block; margin-bottom: 6px; }
+    .corpus-item span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .footer-note { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+    @media (max-width: 900px) {
+      .video-hero, .analysis-hero, .split, .blueprint { grid-template-columns: 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      .sidebar { position: static; max-height: none; padding-right: 0; }
+      .side-links { display: flex; overflow-x: auto; gap: 6px; padding-bottom: 8px; }
+      .side-link { min-width: 200px; border: 1px solid var(--line); border-left-width: 1px; background: var(--surface); }
+      .side-link:hover { border-color: var(--coral); }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stat:nth-child(2) { border-right: 0; }
+      .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .theme-grid, .corpus-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .masthead { padding-top: 28px; }
+      .video-hero { grid-template-columns: 1fr; }
+      .source-button { width: 100%; justify-content: center; }
+      .chapter summary { padding: 16px; }
+      .chapter-body { padding: 0 16px 16px; }
+      .theme-grid, .corpus-grid { grid-template-columns: 1fr; }
+      .layer { grid-template-columns: 1fr; gap: 5px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <p class="eyebrow">Wanderlust research notebook · KBYG</p>
+    <h1>How travel creators prepare you before you go</h1>
+    <p class="dek">A transcript-grounded comparison of seven destination guides. Open a video, scan its original categories, and expand the exact advice patterns underneath. The last tab translates the overlap into a generalizable product model.</p>
+    <div class="method-strip">
+      <span><i></i> Video notes are paraphrased only from captions</span>
+      <span><i></i> Timestamps jump to the source segment</span>
+      <span><i></i> Prices, rules, and availability may now be stale</span>
+    </div>
+  </header>
+
+  <nav class="tabs-wrap" aria-label="Video tabs">
+    <div class="tabs" id="tabs" role="tablist"></div>
+  </nav>
+
+  <main id="app"></main>
+
+  <script>
+    const sec = (title, at, domain, bullets, flags = []) => ({ title, at, domain, bullets, flags });
+
+    const videos = [
+      {
+        id: "S_vIFnT4elM",
+        label: "🇬🇷 Greece",
+        destination: "Greece",
+        title: "GREECE travel guide | EVERYTHING to know before you go",
+        channel: "Rhett and Claire",
+        date: "20 Apr 2024",
+        duration: "40:34",
+        sections: [
+          sec("How to get to Greece + visas", 60, "Arrival & entry", [
+            "Athens, Crete, Santorini and Zakynthos are named as common international entry points; Athens is recommended for first-timers because flights are often cheaper and its port connects to popular islands.",
+            "The creators suggest comparing multiple Greek airports and, if direct flights are costly, checking a cheaper neighboring country such as Turkey before taking a short onward flight.",
+            "The video distinguishes EU/Schengen access from 90-day visa-free nationalities and says travelers who need a Schengen visa should begin several weeks ahead and check their passport-specific requirements."
+          ], ["volatile"]),
+          sec("Currency", 232, "Money", [
+            "Greece uses the euro. Cash is useful for tips, small village businesses and some island buses, while cards and mobile payments work widely elsewhere.",
+            "Bank ATMs are described as easy to find in tourist areas; the creators name Piraeus, Alpha Bank and National Bank and prefer exchange in town over airport booths.",
+            "They withdrew about €200 total during a two-week trip and paid the remainder by card."
+          ], ["volatile"]),
+          sec("Best time to visit", 322, "Timing", [
+            "May to October is the operating season when island hotels and restaurants are most likely to be open; winter can bring closures.",
+            "July and August are described as hottest, busiest and most expensive, while May–June and September–October are preferred shoulder periods.",
+            "Their early-June trip had warm island weather and fewer crowds, although Santorini was already busy."
+          ], ["volatile"]),
+          sec("Where to go / choosing islands", 407, "Discovery", [
+            "Island choice is framed by trip style: Mykonos, Santorini and Ios for nightlife; Paros and Milos for a more relaxed mix; Crete for nature and hiking.",
+            "The creators recommend grouping nearby islands to simplify ferry travel rather than choosing purely from a wish list.",
+            "Paros is their affordable, laid-back favorite; Milos is adventurous and beach-focused; Santorini is iconic but busy, expensive and not presented as a white-sand beach destination.",
+            "Many additional island judgments are personal recommendations rather than general travel rules."
+          ]),
+          sec("What to pack", 726, "Packing", [
+            "Travel light because ferry and bus transfers require carrying your own luggage; AirTags are suggested for checked bags.",
+            "The list includes breathable clothes, photo or restaurant outfits, sun protection, walking shoes, eye drops, a warm layer for cold ferries and motion-sickness medication.",
+            "Bring prescription and preferred personal medicines, a plug converter and an international driving permit if renting a car, scooter or ATV.",
+            "Island shopping is described as limited and expensive compared with bringing essentials from home."
+          ], ["volatile"]),
+          sec("Length of stay", 878, "Trip shape", [
+            "Their two-week route used three days in Athens and three islands; they recommend roughly 3–4 days per island.",
+            "They say four islands would have felt rushed, three weeks would be even better, and a one-week island trip could skip Athens and focus on two islands."
+          ]),
+          sec("Accommodation", 914, "Stay", [
+            "Greece is positioned as a premium destination: the cheapest accommodation they found was around US$80 a night and island hostels were scarce or expensive.",
+            "The creators stayed in boutique hotels, homestays and self-catering units, booking through Agoda, Airbnb and Booking.com.",
+            "Island infrastructure is not recommended for a long digital-nomad stay; Athens is more likely to offer coworking or coliving."
+          ], ["volatile", "commercial"]),
+          sec("Daily budgets", 1002, "Budget", [
+            "For two people, the video estimates US$100–200 a day on a budget, US$200–500 for comfort and US$500+ for a luxury or honeymoon trip.",
+            "Their June 2023 average was about US$150 a day for two, excluding international flights and including food, stay, transport and attractions.",
+            "Accommodation and inter-island transport are identified as the largest costs; advance booking is the main saving tactic."
+          ], ["volatile"]),
+          sec("Transportation", 1078, "Transport", [
+            "Transport rules vary by island. Free Now, Beat and metered taxis are city options; island taxi apps may not work and short private rides can be very expensive.",
+            "Ferryhopper is used to compare operators and dates. The advice is to book early, consider slower cheaper ferries, and plan around changing fares.",
+            "Scooter licence rules differ by island; ATVs usually require a car licence and cars offer shelter from heat and dust. Small cars suit narrow roads.",
+            "Island buses are inexpensive but may require cash; Athens airport rail is straightforward, while domestic flights save time on very long ferry routes."
+          ], ["volatile", "commercial"]),
+          sec("Language and culture", 1433, "Culture", [
+            "Greek is the official language and English may be limited with older residents or on smaller islands, but basic words, smiles and gestures were enough for the creators.",
+            "The video supplies simple greetings and thanks, and describes locals as especially friendly and accommodating.",
+            "Greek Orthodox religion, national holidays and a daily siesta around 14:00–16:00 are highlighted because they can affect opening hours."
+          ], ["volatile"]),
+          sec("What to eat", 1600, "Food & drink", [
+            "The food list includes Greek salad, moussaka, dolmades, tzatziki, gyros, octopus and sweet or savory pies.",
+            "When ordering a gyro, specify wrap, skewer or plate because the plate may cost two or three times more.",
+            "Vegetarian options were common, while vegan meals may be harder because seafood and dairy feature heavily.",
+            "Beer and wine are described as affordable outside the most expensive islands."
+          ], ["volatile"]),
+          sec("Water and ice", 1788, "Water", [
+            "Tap water is described as drinkable in Athens and parts of mainland Greece but not on the islands.",
+            "The creators recommend bottled water throughout for simplicity and say commercial ice is not normally made from unsafe tap water."
+          ], ["volatile"]),
+          sec("Apps to download", 1812, "Apps", [
+            "Free Now or Beat cover urban rides; Ferryhopper is the key inter-island planning tool.",
+            "Google Maps and Translate should have offline data; GetYourGuide is promoted for tickets and activities.",
+            "Holafly is promoted for eSIMs, while Booking.com, Agoda and Airbnb are used to manage stays."
+          ], ["volatile", "commercial"]),
+          sec("SIM cards and internet", 1887, "Connectivity", [
+            "Vodafone and Orange are named as physical SIM options, including an Orange holiday package for broader Europe.",
+            "Wi-Fi was strong in Athens and Thessaloniki but only about 2–10 Mbps on some islands.",
+            "The creators did not buy a local SIM; they relied on roaming and café Wi-Fi."
+          ], ["volatile"]),
+          sec("Vaccinations", 1926, "Health", [
+            "The creators list their own standing hepatitis, typhoid and other vaccine choices and read out a longer US-advisory list.",
+            "Their commentary is personal opinion, illustrating why health modules require current medical or official sources rather than creator confidence."
+          ], ["volatile"]),
+          sec("Medical and pharmacy", 1958, "Health", [
+            "Pharmacies are marked by green crosses, stock a broad range of medicine and may close on Sundays or holidays, though some operate 24 hours.",
+            "Medical facilities are described as stronger on the mainland and more limited on islands, including ambulance availability.",
+            "The creators advise carrying enough prescription medication and promote travel insurance for access to private care."
+          ], ["volatile", "commercial"]),
+          sec("Electricity", 2040, "Power", [
+            "The video states that Greece uses Type C and F plugs at 230 volts.",
+            "Travelers arriving with incompatible plugs are told to bring an adapter."
+          ], ["volatile"]),
+          sec("Tipping", 2058, "Tipping", [
+            "Tipping is described as optional but appreciated.",
+            "The creators say 10–15% in cash is standard at restaurants."
+          ], ["volatile"]),
+          sec("Laundry", 2072, "Practical", [
+            "The creators used guesthouses and homestays for laundry and suggest asking the accommodation or finding a nearby laundromat.",
+            "They estimate no more than roughly US$20–30 for their typical load, while some Airbnbs included machines."
+          ], ["volatile"]),
+          sec("Weather and natural disasters", 2108, "Hazards", [
+            "Wildfires, floods and earthquakes are the major hazards named, with the 2023 Rhodes fire used as a recent example.",
+            "Strong island winds and rough seas can cancel ferries or make beaches unswimmable from one day to the next.",
+            "Heat waves in Athens can be severe, so carrying water and using sun protection are treated as practical safety steps."
+          ], ["volatile"]),
+          sec("What to skip", 2202, "Judgment", [
+            "Travelers uninterested in history could skip Athens and go directly to the islands, although the creators personally enjoyed it.",
+            "Santorini and Milos are presented as skippable for travelers who dislike busy, touristy and expensive places.",
+            "Santorini in particular is not recommended as the strongest choice for a beach holiday."
+          ]),
+          sec("Other things to note", 2294, "Etiquette & access", [
+            "Many islands are described as difficult for disabled visitors because of hills, stairs and rough paths; flatter Paros is suggested as a comparatively easier option.",
+            "Respect churches and monasteries, do not climb iconic domes, and keep noise down in residential villages.",
+            "Toilet paper often goes in a bin rather than the toilet, and drivers should watch for sheep or goats on rural roads."
+          ], ["volatile"])
+        ]
+      },
+      {
+        id: "0OJHgQhNX3g",
+        label: "🇯🇵 Japan",
+        destination: "Japan",
+        title: "Japan Travel Guide for First Timers: Everything You NEED to Know Before You Go",
+        channel: "Rhett and Claire",
+        date: "9 Jul 2025",
+        duration: "41:05",
+        sections: [
+          sec("How to get to Japan", 90, "Arrival", [
+            "Most international flights arrive at Narita or Haneda in Tokyo; Osaka, Nagoya and Fukuoka are also named as direct-entry options.",
+            "For a first visit, the creators recommend starting in Tokyo or Osaka and using Google Flights to compare routes and dates."
+          ], ["volatile"]),
+          sec("Visas", 130, "Entry rules", [
+            "The video says many nationalities receive 90 days visa-free, while some, including South African passport holders, need to apply online in advance.",
+            "It recommends checking Japan's official immigration site, completing Visit Japan forms online for a QR code, or bringing a pen for airport forms.",
+            "Travel insurance is presented as optional for entry but advisable because of medical costs and natural-disaster risk."
+          ], ["volatile", "commercial"]),
+          sec("Currency in Japan", 202, "Money", [
+            "Japan is described as still cash-heavy: cards work in hotels, malls and train stations, while smaller towns, traditional restaurants, temples and street stalls may require cash.",
+            "The recommended cash source is a 7-Eleven ATM rather than airport exchange; the creators carried about US$130 and topped up as needed.",
+            "A coin purse is suggested because travelers quickly accumulate yen coins."
+          ], ["volatile"]),
+          sec("Best time to visit Japan", 289, "Timing", [
+            "Spring is framed around cherry blossoms, summer around heat and festivals, autumn around colorful scenery, and winter around skiing and snow monkeys.",
+            "The creators prefer spring or autumn, but warn that peak blossom season, Golden Week and New Year bring heavy crowds and higher prices.",
+            "Late March and early April were still cold on their trip; summer in Tokyo and Osaka is described as intensely humid."
+          ], ["volatile"]),
+          sec("What to pack / shopping", 388, "Packing", [
+            "Pack light for stairs, small homes and repeated train or bus transfers, while leaving room for shopping; bring a day bag for capsule stays and for carrying rubbish where bins are scarce.",
+            "Comfortable shoes matter because they walked about 15,000 steps per day; a coin purse, reusable bottle, motion-sickness medication and the correct Type A/B adapter are also highlighted.",
+            "Clothes should match the season and local modesty; smaller towns have fewer replacement-shopping options than Tokyo.",
+            "A lengthy universal-adapter promotion and JR-pass affiliate mention sit inside this chapter and should not be treated as neutral topic weight."
+          ], ["commercial"]),
+          sec("Where to go / what to do", 772, "Discovery", [
+            "Tokyo is positioned for city contrast, Kyoto for temples and tea culture, and Osaka for food; Nara, Mount Fuji, Nagano, Hiroshima, Miyajima, Hokkaido and Okinawa are additional route ideas.",
+            "Specific experiences include sushi making, a tea ceremony, onsen stays, skiing, snow monkeys and seasonal island trips.",
+            "Several recommendations point to the creators' linked playlists and GetYourGuide activities."
+          ], ["commercial"]),
+          sec("Length of stay", 924, "Trip shape", [
+            "Two weeks is the stated minimum for Tokyo, Kyoto and Osaka plus a few side trips; three weeks is preferred for Mount Fuji and Nagano as well.",
+            "Their rough pacing is 3–4 days in Tokyo, about 3 days in Kyoto, 3–4 days in Osaka, and 1–3 days across Nara, Hakone, Hiroshima or Miyajima."
+          ]),
+          sec("Accommodation and prices", 984, "Stay", [
+            "The video compares capsule hotels, traditional Airbnbs, ryokans and luxury hotels, recommending a mixture for the experience.",
+            "Their capsule stay cost about US$35 a night; overall accommodation averaged roughly US$100 a night on their trip.",
+            "They stress booking early and staying close to a train station, especially after long walking days."
+          ], ["volatile", "commercial"]),
+          sec("Daily budgets", 1123, "Budget", [
+            "The creators estimate US$60–80 per day for backpacking, US$100–200 for comfort, and US$300+ for luxury.",
+            "Their 26-night trip cost about US$4,900 excluding flights, or roughly US$190 per day, including meals, attractions and bullet trains."
+          ], ["volatile"]),
+          sec("Transportation", 1171, "Transport", [
+            "A nationwide JR Pass may pay off for frequent bullet-train travel, but their three Shinkansen journeys were cheaper than the pass; an IC card such as Suica or Pasmo handles local trains, buses and some purchases.",
+            "Reserve Shinkansen seats online in busy periods and bring food because the video says there is no onboard service on their routes.",
+            "The Go app is preferred over Uber for regulated taxis; a car is unnecessary in cities but useful in rural areas, where an international permit is needed.",
+            "Ferries and low-cost domestic airlines are offered as route-specific alternatives."
+          ], ["volatile", "commercial"]),
+          sec("Language and culture", 1389, "Culture", [
+            "Basic English is available, but the creators advise Google Translate and a few Japanese phrases.",
+            "Keep quiet on public transport, queue, remove shoes in homes and wear a backpack on the front in crowded trains.",
+            "Onsen etiquette includes washing first, entering nude, managing hair and jewelry, and checking tattoo restrictions or using a private onsen.",
+            "Wearing a rented kimono is described as a welcomed way to experience the culture."
+          ]),
+          sec("What to eat / eating culture", 1562, "Food & drink", [
+            "Highlighted foods include ramen, sushi, takoyaki, okonomiyaki, soba, udon, yakitori, curry rice and convenience-store snacks.",
+            "A ryokan is recommended for a traditional breakfast; matcha sweets, sake, plum wine and canned coffee are also called out.",
+            "The video says the legal drinking age is 20 and notes that urban trains stop around midnight.",
+            "Finishing food in a restaurant or local home is presented as a sign of respect for the person who prepared it."
+          ], ["volatile"]),
+          sec("Apps to download", 1708, "Apps", [
+            "Google or Apple Maps and Google Translate are the core tools, with offline maps and Japanese language data downloaded in advance.",
+            "The Japan Official Travel App is mentioned for train times, Go for taxis, GetYourGuide for activities and Holafly for an eSIM.",
+            "The creators say they did not personally need the official travel app."
+          ], ["volatile", "commercial"]),
+          sec("SIM cards and internet", 1756, "Connectivity", [
+            "Physical SIM providers named are SoftBank, AU and Docomo; the creators instead used a Holafly eSIM for immediate connectivity.",
+            "Wi-Fi quality varied sharply: some cafes and one Airbnb were fast, while several budget stays were unexpectedly slow."
+          ], ["volatile", "commercial"]),
+          sec("Medical and health care", 1816, "Health", [
+            "Pharmacies are described as common and professional, but stronger medicines generally require prescriptions; Google Translate helps with communication.",
+            "Private care can add up, which supports their insurance recommendation; they also mention their own routine vaccine choices while noting these are not entry requirements.",
+            "The food supply is described as healthy and clean, although fruit can be unusually expensive."
+          ], ["volatile", "commercial"]),
+          sec("Should you tip?", 1917, "Tipping", [
+            "The video says tipping is not customary and staff may return money left behind.",
+            "Excellent service is framed as already included rather than something that requires a percentage calculation."
+          ]),
+          sec("Weather and natural disasters", 1932, "Hazards", [
+            "Earthquakes and related tsunami risk are the main concern; the video recommends learning what to do and optionally using an alert app such as Yurekuru Call or NERV.",
+            "Typhoons may affect travel from June to October, while rainy-season flooding and landslides are more relevant in rural or mountainous areas.",
+            "The creators discuss long-term Nankai Trough risk at length, but the dashboard treats their probability framing as a dated video claim, not current official guidance."
+          ], ["volatile"]),
+          sec("Safety and scams", 2063, "Safety", [
+            "Japan is described as exceptionally safe with low ordinary theft, but the video recounts a woman being deliberately struck in a public space and urges awareness of this type of targeted harassment.",
+            "Nightlife venues in Kabukicho and Dotonbori may add companionship, table or mystery fees after touts draw customers inside.",
+            "The practical advice is to understand the venue before entering rather than assuming a no-cover offer means a low final bill."
+          ], ["volatile"]),
+          sec("Other important things", 2261, "Etiquette", [
+            "Keep voices down on trains, behave modestly at shrines, carry rubbish until a proper bin is found and smoke only in designated areas.",
+            "The creators advise leaving a drone at home because of restrictions, and separately recommend Taito Station arcades as an enjoyable activity.",
+            "This catch-all chapter mixes high-value rules with optional entertainment, illustrating why a product should separate obligations from inspiration."
+          ], ["volatile"])
+        ]
+      },
+      {
+        id: "Hst12ZP3oS8",
+        label: "🇪🇸 Barcelona",
+        destination: "Barcelona",
+        title: "10 things you should know BEFORE visiting Barcelona",
+        channel: "Patrick Guide Barcelona",
+        date: "22 Nov 2021",
+        duration: "7:56",
+        sections: [
+          sec("When is the best time to visit?", 0, "Timing", [
+            "High season is described as May to mid-September, with the largest crowds in June, July and August.",
+            "The creator recommends late May or early October for beach and terrace weather with fewer tourists and a more local feel."
+          ], ["volatile"]),
+          sec("Is Barcelona a safe city?", 47, "Safety", [
+            "Barcelona is described as safe overall, with pickpocketing the main issue in crowded metro stations and on La Rambla.",
+            "Keep phones and wallets in front pockets, wear bags in front, secure bags on terraces, and consider carrying a passport copy while leaving the original at the hotel."
+          ], ["volatile"]),
+          sec("Reserve tickets ahead of time", 97, "Booking", [
+            "Popular attractions can sell out, and online booking may save both queue time and money compared with buying at the door.",
+            "Park Güell is used as the example where traveling out of the center without a ticket can waste significant time if entry is unavailable."
+          ], ["volatile", "commercial"]),
+          sec("Getting around Barcelona", 133, "Transport", [
+            "Walking is the creator's first recommendation because the city is manageable.",
+            "Buses, metro, trams and trains share a Zone 1 ticket with free transfers; the video says the metro usually closes at midnight but runs all night Saturday, with night buses daily.",
+            "Taxis are presented as affordable; the 2021 video says Uber was not allowed at that time."
+          ], ["volatile"]),
+          sec("Eating times in Barcelona", 181, "Food culture", [
+            "Breakfast is typically light, while lunch is the largest meal and restaurants begin serving around 13:30 through roughly 16:30.",
+            "A menú del día is recommended as an economical set meal; the video quotes about €10–15 at the time.",
+            "Dinner commonly happens around 21:00 or 22:00, and some strong restaurant options do not open until 19:00."
+          ], ["volatile"]),
+          sec("Tipping in Barcelona", 237, "Tipping", [
+            "There is no fixed tipping rule and many people leave nothing, but a good restaurant experience might be rewarded by rounding up or leaving up to about 10%.",
+            "Other services are left to the traveler's discretion; the creator specifically says tour guides should be tipped."
+          ]),
+          sec("How much money should I bring?", 277, "Money", [
+            "Visa and Mastercard are described as widely accepted, with American Express and Discover appearing more often, but some cash is still useful.",
+            "Avoid airport currency exchange, ask whether your home bank partners with a Spanish bank to reduce withdrawal fees, and choose euros when a terminal offers currency conversion."
+          ], ["volatile"]),
+          sec("What if I do not know Spanish?", 314, "Language", [
+            "English is common in the tourist center, so visitors can manage without Spanish, although basic phrases are encouraged.",
+            "Catalan is often the primary written language; many signs also include Spanish and English.",
+            "Trying a little Catalan is framed as a considerate way to connect with locals."
+          ]),
+          sec("Best day trips from Barcelona", 387, "Discovery", [
+            "The creator splits day trips into city/history choices and scenic choices.",
+            "Girona and Tarragona represent medieval and Roman city trips; Montserrat and Costa Brava towns represent the scenic route.",
+            "Rail connections are presented as making these trips relatively easy."
+          ], ["commercial"]),
+          sec("Siesta in Barcelona", 435, "Closures", [
+            "Central tourist shops often stay open through the afternoon, so the classic siesta closure is less visible in the center.",
+            "Outside the center, shops may close roughly 14:00–16:00, and most stores are described as closed on Sundays.",
+            "The practical takeaway is to plan urgent shopping away from Sunday and mid-afternoon."
+          ], ["volatile"])
+        ]
+      }
+    ];
+
+    const analysisMarkup = `
+      <section class="analysis">
+        <div class="analysis-hero">
+          <div class="analysis-title">
+            <p class="eyebrow">Cross-video synthesis</p>
+            <h2>A reusable skeleton is visible. The corpus is not yet diverse enough to call it universal.</h2>
+            <p>Across the seven guides, the recurring job is not “tell me facts.” It is “remove the small uncertainties that could make me lose money, waste time, feel rude, get stranded, or feel unsafe.” That is a strong foundation for KBYG. But six videos come from one channel, so repeated topics partly reflect one creator's template rather than independent traveler demand.</p>
+          </div>
+          <aside class="verdict">
+            <small>Corpus verdict</small>
+            <strong>Enough to prototype the ontology; not enough to freeze it.</strong>
+            <p>Use these videos to define a first modular system, then test saturation with more creators, city formats and traveler types.</p>
+          </aside>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>7</b><span>source videos</span></div>
+          <div class="stat"><b>4h 00m</b><span>captioned material</span></div>
+          <div class="stat"><b>6 : 1</b><span>videos from dominant vs. other creator</span></div>
+          <div class="stat"><b>5 + 2</b><span>country-level + city-level guides</span></div>
+        </div>
+
+        <section class="analysis-section">
+          <h3>The common editorial recipe</h3>
+          <p class="section-intro">The long guides repeatedly move from “Can I enter and afford this?” toward “How do I function there?” and finish with risk, etiquette and recommendations. Barcelona compresses the same job into ten high-impact city decisions.</p>
+          <div class="theme-grid">
+            <article class="theme-card"><span class="num">01</span><h4>Orient the trip</h4><p>Entry point, visa, timing, packing, stay length and accommodation establish whether the trip is feasible and how it should be shaped.</p></article>
+            <article class="theme-card"><span class="num">02</span><h4>Remove transaction anxiety</h4><p>Currency, where to get cash, card acceptance, dynamic conversion, daily budget and tipping answer “How do I pay without being caught out?”</p></article>
+            <article class="theme-card"><span class="num">03</span><h4>Teach local movement</h4><p>Apps, public transport, taxis, ferries, road-crossing behavior, driving documents and traffic turn maps into practical decisions.</p></article>
+            <article class="theme-card"><span class="num">04</span><h4>Prevent social mistakes</h4><p>Language, meal times, religious etiquette, queues, noise, shoes, holidays, siesta and other local norms make the advice feel “insider.”</p></article>
+            <article class="theme-card"><span class="num">05</span><h4>Protect the traveler</h4><p>Water, pharmacies, insurance, weather, disasters, scams and concrete safety behaviors address low-frequency but high-consequence worries.</p></article>
+            <article class="theme-card"><span class="num">06</span><h4>End with judgment</h4><p>“Do this,” “stay here,” and “skip that” convert neutral information into a confident point of view—the part most worth emulating editorially.</p></article>
+          </div>
+        </section>
+
+        <section class="analysis-section">
+          <h3>Theme coverage</h3>
+          <p class="section-intro">This matrix records whether a theme has its own named chapter (●), appears inside another chapter (◐), or is absent (—). It measures editorial presence, not whether a claim is true today.</p>
+          <div class="matrix-wrap">
+            <table>
+              <thead><tr><th>Theme</th><th>Greece</th><th>Vietnam</th><th>Cape Town</th><th>Thailand</th><th>Mexico</th><th>Japan</th><th>Barcelona</th></tr></thead>
+              <tbody>
+                <tr><td>Arrival & entry rules</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">—</td></tr>
+                <tr><td>When to go</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Packing</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">—</td></tr>
+                <tr><td>Cash, cards & exchange</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Daily budget</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="partial">◐</td></tr>
+                <tr><td>Accommodation</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">—</td></tr>
+                <tr><td>Local transport</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Language & culture</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Food / eating rhythm</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Apps & connectivity</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">—</td></tr>
+                <tr><td>Health / pharmacy</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">—</td></tr>
+                <tr><td>Water & ice</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="partial">◐</td><td class="no">—</td></tr>
+                <tr><td>Tipping</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Safety & scams</td><td class="partial">◐</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td></tr>
+                <tr><td>Weather / hazards</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="no">—</td></tr>
+                <tr><td>Do / stay / skip</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="partial">◐</td></tr>
+                <tr><td>Day-to-day friction</td><td class="partial">◐</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td class="partial">◐</td><td class="yes">●</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="matrix-key"><span><b class="yes">●</b> dedicated chapter</span><span><b class="partial">◐</b> embedded mention</span><span><b class="no">—</b> absent</span></div>
+        </section>
+
+        <section class="analysis-section">
+          <h3>Stable core vs. destination triggers</h3>
+          <p class="section-intro">A generalizable feature should not generate the same 25 cards everywhere. It needs a small dependable core, then conditional modules activated by the destination and the traveler's context.</p>
+          <div class="split">
+            <article class="list-card">
+              <h4>Always consider</h4>
+              <ul>
+                <li>Entry status and required pre-arrival actions</li>
+                <li>When to go, closures and crowd trade-offs</li>
+                <li>Money: cash, card, exchange, tipping and realistic costs</li>
+                <li>How to get around and which app or ticket actually matters</li>
+                <li>Communication, etiquette and meal rhythm</li>
+                <li>Connectivity, health access, safety and urgent risks</li>
+              </ul>
+            </article>
+            <article class="list-card coral">
+              <h4>Show only when triggered</h4>
+              <ul>
+                <li>Tap water / ice, malaria, altitude or pollution</li>
+                <li>Ferries, island hopping, motion sickness or rough-sea risk</li>
+                <li>Driving permits, left-side traffic, tolls or rental scams</li>
+                <li>Power cuts, plug type, weak internet or local payment QR systems</li>
+                <li>Religious dress, onsen rules, monarchy laws or Sunday closures</li>
+                <li>Earthquake, tsunami, wildfire, hurricane or burning season</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="analysis-section">
+          <h3>Recommended KBYG content model</h3>
+          <p class="section-intro">The strongest abstraction is a decision brief, not a destination encyclopedia. The system owns the taxonomy; destination data determines which modules are relevant; user context determines their order.</p>
+          <div class="blueprint">
+            <aside class="blueprint-rail"><h4>One card, one decision</h4><p>Each item should help the traveler do, avoid, choose or prepare for something. If a fact changes no decision, it probably belongs in Discover—not KBYG.</p></aside>
+            <div class="blueprint-body">
+              <div class="layers">
+                <div class="layer"><b>1 · Decision</b><p>A direct headline: “Carry some cash,” “Reserve Park Güell,” “Do not tip,” or “Use trains, not a rental car.”</p></div>
+                <div class="layer"><b>2 · Why it matters</b><p>The consequence in one sentence: lost time, extra fees, social friction, access failure or safety exposure.</p></div>
+                <div class="layer"><b>3 · What to do</b><p>Concrete steps, amount, app, timing, neighborhood or fallback—not generic prose.</p></div>
+                <div class="layer"><b>4 · Conditions</b><p>Who, when and where it applies: passport, season, trip length, mobility, transport mode, dietary needs and risk tolerance.</p></div>
+                <div class="layer"><b>5 · Trust layer</b><p>Source, verification date, volatility, confidence and a visible distinction between official rule, practical consensus and personal judgment.</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="callout"><strong>Important separation:</strong> use the videos to learn what questions travelers value and how creators explain them. Do not use old captions as the production source of truth for visas, prices, apps, transport schedules, laws or health guidance.</div>
+        </section>
+
+        <section class="analysis-section">
+          <h3>Major biases to design around</h3>
+          <div class="split">
+            <article class="list-card coral"><h4>Corpus problems</h4><ul>
+              <li><strong>Creator monoculture:</strong> six of seven videos reuse one channel's own template and voice.</li>
+              <li><strong>Affiliate contamination:</strong> insurance, VPN, eSIM, booking and activity links are often embedded inside “must-have” advice.</li>
+              <li><strong>Mixed evidence:</strong> official-sounding rules, personal anecdotes, hearsay and recommendations are presented with similar confidence.</li>
+              <li><strong>Scope mismatch:</strong> country guides blend national rules with one city or island experience; Barcelona is the only compact city-first guide.</li>
+              <li><strong>Recency risk:</strong> the corpus spans 2021–2025, and several quoted prices, transport rules and entry requirements are time-sensitive.</li>
+            </ul></article>
+            <article class="list-card"><h4>Product safeguards</h4><ul>
+              <li>Model topic importance separately from factual truth.</li>
+              <li>Label country, city and neighborhood scope on every claim.</li>
+              <li>Require current authoritative sources for volatile fields.</li>
+              <li>Mark recommendations as judgment and explain the traveler fit.</li>
+              <li>Detect or exclude sponsored recommendations from neutral ranking.</li>
+              <li>Prefer “not relevant” over filling every category with weak content.</li>
+            </ul></article>
+          </div>
+        </section>
+
+        <section class="analysis-section">
+          <h3>Do you need more videos?</h3>
+          <p class="section-intro"><strong>Yes.</strong> The next batch should maximize difference, not add more videos with the same chapter template. A practical next milestone is roughly 15–25 videos across 8–12 creators, reviewed until new sources stop adding important categories or decision patterns.</p>
+          <div class="corpus-grid">
+            <article class="corpus-item"><b>More city weekends</b><span>Paris, Tokyo, Marrakech, New York and a smaller city; test what survives when the trip is only 2–4 days.</span></article>
+            <article class="corpus-item"><b>Local voices</b><span>Resident guides and non-English creators; reduce the Western visitor and affiliate lens.</span></article>
+            <article class="corpus-item"><b>Traveler segments</b><span>Family, solo women, LGBTQ+, older travelers, disability and dietary-needs perspectives.</span></article>
+            <article class="corpus-item"><b>Different trip mechanics</b><span>Road trips, car-free cities, cruises, islands, ski trips, rural travel and multi-country routes.</span></article>
+            <article class="corpus-item"><b>Different constraint levels</b><span>Visa-heavy destinations, conservative cultures, high-cost cities, low-connectivity regions and hazard-prone areas.</span></article>
+            <article class="corpus-item"><b>Different formats</b><span>Five-minute checklists, deep-dive practical guides, mistake videos, local etiquette guides and neighborhood explainers.</span></article>
+          </div>
+          <div class="callout"><strong>Stop rule:</strong> after every 3–5 additional videos, record only genuinely new categories, triggers or card structures. When two consecutive batches add almost none, the ontology is approaching useful saturation.</div>
+        </section>
+
+        <section class="analysis-section">
+          <h3>The key product insight</h3>
+          <div class="analysis-title">
+            <p>The videos feel helpful because they do editorial prioritization on the traveler's behalf. KBYG should do the same: not expose a giant checklist, but select the few decisions most likely to change this particular person's trip. The destination determines what can matter; the traveler context determines what deserves attention now.</p>
+          </div>
+        </section>
+
+        <p class="footer-note">Method note: category names follow the videos' published chapter structures wherever available. Bullets are concise paraphrases of the caption track, not independent fact checks. “Commercial” marks sections containing a sponsor, affiliate link, paid product or the creator's own paid resource. Analysis statements are cross-video inference and intentionally appear only in this tab.</p>
+      </section>`;
+
+    const tabRoot = document.getElementById("tabs");
+    const app = document.getElementById("app");
+    let active = 0;
+
+    const fmt = seconds => {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    };
+
+    const sourceUrl = (id, at = 0) => `https://www.youtube.com/watch?v=${id}&t=${at}s`;
+    const slug = value => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+    function buildTabs() {
+      tabRoot.innerHTML = "";
+      [...videos, { label: "Analysis", analysis: true }].forEach((video, index) => {
+        const button = document.createElement("button");
+        button.className = `tab${video.analysis ? " analysis-tab" : ""}`;
+        button.type = "button";
+        button.role = "tab";
+        button.setAttribute("aria-selected", String(index === active));
+        button.textContent = video.label;
+        button.addEventListener("click", () => {
+          active = index;
+          buildTabs();
+          render();
+          window.scrollTo({ top: document.querySelector(".tabs-wrap").offsetTop, behavior: "smooth" });
+        });
+        tabRoot.appendChild(button);
+      });
+    }
+
+    function renderVideo(video) {
+      const chapters = video.sections.map((section, index) => {
+        const id = `${slug(video.destination)}-${index}-${slug(section.title)}`;
+        const flags = section.flags.map(flag => `<span class="flag ${flag}">${flag === "volatile" ? "time-sensitive" : "commercial / affiliate"}</span>`).join("");
+        const bullets = section.bullets.map(bullet => `<li>${bullet}<a class="timestamp" href="${sourceUrl(video.id, section.at)}" target="_blank" rel="noreferrer" aria-label="Open ${section.title} at ${fmt(section.at)}">↗ ${fmt(section.at)}</a></li>`).join("");
+        return `<details class="chapter" id="${id}" data-search="${(section.title + " " + section.domain + " " + section.bullets.join(" ")).toLowerCase()}" ${index === 0 ? "open" : ""}>
+          <summary><div class="chapter-title"><h3>${section.title}</h3><span class="domain">${section.domain}</span></div><span class="chevron">+</span></summary>
+          <div class="chapter-body">${flags ? `<div class="flags">${flags}</div>` : ""}<ul class="notes">${bullets}</ul></div>
+        </details>`;
+      }).join("");
+
+      const sideLinks = video.sections.map((section, index) => {
+        const id = `${slug(video.destination)}-${index}-${slug(section.title)}`;
+        return `<button class="side-link" type="button" data-target="${id}"><span class="side-time">${fmt(section.at)}</span><span>${section.title}</span></button>`;
+      }).join("");
+
+      app.innerHTML = `
+        <section>
+          <header class="video-hero">
+            <div><span class="video-kicker">${video.destination} · ${video.sections.length} categories</span><h2>${video.title}</h2><div class="video-meta"><span>${video.channel}</span><span>Published ${video.date}</span><span>${video.duration}</span><span>Auto-captions normalized</span></div></div>
+            <a class="source-button" href="${sourceUrl(video.id)}" target="_blank" rel="noreferrer">Watch source ↗</a>
+          </header>
+          <div class="workspace">
+            <aside class="sidebar"><input class="search" id="search" type="search" placeholder="Filter categories or notes…" aria-label="Filter categories"><p class="side-label">Original video categories</p><div class="side-links">${sideLinks}</div></aside>
+            <section class="content"><ul class="legend"><li><span class="transcript"></span>Transcript-backed paraphrase</li><li><span class="volatile"></span>Time-sensitive claim</li><li><span class="commercial"></span>Commercial influence</li></ul><div id="chapters">${chapters}</div><div class="empty" id="empty" hidden>No matching category or note.</div></section>
+          </div>
+        </section>`;
+
+      document.querySelectorAll(".side-link").forEach(button => button.addEventListener("click", () => {
+        const target = document.getElementById(button.dataset.target);
+        target.hidden = false;
+        target.open = true;
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }));
+
+      document.getElementById("search").addEventListener("input", event => {
+        const query = event.target.value.trim().toLowerCase();
+        let visible = 0;
+        document.querySelectorAll(".chapter").forEach(chapter => {
+          const match = !query || chapter.dataset.search.includes(query);
+          chapter.hidden = !match;
+          if (match) visible++;
+        });
+        document.getElementById("empty").hidden = visible !== 0;
+      });
+    }
+
+    function render() {
+      if (active === videos.length) app.innerHTML = analysisMarkup;
+      else renderVideo(videos[active]);
+    }
+
+    buildTabs();
+    render();
+  </script>
+</body>
+</html>

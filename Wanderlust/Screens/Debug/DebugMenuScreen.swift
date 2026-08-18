@@ -71,7 +71,7 @@ struct DebugMenuScreen: View {
                                 Text(row.costUSD.map(money) ?? "—")
                                     .font(.kanit(15))
                             }
-                            Text("\(row.model ?? "unknown model") · \(row.inputTokens) in / \(row.outputTokens) out")
+                            Text("\(row.model ?? "unknown model") · \(seconds(row.durationMs)) · \(row.inputTokens) in / \(row.outputTokens) out")
                                 .font(.kanit(12))
                                 .foregroundColor(Color(.systemGray))
                         }
@@ -126,6 +126,10 @@ struct DebugMenuScreen: View {
                 costs = .error(error)
             }
         }
+    }
+
+    private func seconds(_ ms: Int) -> String {
+        String(format: "%.1fs", Double(ms) / 1_000)
     }
 
     private func money(_ usd: Double) -> String {

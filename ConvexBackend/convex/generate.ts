@@ -472,6 +472,7 @@ export async function callGroupComponent(
       repairs: result.validation.repairs,
       providerAttempts: result.providerAttempts,
       webSearchCalls: result.webSearchCalls,
+      model: result.model,
     });
     return result;
   } catch (error) {

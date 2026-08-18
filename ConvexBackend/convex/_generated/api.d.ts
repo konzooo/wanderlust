@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as costs from "../costs.js";
 import type * as generate from "../generate.js";
 import type * as groupDeepDives from "../groupDeepDives.js";
 import type * as groupNearYou from "../groupNearYou.js";
@@ -35,6 +36,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  costs: typeof costs;
   generate: typeof generate;
   groupDeepDives: typeof groupDeepDives;
   groupNearYou: typeof groupNearYou;

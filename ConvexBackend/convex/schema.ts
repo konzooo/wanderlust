@@ -254,6 +254,8 @@ export default defineSchema({
     providerAttempts: v.optional(v.number()),
     /** Hosted web-search tool calls, absent for rows written before live discovery. */
     webSearchCalls: v.optional(v.number()),
+    /** Model billed. Absent on rows written before cost reporting existed. */
+    model: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_component", ["component", "createdAt"]),
 });

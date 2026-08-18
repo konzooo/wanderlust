@@ -247,6 +247,54 @@ final class GroupTripService {
             throw TripGenerationService.mapped(error)
         }
     }
+
+    /// Recent model calls with their computed cost. Debug reporting only —
+    /// nothing in the product reads this.
+    func recentCosts(limit: Int = 20) async throws -> [GenerationCostRow] {
+        // ConvexMobile exposes subscriptions rather than one-shot queries, so
+        // take the first emission and drop the subscription. Live updates would
+        // be noise here: the panel reports calls that already happened.
+        let publisher: AnyPublisher<[GenerationCostRow], ClientError> = client.subscribe(
+            to: "costs:recent",
+            with: ["limit": Double(limit)],
+            yielding: [GenerationCostRow].self
+        )
+        for try await rows in publisher.values { return rows }
+        return []
+    }
+}
+
+/// One recorded model call, priced. DEBUG surface only.
+struct GenerationCostRow: Decodable, Equatable, Identifiable, Sendable {
+    var id: Double { createdAtRaw }
+    let component: String
+    let mode: String
+    let model: String?
+    let errorCode: String?
+    private let inputTokensRaw: Double
+    private let cachedInputTokensRaw: Double
+    private let outputTokensRaw: Double
+    private let durationMsRaw: Double
+    private let webSearchCallsRaw: Double
+    private let createdAtRaw: Double
+    /// Nil where the row predates model recording or names an unpriced model.
+    let costUSD: Double?
+
+    var inputTokens: Int { Int(inputTokensRaw) }
+    var cachedInputTokens: Int { Int(cachedInputTokensRaw) }
+    var outputTokens: Int { Int(outputTokensRaw) }
+    var webSearchCalls: Int { Int(webSearchCallsRaw) }
+    var createdAt: Date { Date(timeIntervalSince1970: createdAtRaw / 1_000) }
+
+    private enum CodingKeys: String, CodingKey {
+        case component, mode, model, errorCode, costUSD
+        case inputTokensRaw = "inputTokens"
+        case cachedInputTokensRaw = "cachedInputTokens"
+        case outputTokensRaw = "outputTokens"
+        case durationMsRaw = "durationMs"
+        case webSearchCallsRaw = "webSearchCalls"
+        case createdAtRaw = "createdAt"
+    }
 }
 
 protocol GroupDeepDiveGenerating {

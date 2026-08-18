@@ -165,6 +165,7 @@ export const generateComponent = action({
         repairs: result.validation.repairs,
         providerAttempts: result.providerAttempts,
         webSearchCalls: result.webSearchCalls,
+        model: result.model,
       });
       if (reservation.slotId) {
         await ctx.runMutation(internal.quota.commitReservation, {

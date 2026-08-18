@@ -13,6 +13,7 @@ import SwiftUI
 struct DebugMenuScreen: View {
     @AppStorage(DebugSettings.useMockTripDataKey) private var useMockTripData = false
     @State private var didResetOnboarding = false
+    @State private var costs: AsyncValue<[GenerationCostRow]> = .initial
 
     var body: some View {
         List {
@@ -52,6 +53,38 @@ struct DebugMenuScreen: View {
             }
 
             Section {
+                switch costs {
+                case .initial, .loading:
+                    HStack { ProgressView(); Text("Loading").font(.kanit(13)) }
+                case .error:
+                    Text("Couldn't load spend").font(.kanit(13)).foregroundColor(.red)
+                case let .loaded(rows) where rows.isEmpty:
+                    Text("No model calls recorded yet")
+                        .font(.kanit(13))
+                        .foregroundColor(Color(.systemGray))
+                case let .loaded(rows):
+                    ForEach(rows.prefix(5)) { row in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(row.component).font(.kanit(15).weight(.medium))
+                                Spacer()
+                                Text(row.costUSD.map(money) ?? "—")
+                                    .font(.kanit(15))
+                            }
+                            Text("\(row.model ?? "unknown model") · \(row.inputTokens) in / \(row.outputTokens) out")
+                                .font(.kanit(12))
+                                .foregroundColor(Color(.systemGray))
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } header: {
+                Text("Recent model calls")
+            } footer: {
+                Text("Rates are hand-maintained in costs.ts and drift as OpenAI's prices change, so read this for comparison between components rather than as a bill. A dash means the row predates model recording or names a model with no rate.")
+            }
+
+            Section {
                 Button(action: resetOnboarding) {
                     Label(
                         didResetOnboarding ? "Onboarding reset" : "Reset onboarding",
@@ -84,6 +117,21 @@ struct DebugMenuScreen: View {
         }
         .navigationTitle("Debug Menu")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard case .initial = costs else { return }
+            costs = .loading
+            do {
+                costs = .loaded(try await GroupTripService.shared.recentCosts())
+            } catch {
+                costs = .error(error)
+            }
+        }
+    }
+
+    private func money(_ usd: Double) -> String {
+        // Sub-cent calls are the normal case now, so two decimal places would
+        // render almost every row as "$0.00".
+        usd < 0.01 ? String(format: "%.4f USD", usd) : String(format: "%.2f USD", usd)
     }
 
     private func percent(_ value: Double) -> String {

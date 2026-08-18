@@ -153,6 +153,8 @@ export const recordTelemetry = internalMutation({
     providerAttempts: v.optional(v.number()),
     /** Paid hosted-search actions reported by the Near You call. */
     webSearchCalls: v.optional(v.number()),
+    /** Model billed, so cost is computed from what actually ran. */
+    model: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("generationTelemetry", { ...args, createdAt: Date.now() });

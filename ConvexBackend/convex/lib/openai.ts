@@ -61,6 +61,13 @@ export type OpenAIResult = {
   webSources: OpenAIWebSource[];
   /** Paid search actions reported by the provider, retained for spend telemetry. */
   webSearchCalls: number;
+  /**
+   * The model actually billed. Recorded rather than re-derived from the
+   * component later, because component→model routing changes over time and a
+   * cost figure computed from today's routing would silently misprice every
+   * historical row.
+   */
+  model: string;
 };
 
 /**
@@ -160,7 +167,14 @@ export async function callOpenAI(args: {
 
   const webSources = extractWebSources(json);
   const webSearchCalls = countWebSearchCalls(json);
-  return { data, usage, durationMs, webSources, webSearchCalls };
+  return {
+    data,
+    usage,
+    durationMs,
+    webSources,
+    webSearchCalls,
+    model: args.model ?? OPENAI_MODEL,
+  };
 }
 
 /** Pure request construction keeps privacy and cost controls regression-testable. */

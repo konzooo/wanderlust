@@ -2,7 +2,7 @@
 //  KnowBeforeYouGoView.swift
 //  Wanderlust
 //
-//  The practical half of a destination, grouped into its four buckets.
+//  The practical half of a destination, grouped into stable buckets.
 //
 
 import CoreArchitecture
@@ -13,7 +13,7 @@ import SwiftUI
 /// Know Before You Go.
 ///
 /// Reads as a table of contents, not as a feed. Twelve sections of real prose
-/// laid out flat is a scroll nobody finishes; collapsed under their four buckets
+/// laid out flat is a scroll nobody finishes; collapsed under their categories
 /// the whole briefing fits on one or two screens and the traveller opens the
 /// three things they actually care about. There is no heart anywhere — this is
 /// reference, and "how people pay in Barcelona" is not something anyone wants a
@@ -160,7 +160,7 @@ private struct BucketView: View {
                         .fill(Color.appTint.opacity(0.14))
                 )
 
-            Text(group.bucket.title)
+            Text(group.title)
                 .font(DS.Typography.sectionHeader)
                 .foregroundStyle(.primary)
 
@@ -229,10 +229,12 @@ private struct SectionRow: View {
 
     private func expandedBody(for section: Trip.KnowBeforeYouGo.Section) -> some View {
         VStack(alignment: .leading, spacing: .Spacing.small) {
-            Text(section.linkableBody.linkedText)
-                .font(DS.Typography.generatedBody)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !section.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(section.linkableBody.linkedText)
+                    .font(DS.Typography.generatedBody)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if !section.bullets.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {

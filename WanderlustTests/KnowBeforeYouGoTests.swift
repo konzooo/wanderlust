@@ -3,7 +3,7 @@ import CoreModels
 import XCTest
 @testable import Wanderlust
 
-/// Know Before You Go v1.
+/// Know Before You Go.
 ///
 /// Two things are worth testing here and the rest is layout. First, the
 /// persistence contract every component shares: a trip saved before the
@@ -79,6 +79,8 @@ final class KnowBeforeYouGoTests: XCTestCase {
         """)
 
         XCTAssertEqual(briefing.sections.count, 1)
+        XCTAssertEqual(briefing.sections[0].topic, .other, "Old payloads predate stable topic IDs")
+        XCTAssertNil(briefing.sections[0].bucketTitle)
         XCTAssertEqual(briefing.sections[0].bullets, ["Keep €20 for market stalls"])
         XCTAssertEqual(briefing.sections[0].locations?.count, 0)
     }
@@ -201,9 +203,62 @@ final class KnowBeforeYouGoTests: XCTestCase {
             .init(bucket: .money, title: "Cards", body: "Everywhere.")
         ])
 
-        XCTAssertEqual(briefing.groups.map(\.bucket), [.beforeYouLeave, .money, .onTheGround])
-        XCTAssertEqual(briefing.groups.last?.sections.count, 2, "Sections keep their order within a bucket")
-        XCTAssertEqual(briefing.groups.last?.sections.first?.title, "Meal times")
+        XCTAssertEqual(briefing.groups.map(\.bucket), [.beforeYouLeave, .onTheGround, .money])
+        let onTheGround = briefing.groups.first { $0.bucket == .onTheGround }
+        XCTAssertEqual(onTheGround?.sections.count, 2, "Sections keep their order within a bucket")
+        XCTAssertEqual(onTheGround?.sections.first?.title, "Meal times")
+    }
+
+    func testDestinationEssentialUsesItsGeneratedCategoryTitle() {
+        let briefing = Trip.KnowBeforeYouGo(sections: [
+            .init(
+                bucket: .destinationEssential,
+                topic: .destinationEssential,
+                bucketTitle: "Island hopping",
+                title: "Ferries shape the trip",
+                body: "",
+                bullets: ["Book the first crossing", "Leave weather slack"]
+            )
+        ])
+
+        XCTAssertEqual(briefing.groups.first?.title, "Island hopping")
+        XCTAssertEqual(briefing.groups.first?.bucket.title, "Destination essential")
+    }
+
+    func testNewTopicAndBucketTitleDecodeWhileUnknownTopicsDegrade() throws {
+        let known = try decodeBriefing("""
+        {
+          "sections": [
+            {
+              "bucket": "destinationEssential",
+              "topic": "destinationEssential",
+              "bucketTitle": "Altitude",
+              "title": "Acclimatise first",
+              "body": "Take the first day slowly.",
+              "bullets": ["Hydrate", "Sleep low if needed"],
+              "volatility": "stable",
+              "sourceLead": null, "source": null, "sourceURL": null,
+              "locations": []
+            },
+            {
+              "bucket": "culture",
+              "topic": "futureTopic",
+              "bucketTitle": null,
+              "title": "From a newer backend",
+              "body": "Still readable.",
+              "bullets": [],
+              "volatility": "stable",
+              "sourceLead": null, "source": null, "sourceURL": null,
+              "locations": []
+            }
+          ]
+        }
+        """)
+
+        XCTAssertEqual(known.sections[0].topic, .destinationEssential)
+        XCTAssertEqual(known.groups.first?.title, "Culture")
+        XCTAssertEqual(known.groups.last?.title, "Altitude")
+        XCTAssertEqual(known.sections[1].topic, .other)
     }
 
     /// A bucket this build doesn't know must not take the whole briefing down

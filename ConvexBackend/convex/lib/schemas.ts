@@ -188,12 +188,14 @@ export function suggestionsSchema(opts: {
 }
 
 /**
- * Know Before You Go v1 (§12 of the plan).
+ * Know Before You Go.
  *
- * Four buckets, 8–14 sections, six of them always present. The bucket is part
- * of the contract rather than something the app infers from the title: it is
- * what lets the sections be grouped under stable headings and what makes
- * "did the model cover all four" a checkable property.
+ * Eight buckets, with stable topic IDs for the fixed subcategories and a
+ * generated title only for the destination-essential bucket. `topic` is what
+ * lets validation distinguish "three transport modes" from three arbitrary
+ * rows without dictating how the model lays out each row's prose and bullets.
+ * The flat array is deliberate: old saved/shared KBYG payloads still decode,
+ * while the client can group both generations through the same path.
  *
  * `volatility` is the whole confidence mechanism. There is no global
  * disclaimer and no per-section badge: a `stable` section reads with full
@@ -207,7 +209,36 @@ export function suggestionsSchema(opts: {
  * official URL is worse than a named authority with no link, because the link
  * is the part a traveller would trust.
  */
-const KBYG_BUCKETS = ["beforeYouLeave", "money", "gettingAround", "onTheGround"];
+const KBYG_BUCKETS = [
+  "beforeYouLeave",
+  "onTheGround",
+  "money",
+  "gettingAround",
+  "culture",
+  "destinationEssential",
+  "healthAndSafety",
+  "otherTips",
+];
+
+const KBYG_TOPICS = [
+  "entryRequirements",
+  "arrivalTransport",
+  "monthPacking",
+  "simInternet",
+  "apps",
+  "electricity",
+  "onGroundWildcard",
+  "currencyExchange",
+  "costSnapshot",
+  "tipping",
+  "paymentMethods",
+  "localTransport",
+  "culture",
+  "language",
+  "destinationEssential",
+  "healthSafety",
+  "otherTips",
+];
 
 export const KNOW_BEFORE_YOU_GO_SCHEMA = obj(
   {
@@ -215,6 +246,8 @@ export const KNOW_BEFORE_YOU_GO_SCHEMA = obj(
       obj(
         {
           bucket: strEnum(KBYG_BUCKETS),
+          topic: strEnum(KBYG_TOPICS),
+          bucketTitle: nullableStr,
           title: str,
           body: str,
           bullets: arr(str),
@@ -226,6 +259,8 @@ export const KNOW_BEFORE_YOU_GO_SCHEMA = obj(
         },
         [
           "bucket",
+          "topic",
+          "bucketTitle",
           "title",
           "body",
           "bullets",

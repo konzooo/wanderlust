@@ -124,7 +124,12 @@ function repairLocations(
   if (!Array.isArray(locations)) return;
 
   const haystack = textFields
-    .map((field) => (typeof container[field] === "string" ? (container[field] as string) : ""))
+    .flatMap((field) => {
+      const value = container[field];
+      if (typeof value === "string") return [value];
+      if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === "string");
+      return [];
+    })
     .join(" \0 ")
     .toLowerCase();
 
@@ -255,6 +260,319 @@ function normaliseChip(label: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+// MARK: - Know Before You Go -------------------------------------------------
+
+/**
+ * Stable subcategory rules for KBYG.
+ *
+ * Word limits apply to `body` and every bullet together. The prompt is the
+ * first line of defence; this table is the product boundary underneath it so a
+ * verbose model run cannot turn one accordion row into half a screen. Layout
+ * remains the model's choice — prose, bullets, or both — and only the total is
+ * bounded here.
+ */
+const KBYG_RULES = {
+  entryRequirements: {
+    bucket: "beforeYouLeave",
+    min: 1,
+    max: 1,
+    words: 55,
+    minBullets: 0,
+    maxBullets: 1,
+  },
+  arrivalTransport: {
+    bucket: "beforeYouLeave",
+    min: 1,
+    max: 1,
+    words: 90,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  monthPacking: {
+    bucket: "beforeYouLeave",
+    min: 1,
+    max: 1,
+    words: 75,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  simInternet: {
+    bucket: "onTheGround",
+    min: 1,
+    max: 1,
+    words: 55,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  apps: {
+    bucket: "onTheGround",
+    min: 1,
+    max: 1,
+    words: 50,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  electricity: {
+    bucket: "onTheGround",
+    min: 1,
+    max: 1,
+    words: 30,
+    minBullets: 0,
+    maxBullets: 2,
+  },
+  onGroundWildcard: {
+    bucket: "onTheGround",
+    min: 1,
+    max: 1,
+    words: 60,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  currencyExchange: {
+    bucket: "money",
+    min: 1,
+    max: 1,
+    words: 40,
+    minBullets: 0,
+    maxBullets: 2,
+  },
+  costSnapshot: {
+    bucket: "money",
+    min: 1,
+    max: 1,
+    words: 100,
+    minBullets: 4,
+    maxBullets: 4,
+  },
+  tipping: {
+    bucket: "money",
+    min: 1,
+    max: 1,
+    words: 30,
+    minBullets: 0,
+    maxBullets: 1,
+  },
+  paymentMethods: {
+    bucket: "money",
+    min: 1,
+    max: 1,
+    words: 60,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  localTransport: {
+    bucket: "gettingAround",
+    min: 3,
+    max: 4,
+    words: 55,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  culture: {
+    bucket: "culture",
+    min: 3,
+    max: 3,
+    words: 55,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  language: {
+    bucket: "culture",
+    min: 1,
+    max: 1,
+    words: 75,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  destinationEssential: {
+    bucket: "destinationEssential",
+    min: 1,
+    max: 1,
+    words: 85,
+    minBullets: 2,
+    maxBullets: 3,
+  },
+  healthSafety: {
+    bucket: "healthAndSafety",
+    min: 1,
+    max: 3,
+    words: 65,
+    minBullets: 0,
+    maxBullets: 4,
+  },
+  otherTips: {
+    bucket: "otherTips",
+    min: 0,
+    max: 1,
+    words: 65,
+    minBullets: 2,
+    maxBullets: 3,
+  },
+} as const;
+
+export type KBYGTopic = keyof typeof KBYG_RULES;
+
+/** Exported for the evaluation harness and contract tests — one source only. */
+export const KBYG_WORD_LIMITS: Record<KBYGTopic, number> = Object.fromEntries(
+  Object.entries(KBYG_RULES).map(([topic, rule]) => [topic, rule.words]),
+) as Record<KBYGTopic, number>;
+
+export const KBYG_TOPIC_COUNTS: Record<KBYGTopic, { min: number; max: number }> =
+  Object.fromEntries(
+    Object.entries(KBYG_RULES).map(([topic, rule]) => [
+      topic,
+      { min: rule.min, max: rule.max },
+    ]),
+  ) as Record<KBYGTopic, { min: number; max: number }>;
+
+const KBYG_TOPIC_ORDER = Object.keys(KBYG_RULES) as KBYGTopic[];
+
+/**
+ * Repairs a KBYG response into the UI contract and rejects only when a required
+ * subcategory is absent. It never chooses content on the model's behalf.
+ */
+export function validateKnowBeforeYouGo(
+  data: unknown,
+  report: ValidationReport,
+): Record<string, unknown> {
+  if (!isRecord(data) || !Array.isArray(data.sections)) {
+    throw new ValidationError("invalid_know_before_you_go_shape");
+  }
+
+  const byTopic = new Map<KBYGTopic, Record<string, unknown>[]>();
+
+  for (const raw of data.sections) {
+    if (!isRecord(raw) || !nonEmptyString(raw.title) || !isKBYGTopic(raw.topic)) {
+      report.repairs += 1;
+      continue;
+    }
+
+    const topic = raw.topic;
+    const rule = KBYG_RULES[topic];
+    const body = typeof raw.body === "string" ? raw.body.trim() : "";
+    const bullets = Array.isArray(raw.bullets)
+      ? raw.bullets.filter(nonEmptyString).map((entry) => entry.trim())
+      : [];
+
+    if (!body && bullets.length === 0) {
+      report.repairs += 1;
+      continue;
+    }
+
+    const title = raw.title.trim();
+    raw.title = title.slice(0, 48);
+    if (title.length > 48) report.repairs += 1;
+    raw.body = body;
+    raw.bullets = bullets.slice(0, rule.maxBullets);
+    if (bullets.length > rule.maxBullets) report.repairs += 1;
+
+    if (raw.bucket !== rule.bucket) {
+      raw.bucket = rule.bucket;
+      report.repairs += 1;
+    }
+
+    if (topic === "destinationEssential") {
+      if (!nonEmptyString(raw.bucketTitle)) {
+        // The section title is the least surprising readable fallback. This is
+        // counted so prompt drift remains visible in telemetry.
+        raw.bucketTitle = raw.title;
+        report.repairs += 1;
+      } else {
+        const bucketTitle = raw.bucketTitle.trim();
+        raw.bucketTitle = bucketTitle.slice(0, 40);
+        if (bucketTitle.length > 40) report.repairs += 1;
+      }
+    } else if (raw.bucketTitle !== null) {
+      raw.bucketTitle = null;
+      report.repairs += 1;
+    }
+
+    clampKBYGWords(raw, rule.words, report);
+    repairLocations(raw, ["body", "bullets"], report);
+
+    const list = byTopic.get(topic) ?? [];
+    list.push(raw);
+    byTopic.set(topic, list);
+  }
+
+  const result: Record<string, unknown>[] = [];
+  const missing: string[] = [];
+
+  for (const topic of KBYG_TOPIC_ORDER) {
+    const rule = KBYG_RULES[topic];
+    const candidates = byTopic.get(topic) ?? [];
+
+    // "Other tips" is optional. If it appears without its promised compact
+    // list, discard the whole optional section rather than failing the brief.
+    const usable = candidates.filter((section) => {
+      const bulletCount = Array.isArray(section.bullets) ? section.bullets.length : 0;
+      return bulletCount >= rule.minBullets;
+    });
+    if (usable.length !== candidates.length) {
+      report.repairs += candidates.length - usable.length;
+    }
+
+    if (usable.length < rule.min) missing.push(topic);
+    if (usable.length > rule.max) report.repairs += usable.length - rule.max;
+    result.push(...usable.slice(0, rule.max));
+  }
+
+  if (missing.length > 0) {
+    throw new ValidationError(`incomplete_know_before_you_go:${missing.join(",")}`);
+  }
+
+  return { sections: result };
+}
+
+function isKBYGTopic(value: unknown): value is KBYGTopic {
+  return typeof value === "string" && value in KBYG_RULES;
+}
+
+function wordCount(value: string): number {
+  return value.trim() ? value.trim().split(/\s+/).length : 0;
+}
+
+function clipWords(value: string, maximum: number): string {
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maximum) return words.join(" ");
+  if (maximum <= 0) return "";
+  return `${words.slice(0, maximum).join(" ")}…`;
+}
+
+/** Preserves the chosen prose/bullet mix while fitting the combined ceiling. */
+function clampKBYGWords(
+  section: Record<string, unknown>,
+  maximum: number,
+  report: ValidationReport,
+): void {
+  const body = typeof section.body === "string" ? section.body : "";
+  const bullets = Array.isArray(section.bullets)
+    ? section.bullets.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const total = wordCount(body) + bullets.reduce((sum, bullet) => sum + wordCount(bullet), 0);
+  if (total <= maximum) return;
+
+  // When bullets exist, reserve a small useful share for each before clipping
+  // prose. This avoids a long introductory paragraph deleting the four cost
+  // anchors that make the section useful.
+  const reservedForBullets = bullets.length > 0 ? Math.min(maximum, bullets.length * 10) : 0;
+  const clippedBody = clipWords(body, Math.max(0, maximum - reservedForBullets));
+  let remaining = Math.max(0, maximum - wordCount(clippedBody));
+  const clippedBullets: string[] = [];
+
+  for (let index = 0; index < bullets.length; index += 1) {
+    const itemsLeft = bullets.length - index;
+    const allowance = Math.max(1, Math.floor(remaining / itemsLeft));
+    const clipped = clipWords(bullets[index], allowance);
+    if (clipped) clippedBullets.push(clipped);
+    remaining = Math.max(0, remaining - wordCount(clipped));
+  }
+
+  section.body = clippedBody;
+  section.bullets = clippedBullets;
+  report.repairs += 1;
 }
 
 // MARK: - Whole responses -----------------------------------------------------

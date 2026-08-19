@@ -12,8 +12,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   emptyReport,
+  KBYG_WORD_LIMITS,
   validateInterestPrompts,
   validateItinerary,
+  validateKnowBeforeYouGo,
   validateSuggestions,
   validateWhereToStay,
   validateWorthIt,
@@ -37,6 +39,55 @@ const area = (name: string, extra: Record<string, unknown> = {}) => ({
   locations: [],
   ...extra,
 });
+
+const kbygSection = (
+  topic: keyof typeof KBYG_WORD_LIMITS,
+  bucket: string,
+  extra: Record<string, unknown> = {},
+) => ({
+  bucket,
+  topic,
+  bucketTitle: topic === "destinationEssential" ? "Island logistics" : null,
+  title: topic,
+  body: `Useful ${topic} advice.`,
+  bullets:
+    topic === "costSnapshot"
+      ? ["Meal €12", "Ride €3", "Museum €10", "Rooms €50–150"]
+      : topic === "destinationEssential" || topic === "otherTips"
+        ? ["First practical point", "Second practical point"]
+        : [],
+  volatility: "stable",
+  sourceLead: null,
+  source: null,
+  sourceURL: null,
+  locations: [],
+  ...extra,
+});
+
+function validKBYGSections(): Record<string, unknown>[] {
+  return [
+    kbygSection("entryRequirements", "beforeYouLeave"),
+    kbygSection("arrivalTransport", "beforeYouLeave"),
+    kbygSection("monthPacking", "beforeYouLeave"),
+    kbygSection("simInternet", "onTheGround"),
+    kbygSection("apps", "onTheGround"),
+    kbygSection("electricity", "onTheGround"),
+    kbygSection("onGroundWildcard", "onTheGround"),
+    kbygSection("currencyExchange", "money"),
+    kbygSection("costSnapshot", "money"),
+    kbygSection("tipping", "money"),
+    kbygSection("paymentMethods", "money"),
+    kbygSection("localTransport", "gettingAround", { title: "Metro" }),
+    kbygSection("localTransport", "gettingAround", { title: "Bus" }),
+    kbygSection("localTransport", "gettingAround", { title: "Walking" }),
+    kbygSection("culture", "culture", { title: "Greetings" }),
+    kbygSection("culture", "culture", { title: "Dining rhythm" }),
+    kbygSection("culture", "culture", { title: "Public behavior" }),
+    kbygSection("language", "culture"),
+    kbygSection("destinationEssential", "destinationEssential"),
+    kbygSection("healthSafety", "healthAndSafety"),
+  ];
+}
 
 // MARK: - Best-effort count repair
 
@@ -174,6 +225,81 @@ test("a repaired prefix under three characters is refused", () => {
     emptyReport(),
   );
   assert.equal((items![0].locations as any[])[0].linkSubstring, "El, Somewhere");
+});
+
+// MARK: - Know Before You Go contract
+
+test("KBYG keeps the canonical topic order and repairs a mismatched bucket", () => {
+  const sections = validKBYGSections();
+  const payment = sections.find((section) => section.topic === "paymentMethods")!;
+  payment.bucket = "culture";
+  const report = emptyReport();
+
+  const validated = validateKnowBeforeYouGo({ sections: sections.reverse() }, report);
+  const result = validated.sections as Record<string, unknown>[];
+
+  assert.equal(result.length, 20);
+  assert.deepEqual(
+    result.slice(0, 4).map((section) => section.topic),
+    ["entryRequirements", "arrivalTransport", "monthPacking", "simInternet"],
+  );
+  assert.equal(
+    result.find((section) => section.topic === "paymentMethods")!.bucket,
+    "money",
+  );
+  assert.equal(report.repairs, 1);
+});
+
+test("KBYG enforces one combined word ceiling without choosing the content shape", () => {
+  const sections = validKBYGSections();
+  const arrival = sections.find((section) => section.topic === "arrivalTransport")!;
+  arrival.body = Array.from({ length: 90 }, (_, index) => `body${index}`).join(" ");
+  arrival.bullets = ["one two three four five six seven eight nine ten eleven twelve"];
+  const report = emptyReport();
+
+  const validated = validateKnowBeforeYouGo({ sections }, report);
+  const result = (validated.sections as Record<string, unknown>[]).find(
+    (section) => section.topic === "arrivalTransport",
+  )!;
+  const content = [result.body, ...(result.bullets as string[])]
+    .join(" ")
+    .trim()
+    .split(/\s+/);
+
+  assert.ok(content.length <= KBYG_WORD_LIMITS.arrivalTransport);
+  assert.notEqual(result.body, "", "the model's prose-plus-bullets shape is retained");
+  assert.equal((result.bullets as string[]).length, 1);
+  assert.equal(report.repairs, 1);
+});
+
+test("KBYG rejects a missing required topic instead of rendering a structurally incomplete brief", () => {
+  const sections = validKBYGSections().filter(
+    (section) => section.topic !== "currencyExchange",
+  );
+
+  assert.throws(
+    () => validateKnowBeforeYouGo({ sections }, emptyReport()),
+    (error: unknown) =>
+      error instanceof ValidationError &&
+      error.code === "incomplete_know_before_you_go:currencyExchange",
+  );
+});
+
+test("KBYG drops an under-specified optional Other tips section", () => {
+  const report = emptyReport();
+  const sections = [
+    ...validKBYGSections(),
+    kbygSection("otherTips", "otherTips", { bullets: ["Only one"] }),
+  ];
+
+  const validated = validateKnowBeforeYouGo({ sections }, report);
+  assert.equal(
+    (validated.sections as Record<string, unknown>[]).some(
+      (section) => section.topic === "otherTips",
+    ),
+    false,
+  );
+  assert.equal(report.repairs, 1);
 });
 
 // MARK: - Whole responses

@@ -31,6 +31,7 @@ import {
   emptyReport,
   validateDeepDive,
   validateItinerary,
+  validateKnowBeforeYouGo,
   validateNearYou,
   NEAR_YOU_MAX_PROPOSALS,
   validateSuggestions,
@@ -165,13 +166,11 @@ export const COMPONENTS: Record<Component, ComponentSpec> = {
   knowBeforeYouGo: {
     schema: KNOW_BEFORE_YOU_GO_SCHEMA,
     schemaName: "know_before_you_go_schema",
-    // Measured, not estimated: the six §13 evaluation cases (see
-    // `tools/kbyg-eval.ts` and the fixtures beside it) produce 9–12 sections at
-    // 944–1,522 output tokens. The ceiling sits well above that on purpose —
-    // truncation is not a short answer here, it is a hard strict-decode failure
-    // — and a cap costs nothing when it is not reached. Re-derive it from the
-    // `incomplete_` rate in real telemetry, never from arithmetic.
-    maxOutputTokens: 6_144,
+    // KBYG now carries 20–24 tightly word-bounded subcategories. The ceiling
+    // is headroom, not a length target: truncation is a hard strict-decode
+    // failure, while unused output allowance is not billed. Re-measure this
+    // with `tools/kbyg-eval.ts` before lowering it.
+    maxOutputTokens: 8_192,
     required: false,
     perTripCap: null,
   },
@@ -419,9 +418,7 @@ function validate(
     case "deepDive":
       return validateDeepDive(data, report);
     case "knowBeforeYouGo":
-      // KBYG's conditional stable/verify rule is resolved by CoreModels after
-      // decode; the strict schema already owns its backend shape.
-      return data;
+      return validateKnowBeforeYouGo(data, report);
     case "worthIt":
       return validateWorthItResponse(data, report);
     case "whereToStay":

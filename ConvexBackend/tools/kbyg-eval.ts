@@ -1,11 +1,12 @@
 /**
  * Know Before You Go — evaluation harness (§13).
  *
- * One Barcelona generation proves nothing, and the specific thing §12 asks to
- * be checked before v1 is called done is the **stable/verify ratio**: the
- * prompt pushes hard against over-hedging, and the failure mode is a model that
- * flags everything as needing verification, which is a global disclaimer wearing
- * a different hat.
+ * One Barcelona generation proves nothing. The current contract needs a
+ * destination-diverse check of its seven required buckets plus optional eighth,
+ * stable topic counts,
+ * per-subcategory word ceilings, flexible content shapes and stable/verify
+ * ratio. The failure modes are structural drift and a global disclaimer
+ * disguised as section-level caution.
  *
  * This imports the REAL prompt and schema from `convex/lib`. An eval against a
  * copy-pasted prompt measures a copy of the prompt, which is exactly the drift
@@ -24,6 +25,11 @@ import { join } from "node:path";
 
 import { COMPONENTS } from "../convex/lib/components";
 import { callOpenAI, OPENAI_MODEL } from "../convex/lib/openai";
+import {
+  KBYG_TOPIC_COUNTS,
+  KBYG_WORD_LIMITS,
+  type KBYGTopic,
+} from "../convex/lib/validation";
 import {
   buildSystemPrompt,
   buildUserMessage,
@@ -63,6 +69,12 @@ const CASES: Case[] = [
         durationDays: 4,
         startMonth: "may",
         answers: answers("lbbllbb"),
+        profile: {
+          scaleAnswers: [],
+          usuallySkip: [],
+          mustHaves: [],
+          passport: "DE",
+        },
       },
     },
   },
@@ -145,6 +157,8 @@ const CASES: Case[] = [
 
 type Section = {
   bucket: string;
+  topic: KBYGTopic;
+  bucketTitle: string | null;
   title: string;
   body: string;
   bullets: string[];
@@ -179,22 +193,51 @@ const HEDGES = [
 
 function scoreSections(sections: Section[]) {
   const byBucket: Record<string, number> = {};
+  const byTopic: Record<string, number> = {};
   for (const s of sections) byBucket[s.bucket] = (byBucket[s.bucket] ?? 0) + 1;
+  for (const s of sections) byTopic[s.topic] = (byTopic[s.topic] ?? 0) + 1;
 
   const verify = sections.filter((s) => s.volatility === "verify");
   const stable = sections.filter((s) => s.volatility === "stable");
+  const wordBudgetViolations = sections
+    .filter((s) => sectionWordCount(s) > KBYG_WORD_LIMITS[s.topic])
+    .map((s) => ({
+      topic: s.topic,
+      title: s.title,
+      actual: sectionWordCount(s),
+      maximum: KBYG_WORD_LIMITS[s.topic],
+    }));
+  const proseOnly = sections.filter((s) => !!s.body.trim() && s.bullets.length === 0).length;
+  const bulletsOnly = sections.filter((s) => !s.body.trim() && s.bullets.length > 0).length;
+  const mixed = sections.filter((s) => !!s.body.trim() && s.bullets.length > 0).length;
+  const topicCountViolations = Object.entries(KBYG_TOPIC_COUNTS)
+    .filter(([topic, count]) => {
+      const actual = byTopic[topic] ?? 0;
+      return actual < count.min || actual > count.max;
+    })
+    .map(([topic, count]) => ({ topic, actual: byTopic[topic] ?? 0, ...count }));
 
   return {
     sectionCount: sections.length,
-    inRange: sections.length >= 8 && sections.length <= 14,
+    inRange: sections.length >= 20 && sections.length <= 24,
     byBucket,
-    allFourBucketsCovered:
-      ["beforeYouLeave", "money", "gettingAround", "onTheGround"].every(
+    byTopic,
+    topicCountViolations,
+    allRequiredBucketsCovered:
+      [
+        "beforeYouLeave",
+        "onTheGround",
+        "money",
+        "gettingAround",
+        "culture",
+        "destinationEssential",
+        "healthAndSafety",
+      ].every(
         (b) => (byBucket[b] ?? 0) > 0,
       ),
     verifyCount: verify.length,
     stableCount: stable.length,
-    /** §12 expects roughly 3 in 12. Anything above ~40% is over-hedging. */
+    /** Entry and currency always verify; most briefings need only 2–5. */
     verifyRatio: sections.length ? verify.length / sections.length : 0,
     /** The rule Swift enforces after decode; every one of these is a downgrade. */
     verifyWithoutSource: verify.filter((s) => !s.source?.trim()).map((s) => s.title),
@@ -210,17 +253,23 @@ function scoreSections(sections: Section[]) {
     hedgedVerifySections: verify
       .filter((s) => HEDGES.some((h) => s.body.toLowerCase().includes(h)))
       .map((s) => s.title),
-    /** Sections carrying at least one bullet — the card's second half. */
-    bulletCoverage: sections.length
-      ? sections.filter((s) => s.bullets.length > 0).length / sections.length
-      : 0,
-    titlesOverLimit: sections.filter((s) => s.title.length > 45).map((s) => s.title),
-    sectionsWithBullets: sections.filter((s) => s.bullets.length > 0).length,
+    wordBudgetViolations,
+    contentShapes: { proseOnly, bulletsOnly, mixed },
+    titlesOverLimit: sections.filter((s) => s.title.length > 48).map((s) => s.title),
+    destinationBucketTitles: sections
+      .filter((s) => s.topic === "destinationEssential")
+      .map((s) => s.bucketTitle),
     /** Places named at all — KBYG may name them, but it is not a places feed. */
     sectionsNamingPlaces: sections.filter((s) => s.locations.length > 0).length,
     /** Repeated prose anywhere in the briefing. */
     duplicateSentences: duplicateSentences(sections),
   };
+}
+
+function sectionWordCount(section: Section): number {
+  return [section.body, ...section.bullets]
+    .flatMap((text) => text.trim().split(/\s+/).filter(Boolean))
+    .length;
 }
 
 function duplicateSentences(sections: Section[]): string[] {
@@ -295,12 +344,28 @@ async function main() {
       sections: s.sectionCount ?? "—",
       verify: s.verifyCount ?? "—",
       "verify %": s.verifyRatio != null ? `${(s.verifyRatio * 100).toFixed(0)}%` : "—",
-      buckets: s.allFourBucketsCovered === undefined ? "—" : s.allFourBucketsCovered ? "4/4" : "INCOMPLETE",
+      buckets: s.allRequiredBucketsCovered === undefined
+        ? "—"
+        : s.allRequiredBucketsCovered
+          ? "7/7"
+          : "INCOMPLETE",
       "unsourced verify": s.verifyWithoutSource?.length ?? "—",
       hedged: s.hedgedStableSections
         ? s.hedgedStableSections.length + s.hedgedVerifySections.length
         : "—",
-      bullets: s.bulletCoverage != null ? `${(s.bulletCoverage * 100).toFixed(0)}%` : "—",
+      "word cap": s.wordBudgetViolations
+        ? s.wordBudgetViolations.length
+          ? "FAIL"
+          : "OK"
+        : "—",
+      topics: s.topicCountViolations
+        ? s.topicCountViolations.length
+          ? "FAIL"
+          : "OK"
+        : "—",
+      shapes: s.contentShapes
+        ? `${s.contentShapes.proseOnly}/${s.contentShapes.bulletsOnly}/${s.contentShapes.mixed}`
+        : "—",
       places: s.sectionsNamingPlaces ?? "—",
       "out tokens": s.outputTokens ?? "—",
     })),

@@ -36,7 +36,10 @@ export const travellerProfileSnapshot = v.object({
   scaleAnswers: v.array(profileScaleAnswer),
   usuallySkip: v.array(v.string()),
   mustHaves: v.array(v.string()),
-  additionalNotes: v.optional(v.string()),
+  additionalNotes: v.optional(v.union(v.string(), v.null())),
+  age: v.optional(v.union(v.number(), v.null())),
+  /** ISO 3166-1 alpha-2 code; names stay a local presentation concern. */
+  passport: v.optional(v.union(v.string(), v.null())),
 });
 
 /**

@@ -20,7 +20,10 @@ export type ProfileSnapshot = {
   scaleAnswers: { dimension: string; value: number }[];
   usuallySkip: string[];
   mustHaves: string[];
-  additionalNotes?: string;
+  additionalNotes?: string | null;
+  age?: number | null;
+  /** ISO 3166-1 alpha-2 code for the passport the traveller will use. */
+  passport?: string | null;
 };
 
 /** A single traveller or party planning their own trip. */
@@ -94,7 +97,7 @@ const PROFILE_BLOCK = `A traveller may also carry a persistent Traveller DNA pro
 - experience_breadth: a few things deeply / lots of variety
 - day_rhythm: early start / slow start and later finish
 - structure: clear plan / room to improvise
-It may include things they usually skip, recurring must-haves, and additional context. Traveller DNA is secondary fallback context: trip-specific basics and swipe answers always override it when they conflict.`;
+It may include things they usually skip, recurring must-haves, additional context, age, and the passport used for this trip. Use passport only where nationality changes practical rules, especially entry requirements; do not turn age into a stereotype. Traveller DNA is secondary fallback context: trip-specific basics and swipe answers always override it when they conflict.`;
 
 const QUESTION_THREE_BLOCK = `Question 3 sets how well known the recommendations should be, never how good they are:
 - Trusted favorites: the well-known places belong here, the ones a first-time visitor would be sorry to miss. Include them plainly and without apology.
@@ -134,7 +137,7 @@ Other parts of this app cover other ground, so do not do their job:
 - The suggestions feed owns themed lists of places, including what to avoid and what is not worth the time.
 - Worth it or skip owns the honest verdict on the handful of big-name things a visitor has already half decided to do. The suggestions feed does not argue with itself; that is this section's job.
 - Where to stay owns neighbourhoods to sleep in. Nothing else recommends where to stay, and this section recommends nothing to do.
-- Know Before You Go owns destination-wide practical preparation: entry rules, money, transport, food and etiquette basics. It is not a second list of places to go.
+- Know Before You Go owns destination-wide practical preparation: entry rules, arrival, money, transport, on-the-ground setup, culture, health and safety. It is not a second list of places to go or eat.
 - Near You owns only the supplied MapKit candidate set. Its practical transport, grocery and pharmacy layer is built directly on the device and is never model-written.
 - The month section covers what is ON during the month; what the month is LIKE to travel in belongs to Know Before You Go.
 Places recurring across components is fine and expected. Repeating whole sentences is not.`;
@@ -350,40 +353,70 @@ LENGTH
           ? "this group's blended taste and budget"
           : "this traveller's party, pace and budget";
       return `KNOW BEFORE YOU GO
-Destination-wide practical preparation. Not a list of things to do — the things someone needs to have understood before they land.
+Destination-wide practical preparation. Not a list of things to do or places to eat — the decisions and local realities someone should understand before the trip.
 
-Return 10 to 14 sections: the six below, plus four to eight more. Order them by bucket: beforeYouLeave, money, gettingAround, onTheGround.
+OUTPUT CONTRACT
+Return a flat sections array using the eight buckets and stable topic IDs below. Order buckets and topics exactly as listed. The app owns this structure; the model owns the useful, destination-specific title and the best internal mix of prose and bullets.
 
-THESE SIX ALWAYS APPEAR
-1. beforeYouLeave — entry and documents: visas or travel authorisations, passport validity, what actually happens at the border. Never assume a nationality: give the rule and say who it applies to ("EU and Schengen citizens need only an ID card; everyone else…"). This section is ALWAYS volatility "verify" — border rules are the moving target the whole flag exists for.
-2. beforeYouLeave — what this month is practically like there: heat, rain, daylight, crowds, seasonal closures, and what that means for what to pack. This is what the month is LIKE, never what is ON.
-3. money — how people actually pay day to day, and what a day realistically costs given ${party}. Card or cash, whether small places take cards, whether ATMs are the sensible way to get cash.
-4. gettingAround — getting in from the airport or main arrival point: the real options, roughly what each costs and takes, and which one you would actually take.
-5. gettingAround — getting around once there: tickets and passes worth buying, how walkable it really is, when a taxi or rideshare is the honest answer.
-6. onTheGround — food and drink basics, including when people actually eat. Meal times catch visitors out more than menus do.
+1. BEFORE YOU LEAVE — bucket "beforeYouLeave", bucketTitle null
+- topic "entryRequirements" — exactly one section. Give one compact sentence by default. If the supplied Traveller DNA includes a passport, answer specifically for that passport. For a group, cover the supplied passports without implying the same rule applies to everyone. If no passport is supplied, give the useful general pattern for most visitors without pretending it is universal. Add at most one bullet only when most visitors need a concrete action, cost or lead time. Always volatility "verify". Maximum 55 words across body and bullets.
+- topic "arrivalTransport" — exactly one section. Cover the usual airport, station or port; how far or long the first transfer is; the realistic options; and clearly say which option you would take and why. This section is only arrival-to-first-base transport; local movement belongs later. Maximum 90 words.
+- topic "monthPacking" — exactly one section. Explain what the supplied month is LIKE: weather, daylight, crowds, seasonal closures or disruption when material, then what to pack because of it. Never list events here. Maximum 75 words.
 
-ADD BETWEEN TWO AND EIGHT MORE, only where this destination genuinely warrants them:
-- beforeYouLeave: health and vaccinations, travel insurance, packing specifics, apps worth installing before landing
-- money: tipping, tourist taxes and city fees, bargaining
-- gettingAround: intercity travel, driving and car hire, local traffic norms
-- onTheGround: etiquette, language, personal safety, SIM and data, tap water, electricity and plugs, natural hazards
+2. ON THE GROUND — bucket "onTheGround", bucketTitle null
+- topic "simInternet" — exactly one section. Best setup, where to obtain it, realistic coverage or Wi-Fi caveat. Maximum 55 words.
+- topic "apps" — exactly one section. Only apps that materially help in this destination; do not pad with universal apps unless a local use makes one important. Maximum 50 words.
+- topic "electricity" — exactly one section. Plug types, voltage only when it matters, and any real reliability issue. Usually one sentence. Maximum 30 words.
+- topic "onGroundWildcard" — exactly one section with a destination-specific title. Choose the most important remaining while-there practical issue: tap water, opening rhythms, public toilets, laundry, power cuts, Sunday closures or another operational reality. It must fit daily life on the ground, not culture, health, transport or generic advice. Maximum 60 words.
 
-Choose by what this place actually demands, and be led by what would actually derail the trip. An island whose ferry timetable decides the itinerary gets a section on it. Mountains in winter get driving, chains and closures. A Nordic city with no scam problem gets no scam section. Leave a topic out rather than writing one that says nothing specific to this destination — but four of these are the floor, not the ceiling, and a destination with real friction deserves more.
+3. MONEY — bucket "money", bucketTitle null
+- topic "currencyExchange" — exactly one section. Name the local currency and give an approximate conversion into both USD and EUR. Keep it quick. Always volatility "verify" and use the source line as the subtle route to a reputable live exchange-rate reference. Maximum 40 words.
+- topic "costSnapshot" — exactly one section with exactly four bullets. The first three are locally meaningful spending anchors chosen to make this destination's price level immediately understandable — coffee only where coffee is a meaningful benchmark; otherwise choose a casual meal, attraction, short ride, beach setup or another representative purchase. The fourth bullet is accommodation per private room per night: a budget/basic range and an upper-end range. Mention luxury as an open-ended "X+" only when ${party} indicates a high-spend preference. Maximum 100 words total.
+- topic "tipping" — exactly one section, normally one sentence. State what locals actually do and the one exception most likely to catch a visitor. Maximum 30 words.
+- topic "paymentMethods" — exactly one section. Say what is primary, where the secondary method is still needed, and the practical cash advice. In a cash-dominant destination, name a reliably low-fee or trustworthy bank/ATM only when confident; never claim it is universally the cheapest because the traveller's own bank also affects fees. Maximum 60 words.
+
+4. GETTING AROUND — bucket "gettingAround", bucketTitle null
+- Return three or four sections, all topic "localTransport". Each section covers one genuinely useful mode or movement strategy, with a mode-specific title. In no more than 55 words say what it is best for, typical approximate cost, how to use or pay, and the one catch that matters. Choose the modes pragmatically; walking can be one when it is a real default. Do not repeat the arrival transfer.
+
+5. CULTURE — bucket "culture", bucketTitle null
+- Return exactly three sections with topic "culture". Dynamically choose the three things a foreign visitor most benefits from understanding: social etiquette, dining rhythm, religion, dress, bargaining, nightlife, queues, hospitality, public behavior or another real local norm. Help the traveller have a better time around people; do not write general history. Maximum 55 words per section.
+- Return exactly one section with topic "language". Include Hello, Thank you, Goodbye, and one useful, warm or fun destination-specific phrase. For each give the native writing when relevant, a standard romanization, and a simple pronunciation in parentheses. Keep phrases accurate and non-offensive. Maximum 75 words.
+
+6. DESTINATION ESSENTIAL — bucket "destinationEssential"
+- Return exactly one section with topic "destinationEssential" and a short generated bucketTitle naming the missing destination-defining theme, such as "Island hopping", "Altitude", "Onsen etiquette" or "Load shedding". The section itself uses a concrete title and two or three bullets; body may be empty when the bullets carry it better. It must be high-impact, actionable, absent from earlier sections and specific to this city, country, island or region. Maximum 85 words.
+
+7. HEALTH AND SAFETY — bucket "healthAndSafety", bucketTitle null
+- Return one to three sections, all topic "healthSafety". Select only the decision-changing topics for this destination: healthcare access, food and water, vaccinations, scams, personal safety, environmental hazards or important laws. A highly developed low-friction destination may need only one. Pair every risk with an action; calibrate severity and do not fear-dump. Maximum 65 words per section.
+
+8. OTHER TIPS — bucket "otherTips", bucketTitle null
+- Optional: zero or one section with topic "otherTips". This is the last chance for two or three genuinely valuable tips that fit nowhere above. Body may be empty. Omit the entire bucket when nothing clears that bar. Never repeat earlier advice. Maximum 65 words.
+
+TOPIC AND BUCKET DISCIPLINE
+- Set topic to the exact stable ID required above. A natural title may vary; the topic may not.
+- Set bucketTitle to null everywhere except destinationEssential. That one generated title is the category heading, not a duplicate of the section title.
+- The complete response contains 20 to 24 sections. More is a structural failure, not extra helpfulness.
+
+ADAPTIVE SHAPE, HARD WORD BOUNDARIES
+- The word maximum for a subcategory counts body and all bullets together; title and source line do not count. These are hard ceilings, not targets. Use less when the answer is simple.
+- Choose the best internal shape yourself: concise prose only, bullets only, or a short explanation followed by supporting bullets. body may be an empty string only when bullets fully carry the answer. bullets may be empty whenever prose is clearer.
+- Use bullets for scan-worthy facts, comparisons, numbers, phrase lists and compact actions. Use prose for one coherent explanation. Never repeat the same fact in both.
+- The Traveller DNA advice-detail preference may decide how much of the available budget to use, but it never permits crossing a maximum.
+
+COVERAGE AUDIT BEFORE WRITING
+Silently check entry, arrival, season, packing, money, transport, connectivity, power, culture, dining rhythm, health, safety, water, hazards, laws, closures and accessibility or dietary context when the profile makes them relevant. Map important facts into the fixed sections first. Use the three dynamic escape hatches for distinct jobs: onGroundWildcard for operational daily life, destinationEssential for one major defining theme, and otherTips only for small residual facts. Never duplicate one concern across them.
 
 PERSONALISE IT
 The same destination briefs differently for a family, a couple and a solo traveller on a budget. Let the party, the season, the trip length and the spending level decide what gets a section and what each one emphasises. Do not simply restate the preferences.
 
-LENGTH AND SHAPE
-- title: at most 45 characters, concrete, and in sentence case. "Getting in from El Prat", not "Transportation" and not "Getting In From The Airport".
-- body: 2 to 4 sentences of plain prose — the part someone would actually remember.
-- bullets: the hard specifics that would be annoying to dig out of prose — fares, thresholds, opening times, line numbers, names. Any section that has such specifics gets 2 to 4 of them, and entry, money and transport sections almost always do. A section that is genuinely all prose — etiquette, meal culture — sends an empty array. Never repeat a sentence between body and bullets.
+TITLES, LINKS AND LOCATIONS
+- title: at most 48 characters, concrete, and in sentence case. "Getting in from El Prat", not "Transportation" and not "Getting In From The Airport".
 - Name a place where the practical fact is about that place — the airport you arrive at, the metro line you take, the ferry port, the market as an institution. Every one of those goes in that section's locations array, exactly as it appears in the text; a named place with no entry is a bug. Naming places is not the same as recommending them: do not turn a section into a list of things to do.
 
 CONFIDENCE, NOT HEDGING
-- volatility "stable" is the default and covers everything that does not change month to month: how people eat, how the metro works, plug type, etiquette, what the season is like. Write these with full confidence. No "check before you travel", no "rules may change", no "it is advisable to confirm", no "you may be asked to". If a fact needs that kind of qualifier it is not stable — mark it "verify" and name the source instead of hedging inside the prose.
-- volatility "verify" is for facts that genuinely move: entry and visa rules, tourist taxes and official fees, specific prices, vaccination requirements. Expect two to four of your sections — always including entry and documents, and rarely more than four.
+- volatility "stable" is the default and covers enduring behavior and useful approximations: how people eat, the transport pattern, plug type, etiquette, what the season is like, and approximate price ranges clearly written with "about", "roughly" or "~". Write these with full confidence. No "check before you travel", no "rules may change", no "it is advisable to confirm", no "you may be asked to". If a fact needs that kind of qualifier it is not stable — mark it "verify" and name the source instead of hedging inside the prose.
+- volatility "verify" is for facts that genuinely move or have legal consequences: entry and visa rules, live exchange rates, official taxes and fees, current legal restrictions and vaccination requirements. Entry and currencyExchange are always verify. Most briefings need only two to five verify sections.
 - A "verify" section does not hedge in its prose either. The source line IS the caveat, so the body states what the rule actually is and lets the line carry the rest. "EU and Schengen citizens need only an ID card; everyone else needs a passport valid for three months beyond departure" — not "rules can vary, so check the current regulations".
-- A "verify" section, and only a "verify" section, sets: sourceLead, a short lead-in naming what to check ("Entry rules change — confirm with"); source, the authority worth checking ("the Spanish Ministry of Foreign Affairs", "TMB, the Barcelona transport operator"); and sourceURL, that authority's official address ONLY when you are certain of it, otherwise null. Use the authority's main site rather than a deep link into it, and never invent a URL.
+- A "verify" section, and only a "verify" section, sets: sourceLead, a short lead-in naming what to check ("Entry rules — check current with", "Approximate rate — check current with"); source, the authority or reputable live exchange-rate reference worth checking; and sourceURL, that source's official address ONLY when you are certain of it, otherwise null. Use its main site rather than an invented deep link.
 - A "stable" section sets sourceLead, source and sourceURL to null.
 - Write no general disclaimer anywhere. The volatility flag is the only place uncertainty is expressed.`;
     }
@@ -541,6 +574,12 @@ function profileLines(profile: ProfileSnapshot, indent: string): string[] {
     .map((a) => `${a.dimension}=${a.value}/5`)
     .join(", ");
   lines.push(`${indent}Traveller DNA (persistent fallback context): ${dna}`);
+  if (profile.passport) {
+    lines.push(`${indent}Passport used for this trip: ${clean(profile.passport).toUpperCase()}`);
+  }
+  if (profile.age != null) {
+    lines.push(`${indent}Age: ${profile.age}`);
+  }
   if (profile.usuallySkip.length) {
     lines.push(`${indent}Usually prefers to skip: ${profile.usuallySkip.map(clean).join("; ")}`);
   }

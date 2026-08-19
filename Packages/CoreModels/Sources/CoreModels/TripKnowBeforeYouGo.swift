@@ -2,23 +2,21 @@
 //  TripKnowBeforeYouGo.swift
 //  CoreModels
 //
-//  Know Before You Go v1: the practical half of a destination.
+//  Know Before You Go: the practical half of a destination.
 //
 
 import Foundation
 
 extension Trip {
-    /// Destination-wide practical preparation — entry rules, money, transport,
-    /// food and etiquette basics. Deliberately **not** another feed of places:
+    /// Destination-wide practical preparation — entry, arrival, on-the-ground
+    /// setup, money, transport, culture, health and safety. Deliberately **not**
+    /// another feed of places:
     /// it may name an airport or a metro line where the fact is about that
     /// place, but "what to skip" and "where to eat" belong to the suggestions
     /// feed and stay there.
     ///
-    /// **v1 is explicitly provisional.** The taxonomy below — four buckets, six
-    /// always-present sections, 8–14 total — is a complete and testable feature,
-    /// not a researched end state. Expect it to be reworked once there is real
-    /// usage behind it; nothing else in the app should grow a dependency on the
-    /// specific bucket set.
+    /// Stable topic IDs make the category contract testable without forcing the
+    /// model into one visual shape inside each collapsible row.
     public struct KnowBeforeYouGo: Codable, Equatable, Hashable, Sendable {
         public let sections: [Section]
 
@@ -30,7 +28,7 @@ extension Trip {
         /// order, skipping buckets this destination produced nothing for.
         ///
         /// Order comes from ``Bucket/allCases`` rather than from the model's
-        /// output order: the four buckets are the app's structure, and a run
+        /// output order: the buckets are the app's structure, and a run
         /// that happens to emit them out of order should still read the same.
         public var groups: [BucketGroup] {
             Bucket.allCases.compactMap { bucket in
@@ -44,6 +42,16 @@ extension Trip {
             public var id: Bucket { bucket }
             public let bucket: Bucket
             public let sections: [Section]
+
+            /// All category headings are app-owned except the one deliberate
+            /// destination-specific slot. Its backend-provided title lets the
+            /// same position read "Island hopping" or "Altitude" without
+            /// turning every heading into unstable generated chrome.
+            public var title: String {
+                guard bucket == .destinationEssential else { return bucket.title }
+                return sections.compactMap(\.bucketTitle).first(where: { !$0.isEmpty })
+                    ?? bucket.title
+            }
         }
 
         /// How much a section's facts move.
@@ -59,12 +67,16 @@ extension Trip {
             case verify
         }
 
-        /// The four buckets, in the order they are read.
+        /// The buckets, in the order they are read.
         public enum Bucket: String, Codable, CaseIterable, Sendable {
             case beforeYouLeave
+            case onTheGround
             case money
             case gettingAround
-            case onTheGround
+            case culture
+            case destinationEssential
+            case healthAndSafety
+            case otherTips
             /// Anything a newer backend sends that this build doesn't know.
             /// Present so one unrecognised bucket degrades to a trailing group
             /// instead of failing the whole component's decode — the same
@@ -79,9 +91,13 @@ extension Trip {
             public var title: String {
                 switch self {
                 case .beforeYouLeave: "Before you leave"
+                case .onTheGround: "On the ground"
                 case .money: "Money"
                 case .gettingAround: "Getting around"
-                case .onTheGround: "On the ground"
+                case .culture: "Culture"
+                case .destinationEssential: "Destination essential"
+                case .healthAndSafety: "Health and safety"
+                case .otherTips: "Other tips"
                 case .other: "Also worth knowing"
                 }
             }
@@ -91,11 +107,46 @@ extension Trip {
             public var iconName: String {
                 switch self {
                 case .beforeYouLeave: "suitcase"
+                case .onTheGround: "network"
                 case .money: "creditcard"
                 case .gettingAround: "tram"
-                case .onTheGround: "fork.knife"
+                case .culture: "person.2"
+                case .destinationEssential: "sparkles"
+                case .healthAndSafety: "cross.case"
+                case .otherTips: "lightbulb"
                 case .other: "lightbulb"
                 }
+            }
+        }
+
+        /// Stable semantic identity for a subcategory. Titles remain natural
+        /// model prose; this value is what validation, evaluation and future UI
+        /// behavior can safely depend on.
+        public enum Topic: String, Codable, Sendable {
+            case entryRequirements
+            case arrivalTransport
+            case monthPacking
+            case simInternet
+            case apps
+            case electricity
+            case onGroundWildcard
+            case currencyExchange
+            case costSnapshot
+            case tipping
+            case paymentMethods
+            case localTransport
+            case culture
+            case language
+            case destinationEssential
+            case healthSafety
+            case otherTips
+            /// Older saved briefings have no topic; newer backends may add one
+            /// this build has not learned yet. Both remain readable.
+            case other
+
+            public init(from decoder: Decoder) throws {
+                let raw = try decoder.singleValueContainer().decode(String.self)
+                self = Topic(rawValue: raw) ?? .other
             }
         }
 
@@ -107,6 +158,10 @@ extension Trip {
             /// break anything keyed to it.
             public let id: UUID
             public let bucket: Bucket
+            public let topic: Topic
+            /// Generated only for ``Topic/destinationEssential``. Nil on every
+            /// fixed bucket and on briefings saved before this field existed.
+            public let bucketTitle: String?
             /// Written by the model, so it renders as generated prose, not as
             /// app chrome.
             public let title: String
@@ -130,6 +185,8 @@ extension Trip {
 
             public init(
                 bucket: Bucket,
+                topic: Topic = .other,
+                bucketTitle: String? = nil,
                 title: String,
                 body: String,
                 bullets: [String] = [],
@@ -142,6 +199,8 @@ extension Trip {
             ) {
                 self.id = id
                 self.bucket = bucket
+                self.topic = topic
+                self.bucketTitle = Self.nonEmpty(bucketTitle)
                 self.title = title
                 self.body = body
                 self.bullets = bullets
@@ -159,7 +218,7 @@ extension Trip {
             }
 
             private enum CodingKeys: String, CodingKey {
-                case id, bucket, title, body, bullets, volatility
+                case id, bucket, topic, bucketTitle, title, body, bullets, volatility
                 case sourceLead, source, sourceURL, locations
             }
 
@@ -172,6 +231,10 @@ extension Trip {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
                 bucket = try container.decodeIfPresent(Bucket.self, forKey: .bucket) ?? .other
+                topic = try container.decodeIfPresent(Topic.self, forKey: .topic) ?? .other
+                bucketTitle = Self.nonEmpty(
+                    try container.decodeIfPresent(String.self, forKey: .bucketTitle)
+                )
                 title = try container.decode(String.self, forKey: .title)
                 body = try container.decode(String.self, forKey: .body)
                 bullets = try container.decodeIfPresent([String].self, forKey: .bullets) ?? []
@@ -198,6 +261,8 @@ extension Trip {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 try container.encode(id, forKey: .id)
                 try container.encode(bucket, forKey: .bucket)
+                try container.encode(topic, forKey: .topic)
+                try container.encodeIfPresent(bucketTitle, forKey: .bucketTitle)
                 try container.encode(title, forKey: .title)
                 try container.encode(body, forKey: .body)
                 try container.encode(bullets, forKey: .bullets)
@@ -283,50 +348,147 @@ public extension Trip.KnowBeforeYouGo {
     static let mock = Trip.KnowBeforeYouGo(sections: [
         .init(
             bucket: .beforeYouLeave,
+            topic: .entryRequirements,
             title: "Entry and documents",
-            body: "EU and Schengen travellers need nothing beyond an ID card. Everyone else enters on the Schengen 90/180 rule, and from 2026 non-EU visitors register with the EU's new entry system at the border, which adds time at El Prat on arrival.",
-            bullets: ["Passport valid 3 months beyond departure", "90 days in any 180 for most non-EU visitors"],
+            body: "German citizens can enter Spain with a valid passport or national ID card for this trip.",
             volatility: .verify,
-            sourceLead: "Entry rules move — confirm with",
+            sourceLead: "Entry rules — check current with",
             source: "the Spanish Ministry of Foreign Affairs",
             sourceURL: URL(string: "https://www.exteriores.gob.es")
         ),
         .init(
             bucket: .beforeYouLeave,
-            title: "What May is actually like",
-            body: "Warm without being punishing — mid-20s by day, cool enough at night that a light jacket earns its place. The sea is still bracing, the terraces are already full, and the crowds have not reached their July weight.",
-            bullets: ["Pack layers for evenings", "Rain is brief when it comes"]
-        ),
-        .init(
-            bucket: .money,
-            title: "Cards everywhere, cash for the small stuff",
-            body: "Card works nearly everywhere including buses and most bars. Keep twenty or thirty euros for the odd market stall and the bakery that has never taken a card and never will.",
-            bullets: ["Two people, mid-range: €120–180 a day", "ATMs in bank branches, not the standalone ones on La Rambla"]
-        ),
-        .init(
-            bucket: .gettingAround,
+            topic: .arrivalTransport,
             title: "Getting in from El Prat",
-            body: "The Aerobús runs to Plaça Catalunya every five minutes and takes about 35 minutes, which beats the metro for anyone with luggage. A taxi is roughly €35 and worth it late at night or with children.",
-            bullets: ["Aerobús about €7", "Metro L9 Sud needs a separate airport ticket"],
+            body: "Aerobús is the easiest first transfer with luggage: it runs to Plaça Catalunya in about 35 minutes. Metro and train cost less; a taxi makes sense late at night or for a family.",
+            bullets: ["Aerobús: direct and frequent", "Taxi: roughly €35"],
             locations: [
                 .init(linkSubstring: "El Prat", placeName: "Josep Tarradellas Barcelona–El Prat Airport")
             ]
         ),
         .init(
-            bucket: .gettingAround,
-            title: "The city is smaller than it looks",
-            body: "Most of what you came for sits inside a walkable core, and the metro covers the rest in under twenty minutes. Buy a T-casual for ten journeys rather than paying single fares.",
-            bullets: ["T-casual: 10 journeys, shareable"],
-            volatility: .verify,
-            sourceLead: "Fares change each January — check with",
-            source: "TMB, the Barcelona transport operator",
-            sourceURL: URL(string: "https://www.tmb.cat")
+            bucket: .beforeYouLeave,
+            topic: .monthPacking,
+            title: "Barcelona in May",
+            body: "Days are usually warm and evenings cooler, with occasional showers and growing crowds.",
+            bullets: ["Pack breathable layers", "Bring a light rain shell", "Add comfortable walking shoes"]
         ),
         .init(
             bucket: .onTheGround,
-            title: "Nobody eats when you do",
-            body: "Lunch runs from two, dinner rarely starts before nine, and a kitchen that opens at seven is cooking for tourists. Plan an afternoon coffee and pastry so the gap does not defeat you.",
-            bullets: ["Menú del día at lunch is the best value meal of the day"]
+            topic: .simInternet,
+            title: "Your phone will just work",
+            body: "EU roaming usually covers Spain. Other visitors can buy an eSIM before arrival or a prepaid SIM from a staffed carrier shop; city coverage is strong."
+        ),
+        .init(
+            bucket: .onTheGround,
+            topic: .apps,
+            title: "Two useful downloads",
+            body: "TMB App helps with live public-transport planning; Free Now or Cabify is useful when you need a licensed ride."
+        ),
+        .init(
+            bucket: .onTheGround,
+            topic: .electricity,
+            title: "Plugs and power",
+            body: "Spain uses type C and F plugs at 230V; North American and British devices need an adapter."
+        ),
+        .init(
+            bucket: .onTheGround,
+            topic: .onGroundWildcard,
+            title: "Sundays run differently",
+            body: "Many independent shops close on Sunday, while restaurants and central convenience stores keep more flexible hours. Do essential shopping on Saturday."
+        ),
+        .init(
+            bucket: .money,
+            topic: .currencyExchange,
+            title: "Euros at a glance",
+            body: "Spain uses the euro. €1 is approximately US$1.10 and, naturally, €1.",
+            volatility: .verify,
+            sourceLead: "Approximate rate — check current with",
+            source: "the European Central Bank",
+            sourceURL: URL(string: "https://www.ecb.europa.eu")
+        ),
+        .init(
+            bucket: .money,
+            topic: .costSnapshot,
+            title: "What things cost",
+            body: "",
+            bullets: ["Coffee: €1.50–3", "Casual meal: €12–20", "Museum ticket: €10–18", "Private room: €70–120 basic; €180–300 upper end"]
+        ),
+        .init(
+            bucket: .money,
+            topic: .tipping,
+            title: "Tipping is modest",
+            body: "Round up or leave 5–10% for notably good table service; tipping is not obligatory."
+        ),
+        .init(
+            bucket: .money,
+            topic: .paymentMethods,
+            title: "Cards first, some cash",
+            body: "Contactless cards are the default. Keep €20–30 for markets and very small purchases, and decline dynamic currency conversion at terminals and ATMs."
+        ),
+        .init(
+            bucket: .gettingAround,
+            topic: .localTransport,
+            title: "Walk the compact center",
+            body: "Best for the old city and Eixample blocks. Walking is free, but distances and summer heat add up; comfortable shoes matter."
+        ),
+        .init(
+            bucket: .gettingAround,
+            topic: .localTransport,
+            title: "Metro for cross-city hops",
+            body: "Fastest for longer urban journeys. Tap or validate the correct ticket before travel, and keep bags closed on busy platforms."
+        ),
+        .init(
+            bucket: .gettingAround,
+            topic: .localTransport,
+            title: "Use buses for the gaps",
+            body: "Buses reach hills and neighborhoods the metro misses. Board at marked stops, validate on entry, and allow extra time in traffic."
+        ),
+        .init(
+            bucket: .culture,
+            topic: .culture,
+            title: "Meals happen late",
+            body: "Lunch commonly starts around 14:00 and dinner around 21:00. An afternoon snack makes the local rhythm much easier."
+        ),
+        .init(
+            bucket: .culture,
+            topic: .culture,
+            title: "Catalan identity matters",
+            body: "Barcelona is Catalonia's capital. Treat Catalan as a living local language and identity, not a decorative version of Spanish."
+        ),
+        .init(
+            bucket: .culture,
+            topic: .culture,
+            title: "Keep residential nights quiet",
+            body: "Dense neighborhoods place homes directly above bars. Lower your voice in stairwells and streets late at night."
+        ),
+        .init(
+            bucket: .culture,
+            topic: .language,
+            title: "Four Catalan phrases",
+            body: "",
+            bullets: ["Hello — Hola (OH-lah)", "Thank you — Gràcies (GRAH-see-uhs)", "Goodbye — Adéu (uh-DEH-oo)", "Very good! — Molt bé! (molt BEH)"]
+        ),
+        .init(
+            bucket: .destinationEssential,
+            topic: .destinationEssential,
+            bucketTitle: "Tourist-pressure etiquette",
+            title: "Travel gently in lived-in areas",
+            body: "",
+            bullets: ["Keep doorways and narrow lanes clear", "Choose licensed accommodation", "Treat markets as working food spaces, not photo sets"]
+        ),
+        .init(
+            bucket: .healthAndSafety,
+            topic: .healthSafety,
+            title: "Pickpockets are the main risk",
+            body: "Use a closed cross-body bag on crowded transport and terraces; never hang a phone or bag over a chair back."
+        ),
+        .init(
+            bucket: .otherTips,
+            topic: .otherTips,
+            title: "Two small wins",
+            body: "",
+            bullets: ["Reserve major timed-entry sights before the weekend", "Carry a refillable bottle; public fountains are common"]
         )
     ])
 }

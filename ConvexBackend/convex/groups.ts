@@ -407,15 +407,22 @@ export const submitPreferences = mutation({
         profile.mustHaves.length <= 5 &&
         profile.usuallySkip.every((value) => value.length <= 100) &&
         profile.mustHaves.every((value) => value.length <= 100) &&
-        (profile.additionalNotes === undefined ||
+        (profile.additionalNotes == null ||
           profile.additionalNotes.length <= 500);
+      const hasValidAge =
+        profile.age == null ||
+        (Number.isInteger(profile.age) && profile.age >= 1 && profile.age <= 120);
+      const hasValidPassport =
+        profile.passport == null || /^[A-Za-z]{2}$/.test(profile.passport);
       if (
         !expectedDNA ||
         dimensions.length !== expectedDNA.length ||
         dimensionSet.size !== expectedDNA.length ||
         !expectedDNA.every((id) => dimensionSet.has(id as typeof dimensions[number])) ||
         !hasValidScaleValues ||
-        !hasValidText
+        !hasValidText ||
+        !hasValidAge ||
+        !hasValidPassport
       ) {
         throw new ConvexError("Traveller DNA doesn't match the supported profile version");
       }

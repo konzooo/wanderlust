@@ -660,6 +660,32 @@ struct ProfileSelectionButton: View {
 
 // MARK: - Profile management
 
+/// What the editor cover is opened for.
+///
+/// This is one `Identifiable` value rather than a `Bool` plus a separate
+/// profile: driving `fullScreenCover(isPresented:)` from two pieces of state
+/// let the cover read a stale profile, so "Recalibrate" opened a blank
+/// editor. With `fullScreenCover(item:)` the profile is part of what is
+/// presented and cannot lag behind it.
+private enum EditorTarget: Identifiable {
+    case create
+    case edit(TravellerProfile)
+
+    var id: String {
+        switch self {
+        case .create: "create"
+        case .edit(let profile): profile.id.uuidString
+        }
+    }
+
+    var profile: TravellerProfile? {
+        switch self {
+        case .create: nil
+        case .edit(let profile): profile
+        }
+    }
+}
+
 struct ProfilesScreen: View {
     var startsCreating = false
     var onProfileCreated: ((TravellerProfile) -> Void)?
@@ -672,8 +698,7 @@ struct ProfilesScreen: View {
     @ObservedObject private var library = TravellerProfileLibrary.shared
     @Environment(\.dismiss) private var dismiss
     @AppStorage(ProfilePreferenceKey.introductionDismissed) private var onboardingDismissed = false
-    @State private var editorProfile: TravellerProfile?
-    @State private var editorPresented = false
+    @State private var editorTarget: EditorTarget?
     @State private var onboardingPresented = false
     @State private var onboardingStartsEditor = false
     @State private var dismissAfterOnboarding = false
@@ -720,8 +745,7 @@ struct ProfilesScreen: View {
                !onboardingDismissed {
                 onboardingPresented = true
             } else if startsCreating {
-                editorProfile = nil
-                editorPresented = true
+                editorTarget = .create
             }
         }
         .fullScreenCover(
@@ -755,8 +779,8 @@ struct ProfilesScreen: View {
                 )
             }
         }
-        .fullScreenCover(isPresented: $editorPresented) {
-            TravellerDNAEditorScreen(profile: editorProfile) { saved in
+        .fullScreenCover(item: $editorTarget) { target in
+            TravellerDNAEditorScreen(profile: target.profile) { saved in
                 onProfileCreated?(saved)
             }
         }
@@ -799,8 +823,7 @@ struct ProfilesScreen: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Create Traveller DNA") {
-                editorProfile = nil
-                editorPresented = true
+                editorTarget = .create
             }
             .buttonStyle(PrimaryButtonStyle(fullWidth: true))
         }
@@ -837,8 +860,7 @@ struct ProfilesScreen: View {
                     .foregroundStyle(.secondary)
 
                 Button {
-                    editorProfile = profile
-                    editorPresented = true
+                    editorTarget = .edit(profile)
                 } label: {
                     Label("Recalibrate DNA", systemImage: "slider.horizontal.3")
                 }
@@ -875,8 +897,7 @@ struct ProfilesScreen: View {
             }
 
             Button {
-                editorProfile = nil
-                editorPresented = true
+                editorTarget = .create
             } label: {
                 Label("Add another profile", systemImage: "plus")
                     .frame(maxWidth: .infinity)
@@ -923,8 +944,7 @@ struct ProfilesScreen: View {
             Spacer()
             Menu {
                 Button("View and edit") {
-                    editorProfile = profile
-                    editorPresented = true
+                    editorTarget = .edit(profile)
                 }
                 Button("Make Main") {
                     library.makeMain(profile.id)
@@ -1131,7 +1151,7 @@ struct TravellerDNAEditorScreen: View {
                     }
                 PassportAgeRow(passport: $passport, age: $age)
                     .padding(.top, 2)
-                Text("Passport and age are optional. You can create additional profiles later.")
+                Text("You can create additional profiles later.")
                     .font(.kanit(12))
                     .foregroundStyle(.secondary)
             }

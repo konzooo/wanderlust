@@ -35,7 +35,7 @@ struct PassportAgeRow: View {
                             .lineLimit(1)
                             .foregroundStyle(.primary)
                     } else {
-                        Text("Passport")
+                        Text("Passport/Nationality")
                             .font(.kanit(15))
                             .foregroundStyle(Color.secondary.opacity(0.7))
                     }
@@ -50,7 +50,7 @@ struct PassportAgeRow: View {
                 .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Passport")
+            .accessibilityLabel("Passport or nationality")
             .accessibilityValue(
                 passport.flatMap(Country.displayName(for:)) ?? "Not set"
             )
@@ -161,7 +161,7 @@ struct PassportPickerSheet: View {
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("Passport")
+            .navigationTitle("Passport/Nationality")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

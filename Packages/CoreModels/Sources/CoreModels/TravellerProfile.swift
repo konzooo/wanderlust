@@ -53,19 +53,27 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
     public let usuallySkip: [String]
     public let mustHaves: [String]
     public let additionalNotes: String?
+    public let age: Int?
+    /// ISO 3166-1 alpha-2 region code, e.g. `DE`. Stored as a code so the
+    /// display name can follow the device language.
+    public let nationality: String?
 
     public init(
         questionnaireVersion: Int = Self.currentVersion,
         scaleAnswers: [ProfileScaleAnswer],
         usuallySkip: [String] = [],
         mustHaves: [String] = [],
-        additionalNotes: String? = nil
+        additionalNotes: String? = nil,
+        age: Int? = nil,
+        nationality: String? = nil
     ) {
         self.questionnaireVersion = questionnaireVersion
         self.scaleAnswers = scaleAnswers
         self.usuallySkip = usuallySkip
         self.mustHaves = mustHaves
         self.additionalNotes = additionalNotes
+        self.age = age.map { max(1, min(120, $0)) }
+        self.nationality = nationality
     }
 
     public func score(for dimension: TravellerDNADimension) -> Int? {
@@ -81,6 +89,12 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
         var lines = TravellerDNADimension.allCases.map { dimension in
             let value = score(for: dimension) ?? 3
             return "\n- \(dimension.rawValue): \(value)/5 (\(dimension.leftLabel) ↔ \(dimension.rightLabel))"
+        }
+        if let age {
+            lines.append("\n- Age: \(age)")
+        }
+        if let nationalityName {
+            lines.append("\n- Nationality: \(nationalityName)")
         }
         if !usuallySkip.isEmpty {
             lines.append("\n- Usually prefers to skip: \(usuallySkip.map(cleanPromptValue).joined(separator: "; "))")

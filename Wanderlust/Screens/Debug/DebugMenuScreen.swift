@@ -14,6 +14,7 @@ struct DebugMenuScreen: View {
     @AppStorage(DebugSettings.useMockTripDataKey) private var useMockTripData = false
     @State private var didResetOnboarding = false
     @State private var costs: AsyncValue<[GenerationCostRow]> = .initial
+    @State private var showsCostInfo = false
 
     var body: some View {
         List {
@@ -79,9 +80,18 @@ struct DebugMenuScreen: View {
                     }
                 }
             } header: {
-                Text("Recent model calls")
-            } footer: {
-                Text("Rates are hand-maintained in costs.ts and drift as OpenAI's prices change, so read this for comparison between components rather than as a bill. A dash means the row predates model recording or names a model with no rate.")
+                HStack {
+                    Text("Recent model calls")
+                    Spacer()
+                    Button {
+                        showsCostInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.appTint)
+                    .accessibilityLabel("How cost is estimated")
+                }
             }
 
             Section {
@@ -117,6 +127,7 @@ struct DebugMenuScreen: View {
         }
         .navigationTitle("Debug Menu")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showsCostInfo) { costInfo }
         .task {
             guard case .initial = costs else { return }
             costs = .loading
@@ -126,6 +137,59 @@ struct DebugMenuScreen: View {
                 costs = .error(error)
             }
         }
+    }
+
+    /// Everything that makes the figure beside each call an estimate rather
+    /// than a bill. It lives behind an icon because it is the kind of thing you
+    /// need once, when the number first surprises you.
+    private var costInfo: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Every model call records how many tokens it used. The cost beside each one is those tokens multiplied by a price list kept in costs.ts — not a figure returned by OpenAI.")
+                } header: {
+                    Text("What the number is")
+                }
+
+                Section {
+                    infoRow("Input", "Tokens sent — the prompt and the traveller's answers. Tokens OpenAI had already cached from a previous call are billed at a lower rate and counted separately.")
+                    infoRow("Output", "Tokens written back. On models that think before answering, that thinking is billed as output, so it is already inside this figure rather than missing from it.")
+                    infoRow("Web search", "Charged per search action. Zero for every component since Near You stopped searching.")
+                    infoRow("Retries", "A call that needed a corrective second attempt sums both attempts into one row, so a retry shows as one expensive call rather than disappearing.")
+                } header: {
+                    Text("What is counted")
+                }
+
+                Section {
+                    infoRow("Prices drift", "The price list is maintained by hand and nothing warns you when OpenAI changes it. This is the weakest part: it fails silently and confidently.")
+                    infoRow("Failures still cost", "A call that failed or was cut off at its token ceiling was still billed for what it produced. Those look like ordinary expensive rows.")
+                    infoRow("It is a sample", "The last 20 calls on whichever backend this build talks to — the dev one in a Debug build. It will never match an OpenAI invoice.")
+                    infoRow("A dash", "Means the model has no price listed, shown as unknown rather than as zero.")
+                } header: {
+                    Text("Why it is an estimate")
+                } footer: {
+                    Text("Good for asking which component costs or takes the most. Not accounting.")
+                }
+            }
+            .navigationTitle("How cost is estimated")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showsCostInfo = false }
+                }
+            }
+        }
+    }
+
+    private func infoRow(_ title: String, _ detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.kanit(15).weight(.medium))
+            Text(detail)
+                .font(.kanit(13))
+                .foregroundColor(Color(.systemGray))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 2)
     }
 
     private func seconds(_ ms: Int) -> String {

@@ -147,6 +147,9 @@ final class TravellerProfileLibrary: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .prefix(500)
         copy.additionalNotes = notes.map(String.init).flatMap { $0.isEmpty ? nil : $0 }
+        copy.nationality = profile.nationality.flatMap { code in
+            Nationality.all.contains(where: { $0.code == code }) ? code : nil
+        }
         copy.updatedAt = Date()
         return copy
     }
@@ -947,7 +950,9 @@ private extension TravellerProfile {
             "has_notes": .boolean(
                 !(additionalNotes?
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-            )
+            ),
+            "has_age": .boolean(age != nil),
+            "has_nationality": .boolean(nationality != nil)
         ]
         for dimension in TravellerDNADimension.allCases {
             if let score = score(for: dimension) {
@@ -986,6 +991,8 @@ struct TravellerDNAEditorScreen: View {
     @State private var usuallySkip: [String]
     @State private var mustHaves: [String]
     @State private var additionalNotes: String
+    @State private var age: String
+    @State private var nationality: String?
     @State private var saveError: String?
     @FocusState private var nameFocused: Bool
 
@@ -999,6 +1006,8 @@ struct TravellerDNAEditorScreen: View {
         _usuallySkip = State(initialValue: profile?.usuallySkip ?? [])
         _mustHaves = State(initialValue: profile?.mustHaves ?? [])
         _additionalNotes = State(initialValue: profile?.additionalNotes ?? "")
+        _age = State(initialValue: profile?.age.map(String.init) ?? "")
+        _nationality = State(initialValue: profile?.nationality)
     }
 
     var body: some View {
@@ -1140,6 +1149,8 @@ struct TravellerDNAEditorScreen: View {
             )
         } else {
             VStack(alignment: .leading, spacing: 8) {
+                AgeNationalityRow(age: $age, nationality: $nationality)
+                    .padding(.bottom, 2)
                 Text("Optional")
                     .font(DS.Typography.fieldLabel)
                 TextEditor(text: $additionalNotes)
@@ -1306,6 +1317,8 @@ struct TravellerDNAEditorScreen: View {
             usuallySkip: usuallySkip,
             mustHaves: mustHaves,
             additionalNotes: additionalNotes,
+            age: Int(age).flatMap { (1...120).contains($0) ? $0 : nil },
+            nationality: nationality,
             createdAt: profile?.createdAt ?? now,
             updatedAt: now
         )

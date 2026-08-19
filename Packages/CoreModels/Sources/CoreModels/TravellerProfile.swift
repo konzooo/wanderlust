@@ -80,6 +80,11 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
         scaleAnswers.first(where: { $0.dimension == dimension })?.value
     }
 
+    /// English country name for the stored code, for prompt text.
+    public var nationalityName: String? {
+        nationality.flatMap(Nationality.englishName(for:))
+    }
+
     public var hasEveryScaleAnswer: Bool {
         Set(scaleAnswers.map(\.dimension)) == Set(TravellerDNADimension.allCases)
     }
@@ -123,6 +128,9 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
     public var usuallySkip: [String]
     public var mustHaves: [String]
     public var additionalNotes: String?
+    public var age: Int?
+    /// ISO 3166-1 alpha-2 region code, e.g. `DE`.
+    public var nationality: String?
     public let createdAt: Date
     public var updatedAt: Date
 
@@ -134,6 +142,8 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
         usuallySkip: [String] = [],
         mustHaves: [String] = [],
         additionalNotes: String? = nil,
+        age: Int? = nil,
+        nationality: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -144,6 +154,8 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
         self.usuallySkip = usuallySkip
         self.mustHaves = mustHaves
         self.additionalNotes = additionalNotes
+        self.age = age.map { max(1, min(120, $0)) }
+        self.nationality = nationality
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -154,8 +166,19 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
             scaleAnswers: scaleAnswers,
             usuallySkip: usuallySkip,
             mustHaves: mustHaves,
-            additionalNotes: additionalNotes
+            additionalNotes: additionalNotes,
+            age: age,
+            nationality: nationality
         )
+    }
+
+    /// Localized country name for the stored code, for display.
+    public var nationalityName: String? {
+        nationality.flatMap(Nationality.displayName(for:))
+    }
+
+    public var nationalityFlag: String? {
+        nationality.map(Nationality.flag(for:))
     }
 
     public func score(for dimension: TravellerDNADimension) -> Int? {

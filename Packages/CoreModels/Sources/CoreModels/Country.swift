@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The list comes from the system rather than a bundled table, so it stays
 /// correct as the OS updates and the names follow the device language.
-public struct Nationality: Identifiable, Hashable, Sendable {
+public struct Country: Identifiable, Hashable, Sendable {
     /// ISO 3166-1 alpha-2 code, e.g. `DE`.
     public let code: String
     /// Localized country name for display.
@@ -13,7 +13,7 @@ public struct Nationality: Identifiable, Hashable, Sendable {
     public var id: String { code }
 
     /// The regional-indicator flag emoji for the code.
-    public var flag: String { Nationality.flag(for: code) }
+    public var flag: String { Country.flag(for: code) }
 
     public init(code: String, name: String) {
         self.code = code
@@ -21,12 +21,12 @@ public struct Nationality: Identifiable, Hashable, Sendable {
     }
 }
 
-extension Nationality {
+extension Country {
     /// Every ISO country, sorted by localized name.
     ///
     /// Continents and numeric groupings ("001 – World") are filtered out by
     /// requiring a two-letter code that belongs to a continent.
-    public static let all: [Nationality] = {
+    public static let all: [Country] = {
         Locale.Region.isoRegions
             .filter { region in
                 region.identifier.count == 2 &&
@@ -35,7 +35,7 @@ extension Nationality {
             }
             .compactMap { region in
                 guard let name = displayName(for: region.identifier) else { return nil }
-                return Nationality(code: region.identifier, name: name)
+                return Country(code: region.identifier, name: name)
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }()
@@ -62,7 +62,7 @@ extension Nationality {
 
     /// Matches on both the localized name and the code, so typing "DE" or
     /// "Ger" both land on Germany.
-    public static func search(_ query: String) -> [Nationality] {
+    public static func search(_ query: String) -> [Country] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return all }
         let prefixed = all.filter {

@@ -1,55 +1,41 @@
 //
-//  NationalityPickerSheet.swift
+//  PassportPicker.swift
 //  Wanderlust
 //
-//  A compact age + nationality row, and the country search it opens. Both
-//  live on one line so the last DNA step stays a single question with a
-//  quiet pair of extras above it.
+//  A compact passport + age row, and the country search it opens. Both sit
+//  on one line under the profile name, so the first DNA step stays a single
+//  question with a quiet pair of extras below it.
 //
 
 import CoreModels
 import DesignSystem
 import SwiftUI
 
-/// Age and nationality, side by side, sized to sit above a text editor
-/// without claiming a section of its own.
-struct AgeNationalityRow: View {
+/// Passport and age, side by side, sized to sit under a text field without
+/// claiming a section of its own.
+struct PassportAgeRow: View {
+    @Binding var passport: String?
     @Binding var age: String
-    @Binding var nationality: String?
 
     @FocusState private var ageFocused: Bool
     @State private var pickerPresented = false
 
     var body: some View {
         HStack(spacing: 10) {
-            TextField("Age", text: $age)
-                .keyboardType(.numberPad)
-                .focused($ageFocused)
-                .multilineTextAlignment(.leading)
-                .font(.kanit(15))
-                .frame(width: 62)
-                .onChange(of: age) { _, value in
-                    age = String(value.filter(\.isNumber).prefix(3))
-                }
-                .accessibilityLabel("Age")
-                .padding(.vertical, 12)
-                .padding(.horizontal, 14)
-                .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 14))
-
             Button {
                 ageFocused = false
                 pickerPresented = true
             } label: {
                 HStack(spacing: 8) {
-                    if let nationality {
-                        Text(Nationality.flag(for: nationality))
+                    if let passport {
+                        Text(Country.flag(for: passport))
                             .font(.system(size: 17))
-                        Text(Nationality.displayName(for: nationality) ?? nationality)
+                        Text(Country.displayName(for: passport) ?? passport)
                             .font(.kanit(15))
                             .lineLimit(1)
                             .foregroundStyle(.primary)
                     } else {
-                        Text("Nationality")
+                        Text("Passport")
                             .font(.kanit(15))
                             .foregroundStyle(Color.secondary.opacity(0.7))
                     }
@@ -64,18 +50,36 @@ struct AgeNationalityRow: View {
                 .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Nationality")
+            .accessibilityLabel("Passport")
             .accessibilityValue(
-                nationality.flatMap(Nationality.displayName(for:)) ?? "Not set"
+                passport.flatMap(Country.displayName(for:)) ?? "Not set"
             )
+
+            TextField("Age", text: $age)
+                .keyboardType(.numberPad)
+                .focused($ageFocused)
+                .multilineTextAlignment(.leading)
+                .font(.kanit(15))
+                .frame(width: 62)
+                .onChange(of: age) { _, value in
+                    age = String(value.filter(\.isNumber).prefix(3))
+                }
+                .accessibilityLabel("Age")
+                .padding(.vertical, 12)
+                .padding(.horizontal, 14)
+                .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 14))
         }
         .sheet(isPresented: $pickerPresented) {
-            NationalityPickerSheet(selection: $nationality)
+            PassportPickerSheet(selection: $passport)
         }
         .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { ageFocused = false }
+            // Only while the number pad is up: it has no return key, and the
+            // name field above has its own.
+            if ageFocused {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { ageFocused = false }
+                }
             }
         }
     }
@@ -83,15 +87,15 @@ struct AgeNationalityRow: View {
 
 /// Type-to-filter country list with flags, in a half-height sheet so the
 /// keyboard and the results share the screen.
-struct NationalityPickerSheet: View {
+struct PassportPickerSheet: View {
     @Binding var selection: String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @FocusState private var queryFocused: Bool
 
-    private var results: [Nationality] {
-        Nationality.search(query)
+    private var results: [Country] {
+        Country.search(query)
     }
 
     var body: some View {
@@ -157,7 +161,7 @@ struct NationalityPickerSheet: View {
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("Nationality")
+            .navigationTitle("Passport")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -173,7 +177,7 @@ struct NationalityPickerSheet: View {
         }
     }
 
-    private func select(_ country: Nationality) {
+    private func select(_ country: Country) {
         selection = country.code
         dismiss()
     }

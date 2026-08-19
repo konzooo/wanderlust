@@ -22,7 +22,7 @@
 		C0DE30040000000000000001 /* JoinerIntroOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE30040000000000000002 /* JoinerIntroOverlay.swift */; };
 		C0DE30070000000000000001 /* WelcomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE30070000000000000002 /* WelcomeScreen.swift */; };
 		C0DE30090000000000000001 /* TravellerDNAIntroScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE30090000000000000002 /* TravellerDNAIntroScreen.swift */; };
-		C0DE60010000000000000001 /* NationalityPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE60010000000000000002 /* NationalityPickerSheet.swift */; };
+		C0DE60010000000000000001 /* PassportPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE60010000000000000002 /* PassportPicker.swift */; };
 		C0DE40010000000000000001 /* HomeTripsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40010000000000000002 /* HomeTripsStore.swift */; };
 		C0DE40020000000000000001 /* TripStartDateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40020000000000000002 /* TripStartDateTests.swift */; };
 		C0DE40030000000000000001 /* HomeTripsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40030000000000000002 /* HomeTripsStoreTests.swift */; };
@@ -200,7 +200,7 @@
 		C0DE30040000000000000002 /* JoinerIntroOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinerIntroOverlay.swift; sourceTree = "<group>"; };
 		C0DE30070000000000000002 /* WelcomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeScreen.swift; sourceTree = "<group>"; };
 		C0DE30090000000000000002 /* TravellerDNAIntroScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TravellerDNAIntroScreen.swift; sourceTree = "<group>"; };
-		C0DE60010000000000000002 /* NationalityPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NationalityPickerSheet.swift; sourceTree = "<group>"; };
+		C0DE60010000000000000002 /* PassportPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassportPicker.swift; sourceTree = "<group>"; };
 		C0DE40010000000000000002 /* HomeTripsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTripsStore.swift; sourceTree = "<group>"; };
 		C0DE40020000000000000002 /* TripStartDateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripStartDateTests.swift; sourceTree = "<group>"; };
 		C0DE40030000000000000002 /* HomeTripsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeTripsStoreTests.swift; sourceTree = "<group>"; };
@@ -702,7 +702,7 @@
 			children = (
 				D1A000000000000000000002 /* TravellerProfiles.swift */,
 				C0DE30090000000000000002 /* TravellerDNAIntroScreen.swift */,
-				C0DE60010000000000000002 /* NationalityPickerSheet.swift */,
+				C0DE60010000000000000002 /* PassportPicker.swift */,
 				C0DE20010000000000000002 /* ProfileTabScreen.swift */,
 				C0DE20020000000000000002 /* SettingsScreen.swift */,
 			);
@@ -1054,7 +1054,7 @@
 				C0DE30040000000000000001 /* JoinerIntroOverlay.swift in Sources */,
 				C0DE30070000000000000001 /* WelcomeScreen.swift in Sources */,
 				C0DE30090000000000000001 /* TravellerDNAIntroScreen.swift in Sources */,
-				C0DE60010000000000000001 /* NationalityPickerSheet.swift in Sources */,
+				C0DE60010000000000000001 /* PassportPicker.swift in Sources */,
 				C0DE40010000000000000001 /* HomeTripsStore.swift in Sources */,
 				C0DE10040000000000000001 /* NavigationTabEnvironment.swift in Sources */,
 				C0DE10050000000000000001 /* TabRootAppear.swift in Sources */,

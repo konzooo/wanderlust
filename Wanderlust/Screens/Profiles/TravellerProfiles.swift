@@ -147,8 +147,8 @@ final class TravellerProfileLibrary: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .prefix(500)
         copy.additionalNotes = notes.map(String.init).flatMap { $0.isEmpty ? nil : $0 }
-        copy.nationality = profile.nationality.flatMap { code in
-            Nationality.all.contains(where: { $0.code == code }) ? code : nil
+        copy.passport = profile.passport.flatMap { code in
+            Country.all.contains(where: { $0.code == code }) ? code : nil
         }
         copy.updatedAt = Date()
         return copy
@@ -952,7 +952,7 @@ private extension TravellerProfile {
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
             ),
             "has_age": .boolean(age != nil),
-            "has_nationality": .boolean(nationality != nil)
+            "has_passport": .boolean(passport != nil)
         ]
         for dimension in TravellerDNADimension.allCases {
             if let score = score(for: dimension) {
@@ -992,7 +992,7 @@ struct TravellerDNAEditorScreen: View {
     @State private var mustHaves: [String]
     @State private var additionalNotes: String
     @State private var age: String
-    @State private var nationality: String?
+    @State private var passport: String?
     @State private var saveError: String?
     @FocusState private var nameFocused: Bool
 
@@ -1007,7 +1007,7 @@ struct TravellerDNAEditorScreen: View {
         _mustHaves = State(initialValue: profile?.mustHaves ?? [])
         _additionalNotes = State(initialValue: profile?.additionalNotes ?? "")
         _age = State(initialValue: profile?.age.map(String.init) ?? "")
-        _nationality = State(initialValue: profile?.nationality)
+        _passport = State(initialValue: profile?.passport)
     }
 
     var body: some View {
@@ -1129,7 +1129,9 @@ struct TravellerDNAEditorScreen: View {
                         nameFocused = false
                         page = 0
                     }
-                Text("You can create additional profiles later.")
+                PassportAgeRow(passport: $passport, age: $age)
+                    .padding(.top, 2)
+                Text("Passport and age are optional. You can create additional profiles later.")
                     .font(.kanit(12))
                     .foregroundStyle(.secondary)
             }
@@ -1149,8 +1151,6 @@ struct TravellerDNAEditorScreen: View {
             )
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                AgeNationalityRow(age: $age, nationality: $nationality)
-                    .padding(.bottom, 2)
                 Text("Optional")
                     .font(DS.Typography.fieldLabel)
                 TextEditor(text: $additionalNotes)
@@ -1318,7 +1318,7 @@ struct TravellerDNAEditorScreen: View {
             mustHaves: mustHaves,
             additionalNotes: additionalNotes,
             age: Int(age).flatMap { (1...120).contains($0) ? $0 : nil },
-            nationality: nationality,
+            passport: passport,
             createdAt: profile?.createdAt ?? now,
             updatedAt: now
         )

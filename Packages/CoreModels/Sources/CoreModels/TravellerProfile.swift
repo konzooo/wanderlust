@@ -56,7 +56,7 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
     public let age: Int?
     /// ISO 3166-1 alpha-2 region code, e.g. `DE`. Stored as a code so the
     /// display name can follow the device language.
-    public let nationality: String?
+    public let passport: String?
 
     public init(
         questionnaireVersion: Int = Self.currentVersion,
@@ -65,7 +65,7 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
         mustHaves: [String] = [],
         additionalNotes: String? = nil,
         age: Int? = nil,
-        nationality: String? = nil
+        passport: String? = nil
     ) {
         self.questionnaireVersion = questionnaireVersion
         self.scaleAnswers = scaleAnswers
@@ -73,7 +73,7 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
         self.mustHaves = mustHaves
         self.additionalNotes = additionalNotes
         self.age = age.map { max(1, min(120, $0)) }
-        self.nationality = nationality
+        self.passport = passport
     }
 
     public func score(for dimension: TravellerDNADimension) -> Int? {
@@ -81,8 +81,8 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
     }
 
     /// English country name for the stored code, for prompt text.
-    public var nationalityName: String? {
-        nationality.flatMap(Nationality.englishName(for:))
+    public var passportName: String? {
+        passport.flatMap(Country.englishName(for:))
     }
 
     public var hasEveryScaleAnswer: Bool {
@@ -95,11 +95,11 @@ public struct TravellerProfileSnapshot: Codable, Equatable, Hashable, Sendable {
             let value = score(for: dimension) ?? 3
             return "\n- \(dimension.rawValue): \(value)/5 (\(dimension.leftLabel) ↔ \(dimension.rightLabel))"
         }
+        if let passportName {
+            lines.append("\n- Passport: \(passportName)")
+        }
         if let age {
             lines.append("\n- Age: \(age)")
-        }
-        if let nationalityName {
-            lines.append("\n- Nationality: \(nationalityName)")
         }
         if !usuallySkip.isEmpty {
             lines.append("\n- Usually prefers to skip: \(usuallySkip.map(cleanPromptValue).joined(separator: "; "))")
@@ -130,7 +130,7 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
     public var additionalNotes: String?
     public var age: Int?
     /// ISO 3166-1 alpha-2 region code, e.g. `DE`.
-    public var nationality: String?
+    public var passport: String?
     public let createdAt: Date
     public var updatedAt: Date
 
@@ -143,7 +143,7 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
         mustHaves: [String] = [],
         additionalNotes: String? = nil,
         age: Int? = nil,
-        nationality: String? = nil,
+        passport: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -155,7 +155,7 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
         self.mustHaves = mustHaves
         self.additionalNotes = additionalNotes
         self.age = age.map { max(1, min(120, $0)) }
-        self.nationality = nationality
+        self.passport = passport
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -168,17 +168,17 @@ public struct TravellerProfile: Codable, Equatable, Hashable, Sendable, Identifi
             mustHaves: mustHaves,
             additionalNotes: additionalNotes,
             age: age,
-            nationality: nationality
+            passport: passport
         )
     }
 
     /// Localized country name for the stored code, for display.
-    public var nationalityName: String? {
-        nationality.flatMap(Nationality.displayName(for:))
+    public var passportName: String? {
+        passport.flatMap(Country.displayName(for:))
     }
 
-    public var nationalityFlag: String? {
-        nationality.map(Nationality.flag(for:))
+    public var passportFlag: String? {
+        passport.map(Country.flag(for:))
     }
 
     public func score(for dimension: TravellerDNADimension) -> Int? {

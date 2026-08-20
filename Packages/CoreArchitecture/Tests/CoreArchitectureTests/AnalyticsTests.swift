@@ -83,6 +83,42 @@ final class AnalyticsTests: XCTestCase {
         )
     }
 
+    func testProfileStepViewedAcceptsCanonicalStepNamesForCreateAndEdit() {
+        let stepNames = [
+            "identity", "advice_detail", "physical_energy",
+            "experience_breadth", "day_rhythm", "structure",
+            "usually_skip", "must_haves", "additional_notes"
+        ]
+
+        for operation in ["create", "edit"] {
+            for (index, stepName) in stepNames.enumerated() {
+                let event = AnalyticsEvent(.profileStepViewed, properties: [
+                    "entry_point": .string("profile_tab"),
+                    "operation": .string(operation),
+                    "step_name": .string(stepName),
+                    "step_index": .integer(index)
+                ])
+
+                XCTAssertEqual(event.properties["step_name"], .string(stepName))
+                XCTAssertTrue(
+                    event.isContractValid,
+                    "Rejected \(operation) profile editor event for \(stepName)"
+                )
+            }
+        }
+    }
+
+    func testProfileStepViewedRejectsNonCanonicalStepName() {
+        let event = AnalyticsEvent(.profileStepViewed, properties: [
+            "entry_point": .string("profile_tab"),
+            "operation": .string("edit"),
+            "step_name": .string("someone's profile"),
+            "step_index": .integer(0)
+        ])
+
+        XCTAssertFalse(event.isContractValid)
+    }
+
     func testErrorTaxonomyIsExact() {
         XCTAssertEqual(
             [

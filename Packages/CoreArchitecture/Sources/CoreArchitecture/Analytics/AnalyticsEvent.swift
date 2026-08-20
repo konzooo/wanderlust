@@ -103,6 +103,9 @@ public struct AnalyticsEvent: Equatable, Sendable {
     private static let forbiddenKeyFragments = [
         "token", "code", "url", "raw_error", "error_message", "free_text"
     ]
+    /// These schema-defined fields describe app navigation, not user-provided
+    /// names. All other `*_name` properties remain blocked by default.
+    private static let allowedNameKeys: Set<String> = ["screen_name", "step_name"]
 
     private static func sanitize(
         _ properties: [String: AnalyticsValue]
@@ -112,7 +115,7 @@ public struct AnalyticsEvent: Equatable, Sendable {
             guard !forbiddenKeys.contains(key),
                   !forbiddenKeyFragments.contains(where: key.contains),
                   !(key.hasSuffix("_id") && key != "questionnaire_id"),
-                  !(key.hasSuffix("_name") && key != "screen_name")
+                  !(key.hasSuffix("_name") && !allowedNameKeys.contains(key))
             else { return }
 
             switch pair.value {
@@ -365,6 +368,13 @@ public struct AnalyticsEvent: Equatable, Sendable {
         }
         if key == "trip_mode" { return ["solo", "group"].contains(string) }
         if key == "operation" { return ["create", "edit"].contains(string) }
+        if key == "step_name" {
+            return [
+                "identity", "advice_detail", "physical_energy",
+                "experience_breadth", "day_rhythm", "structure",
+                "usually_skip", "must_haves", "additional_notes"
+            ].contains(string)
+        }
         if key == "selection" { return ["profile", "none"].contains(string) }
         if key == "decision" { return ["keep", "skip", "undo"].contains(string) }
         if key == "component" {

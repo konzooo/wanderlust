@@ -63,7 +63,13 @@ struct SavedTripsScreen: View {
             refreshTrips()
         }
         .onChange(of: store.state.savedTrips) { _, value in
-            guard !didLogView, case let .loaded(trips) = value else { return }
+            guard case let .loaded(trips) = value else { return }
+            AnalyticsTracker.shared.setUserProperties([
+                "saved_solo_trip_count": .integer(trips.count),
+                "group_trip_count": .integer(groupSummaries.count),
+                "received_trip_count": .integer(sharedTrips.count)
+            ])
+            guard !didLogView else { return }
             didLogView = true
             AnalyticsTracker.shared.log(
                 .init(.savedTripsViewed, properties: [
@@ -86,12 +92,9 @@ struct SavedTripsScreen: View {
                 } else {
                     ForEach(groupSummaries) { summary in
                         Button {
-                            var properties: [String: AnalyticsValue] = [
+                            let properties: [String: AnalyticsValue] = [
                                 "trip_type": .string("group")
                             ]
-                            if let destination = AnalyticsSanitizer.destination(summary.destination) {
-                                properties["destination"] = .string(destination)
-                            }
                             AnalyticsTracker.shared.log(
                                 .init(.savedTripOpened, properties: properties)
                             )
@@ -133,7 +136,15 @@ struct SavedTripsScreen: View {
             title: "Many preferences. One trip.",
             message: "Everyone swipes on their own, and the trip is built from what the group actually agrees on.",
             actionTitle: "Create a group trip",
-            action: { router.goToGroupCreate(resetStack: true) },
+            action: {
+                AnalyticsTracker.shared.log(
+                    .tripPlanningStarted(
+                        entryPoint: "saved_trips_empty_group",
+                        tripMode: "group"
+                    )
+                )
+                router.goToGroupCreate(resetStack: true)
+            },
             secondaryTitle: "Join with a code",
             secondaryAction: { router.goToGroupCreate(segment: .join, resetStack: true) }
         )
@@ -180,7 +191,12 @@ struct SavedTripsScreen: View {
             title: "No trips yet",
             message: "Where are you going next? It's time to get some inspiration and local tips.",
             actionTitle: "Plan a trip",
-            action: { router.goToBasicInfo(resetStack: true) }
+            action: {
+                AnalyticsTracker.shared.log(
+                    .tripPlanningStarted(entryPoint: "saved_trips_empty_solo")
+                )
+                router.goToBasicInfo(resetStack: true)
+            }
         )
         .padding(.top, 20)
     }
@@ -188,11 +204,20 @@ struct SavedTripsScreen: View {
     var plusButton: some View {
         Menu {
             Button {
+                AnalyticsTracker.shared.log(
+                    .tripPlanningStarted(entryPoint: "saved_trips_add_solo")
+                )
                 router.goToBasicInfo(resetStack: true)
             } label: {
                 Label("Start a new trip", systemImage: "mappin.and.ellipse")
             }
             Button {
+                AnalyticsTracker.shared.log(
+                    .tripPlanningStarted(
+                        entryPoint: "saved_trips_add_group",
+                        tripMode: "group"
+                    )
+                )
                 router.goToGroupCreate(resetStack: true)
             } label: {
                 Label("Create a group trip", systemImage: "person.3.fill")
@@ -249,10 +274,7 @@ struct SavedTripsScreen: View {
 
     // should be part of a Store Action
     func navigateToTripDetails(_ trip: Trip) {
-        var properties: [String: AnalyticsValue] = ["trip_type": .string("personal")]
-        if let destination = AnalyticsSanitizer.destination(trip.destination) {
-            properties["destination"] = .string(destination)
-        }
+        let properties: [String: AnalyticsValue] = ["trip_type": .string("personal")]
         AnalyticsTracker.shared.log(.init(.savedTripOpened, properties: properties))
         router.goToItineraryResult(
             TripOutputStateFactory.savedTrip(trip),
@@ -263,13 +285,10 @@ struct SavedTripsScreen: View {
     /// A trip in "Shared" is already a durable local copy
     /// (`ReceivedSharedTripStorage`) — opens instantly, no network.
     func navigateToSharedTripDetails(_ trip: Trip) {
-        var properties: [String: AnalyticsValue] = [
+        let properties: [String: AnalyticsValue] = [
             "source": .string("saved_trips"),
             "outcome": .string("success")
         ]
-        if let destination = AnalyticsSanitizer.destination(trip.destination) {
-            properties["destination"] = .string(destination)
-        }
         AnalyticsTracker.shared.log(.init(.sharedTripOpened, properties: properties))
         let suggestions: AsyncValue<Trip.Suggestions> = trip.suggestions != nil ?
             .loaded(trip.suggestions!) : .initial

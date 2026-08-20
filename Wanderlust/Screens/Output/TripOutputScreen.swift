@@ -139,7 +139,20 @@ struct TripOutputScreen: View {
             store.setRouter(router, tab: navigationTab)
             store.send(.onAppear)
             store.logResultViewedIfNeeded()
+            store.logCurrentSectionViewed()
             previousFavoriteCount = store.state.favorites.liked.count
+        }
+        .onChange(of: store.state.itineraryResponse.isLoaded) { _, isLoaded in
+            guard isLoaded else { return }
+            store.logTripCreatedIfNeeded()
+            store.logResultViewedIfNeeded()
+            store.logCurrentSectionViewed()
+        }
+        .onChange(of: store.state.selectedContentTab) { _, _ in
+            store.logCurrentSectionViewed()
+        }
+        .onChange(of: store.state.discoverSegment) { _, _ in
+            store.logCurrentSectionViewed()
         }
         .onChange(of: store.state.favorites.liked.count) { oldCount, newCount in
             guard newCount != previousFavoriteCount else { return }

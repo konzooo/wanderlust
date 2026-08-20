@@ -6,12 +6,14 @@
 //
 
 import CoreArchitecture
+import Sentry
 import SwiftUI
 import DesignSystem
 
 @main
 struct WanderlustApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @Environment(\.openURL) private var openURL
     @StateObject private var metricsTracker = MetricsTracker(storage: UserDefaultsMetricsStorage())
     @StateObject private var navigationRouter = NavigationRouter()
 
@@ -21,6 +23,7 @@ struct WanderlustApp: App {
     @State private var showSplash = true
 
     @AppStorage(OnboardingPreferenceKey.welcomeCompleted) private var welcomeCompleted = false
+    @AppStorage(PrivacyPolicyConsent.preferenceKey) private var privacyPolicyConsentVersion = 0
 
     init() {
         DS.applyUniformDesign()
@@ -39,6 +42,10 @@ struct WanderlustApp: App {
         // what the argument below is for.
         if arguments.contains("-ui-testing") || arguments.contains("-ui-testing-reset-profiles") {
             UserDefaults.standard.set(true, forKey: OnboardingPreferenceKey.welcomeCompleted)
+            UserDefaults.standard.set(
+                PrivacyPolicyConsent.currentVersion,
+                forKey: PrivacyPolicyConsent.preferenceKey
+            )
         }
 
         if arguments.contains("-ui-testing-reset-onboarding") {
@@ -88,6 +95,9 @@ struct WanderlustApp: App {
                 .preferredColorScheme(.light)
                 .environmentObject(navigationRouter)
                 .environmentObject(metricsTracker)
+                .task {
+                    syncAnonymousAnalyticsState()
+                }
                 .onOpenURL { url in
                     // A deep link means the user is heading somewhere specific.
                     // Get out of the way rather than making them watch the
@@ -120,6 +130,23 @@ struct WanderlustApp: App {
                     .transition(.opacity)
                     .zIndex(2)
                 }
+
+                if !showSplash,
+                   privacyPolicyConsentVersion < PrivacyPolicyConsent.currentVersion {
+                    PrivacyPolicyConsentOverlay(
+                        onAccept: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                privacyPolicyConsentVersion = PrivacyPolicyConsent.currentVersion
+                            }
+                        },
+                        onViewPolicy: {
+                            openURL(PrivacyPolicyConsent.privacyURL)
+                        }
+                    )
+                    .transition(.opacity)
+                    .zIndex(4)
+                }
+
             }
             
 //            NavigationStack {
@@ -154,12 +181,116 @@ struct WanderlustApp: App {
 //            .environmentObject(NavigationRouter())
         }
     }
+
+    @MainActor
+    private func syncAnonymousAnalyticsState() {
+        TravellerProfileLibrary.shared.syncAnalyticsState()
+        AnalyticsTracker.shared.setUserProperties([
+            "saved_solo_trip_count": .integer(
+                (try? TripStorage().fetchAll().count) ?? 0
+            ),
+            "group_trip_count": .integer(GroupTripCredentialsStore.summaries.count),
+            "received_trip_count": .integer(
+                (try? ReceivedSharedTripStorage.received().fetchAll().count) ?? 0
+            )
+        ])
+    }
+}
+
+private enum PrivacyPolicyConsent {
+    static let preferenceKey = "privacy.aiDataSharingConsentVersion"
+    static let currentVersion = 1
+    static let privacyURL = URL(
+        string: "https://wanderlust.get-catalyst.app/privacy"
+    )!
+}
+
+private struct PrivacyPolicyConsentOverlay: View {
+    let onAccept: () -> Void
+    let onViewPolicy: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.32)
+                .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                VStack(spacing: 7) {
+                    Text("Accept Privacy Policy")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+
+                    Text("Please review and accept our Privacy Policy to continue using Wanderlust.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(spacing: 4) {
+                    Button(action: onAccept) {
+                        Text("Accept & Continue")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(Color(uiColor: .systemBlue))
+
+                    Button("View Policy", action: onViewPolicy)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(uiColor: .systemBlue))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Opens the Privacy Policy")
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 26)
+            .padding(.bottom, 14)
+            .frame(maxWidth: 286)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(.white.opacity(0.35), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 30, y: 12)
+            .padding(.horizontal, 28)
+        }
+    }
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        CrashReporter.start()
         AnalyticsTracker.shared.initialize()
         return true
+    }
+}
+
+private enum CrashReporter {
+    static func start(bundle: Bundle = .main) {
+        guard let dsn = bundle.object(forInfoDictionaryKey: "SentryDSN") as? String,
+              !dsn.isEmpty,
+              !dsn.contains("$(")
+        else { return }
+
+        SentrySDK.start { options in
+            options.dsn = dsn
+            options.sendDefaultPii = false
+            options.tracesSampleRate = 0
+            options.attachScreenshot = false
+            options.attachViewHierarchy = false
+            options.enableMemoryIntrospection = false
+#if DEBUG
+            options.environment = "development"
+#else
+            options.environment = "production"
+#endif
+        }
     }
 }

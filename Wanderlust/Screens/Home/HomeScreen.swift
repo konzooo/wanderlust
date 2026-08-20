@@ -87,6 +87,9 @@ struct HomeScreen: View {
             groupTripCard
 
             Button {
+                AnalyticsTracker.shared.log(
+                    .tripPlanningStarted(entryPoint: "home_group_join", tripMode: "group")
+                )
                 router.goToGroupCreate(segment: .join, on: .home)
             } label: {
                 HStack(spacing: 10) {
@@ -181,6 +184,9 @@ struct HomeScreen: View {
 
     private var groupTripCard: some View {
         Button {
+            AnalyticsTracker.shared.log(
+                .tripPlanningStarted(entryPoint: "home_group_create", tripMode: "group")
+            )
             router.goToGroupCreate(segment: .create, on: .home)
         } label: {
             HStack(spacing: 15) {

@@ -39,4 +39,8 @@ final class AmplitudeAnalyticsService: AnalyticsService {
             )
         )
     }
+
+    func setUserProperties(_ properties: [String: AnalyticsValue]) {
+        amplitude?.identify(userProperties: properties.mapValues(\.amplitudeValue))
+    }
 }

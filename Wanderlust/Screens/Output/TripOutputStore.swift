@@ -39,6 +39,7 @@ class TripOutputStore: ObservableStore {
     /// from this local copy. Remember them for this screen lifetime so a chip
     /// does not immediately offer the same rejected request again.
     private var blockedDeepDiveInterestKeys: Set<String> = []
+    private var viewedAnalyticsSections: Set<String> = []
     
     // Navigation
     var router: NavigationRouter?
@@ -350,6 +351,11 @@ extension TripOutputStore {
         var accommodation: CoarseAccommodation? = nil
         var imageUrlResponse: AsyncValue<URL> = .initial
         var didLogResultViewed = false
+        var didLogTripCreated = false
+        /// Captured when the questionnaire hands off to generation, so the
+        /// completion event records the final attachment—not the earlier
+        /// default shown on the details screen.
+        var profileAttachmentSource: String = "none"
 
         /// The Worth-it/Skip cards, as their own component state.
         ///
@@ -779,7 +785,7 @@ extension TripOutputStore {
         let context = state.mode == .groupTrip ? [] : alreadyRecommended()
         let startedAt = Date()
         let attempt = retryCount + 1
-        logGeneration(.tripGenerationStarted, component: "nearYou", attempt: attempt)
+        logGeneration(.tripGenerationStarted, component: "near_you", attempt: attempt)
 
         nearYouTask = Task { [weak self] in
             guard let self else { return }
@@ -877,7 +883,7 @@ extension TripOutputStore {
                 if state.saved { reSaveTrip() }
                 logGeneration(
                     .tripGenerationSucceeded,
-                    component: "nearYou",
+                    component: "near_you",
                     attempt: attempt,
                     duration: startedAt
                 )
@@ -888,7 +894,7 @@ extension TripOutputStore {
                 if state.saved { reSaveTrip() }
                 logGeneration(
                     .tripGenerationFailed,
-                    component: "nearYou",
+                    component: "near_you",
                     attempt: attempt,
                     duration: startedAt,
                     error: error
@@ -1009,8 +1015,12 @@ extension TripOutputStore {
     /// with a card showing "kept" that is not in their favourites. Nothing else
     /// may mutate `favorites` and `worthItDecisions` at separate call sites.
     func removeFavourite(_ id: UUID) {
+        let clearedWorthItDecision = state.worthItDecisions[id] != nil
         state.favorites.remove(id)
         state.worthItDecisions[id] = nil
+        if clearedWorthItDecision {
+            logWorthItDecision("undo", itemID: id)
+        }
         persistGroupPersonalLayer()
     }
 
@@ -1049,6 +1059,12 @@ extension TripOutputStore {
             // Skipping, and undoing a skip, deliberately leave favourites alone.
             break
         }
+        let analyticsDecision: String = switch decision {
+        case .kept: "keep"
+        case .skipped: "skip"
+        case nil: "undo"
+        }
+        logWorthItDecision(analyticsDecision, itemID: id)
         persistGroupPersonalLayer()
     }
 
@@ -1121,6 +1137,7 @@ extension TripOutputStore {
                     state.itineraryResponse = .loaded(itinerary)
                     // Re-fetch using the destination the model normalized.
                     fetchDestinationImage()
+                    logTripCreatedIfNeeded()
                     logResultViewedIfNeeded()
 
                 case .suggestions:
@@ -1173,7 +1190,7 @@ extension TripOutputStore {
                 }
                 logGeneration(
                     .tripGenerationSucceeded,
-                    component: component.rawValue,
+                    component: component.analyticsName,
                     attempt: attempt,
                     duration: startedAt
                 )
@@ -1190,7 +1207,7 @@ extension TripOutputStore {
                 }
                 logGeneration(
                     .tripGenerationFailed,
-                    component: component.rawValue,
+                    component: component.analyticsName,
                     attempt: attempt,
                     duration: startedAt,
                     error: error
@@ -1208,7 +1225,7 @@ extension TripOutputStore {
         setLoading(component)
         logGeneration(
             .tripGenerationStarted,
-            component: component.rawValue,
+            component: component.analyticsName,
             attempt: attempt
         )
     }
@@ -1226,7 +1243,7 @@ extension TripOutputStore {
         deepDiveErrorMessage = nil
         let startedAt = Date()
         let attempt = retryCount + 1
-        logGeneration(.tripGenerationStarted, component: "deepDive", attempt: attempt)
+        logGeneration(.tripGenerationStarted, component: "deep_dive", attempt: attempt)
 
         groupDeepDiveTask = Task { [weak self] in
             guard let self else { return }
@@ -1241,7 +1258,7 @@ extension TripOutputStore {
                 state.deepDives = (state.deepDives ?? []) + [category]
                 logGeneration(
                     .tripGenerationSucceeded,
-                    component: "deepDive",
+                    component: "deep_dive",
                     attempt: attempt,
                     duration: startedAt
                 )
@@ -1251,7 +1268,7 @@ extension TripOutputStore {
                 setDeepDiveFailure(error, interest: interest)
                 logGeneration(
                     .tripGenerationFailed,
-                    component: "deepDive",
+                    component: "deep_dive",
                     attempt: attempt,
                     duration: startedAt,
                     error: error
@@ -1703,6 +1720,78 @@ extension TripOutputStore {
         AnalyticsTracker.shared.log(.init(name, properties: analyticsTripProperties))
     }
 
+    func logTripCreatedIfNeeded() {
+        guard state.mode == .newTrip,
+              !state.didLogTripCreated,
+              state.itineraryResponse.isLoaded
+        else { return }
+        state.didLogTripCreated = true
+        let hasProfile = state.generationRequest?.input.profile != nil
+        AnalyticsTracker.shared.log(
+            .init(.tripCreated, properties: [
+                "trip_mode": .string("solo"),
+                "duration_days": .integer(state.details.duration),
+                "profile_attached": .boolean(hasProfile),
+                "profile_attachment_source": .string(
+                    hasProfile ? state.profileAttachmentSource : "none"
+                ),
+                "profile_count": .integer(
+                    TravellerProfileLibrary.shared.profiles.count
+                )
+            ])
+        )
+    }
+
+    /// Logs each output section at most once per screen lifetime. This keeps a
+    /// tab switch useful as engagement while avoiding counts from redraws.
+    func logCurrentSectionViewed() {
+        guard state.itineraryResponse.isLoaded else { return }
+        let section: String
+        let subsection: String?
+        switch state.selectedContentTab {
+        case .discover:
+            section = "discover"
+            subsection = switch state.discoverSegment {
+            case .suggestions: "suggestions"
+            case .worthIt: "worth_it"
+            case .itinerary: "itinerary"
+            }
+        case .nearYou:
+            section = "near_you"
+            subsection = nil
+        case .knowBeforeYouGo:
+            section = "know_before_you_go"
+            subsection = nil
+        }
+        let key = [section, subsection].compactMap { $0 }.joined(separator: "/")
+        guard viewedAnalyticsSections.insert(key).inserted else { return }
+        var properties: [String: AnalyticsValue] = [
+            "trip_mode": .string(analyticsTripMode),
+            "trip_context": .string(state.mode.analyticsName),
+            "section": .string(section),
+            "duration_days": .integer(state.details.duration)
+        ]
+        if let subsection { properties["subsection"] = .string(subsection) }
+        AnalyticsTracker.shared.log(
+            .init(.tripSectionViewed, properties: properties)
+        )
+    }
+
+    private func logWorthItDecision(_ decision: String, itemID: UUID) {
+        guard let index = state.worthItItems?.firstIndex(where: { $0.id == itemID }) else {
+            return
+        }
+        AnalyticsTracker.shared.log(
+            .init(.worthItDecided, properties: [
+                "trip_mode": .string(analyticsTripMode),
+                "trip_context": .string(state.mode.analyticsName),
+                "decision": .string(decision),
+                "item_position": .integer(index + 1),
+                "duration_days": .integer(state.details.duration)
+            ])
+        )
+    }
+
     func logFavoriteChange(action: String) {
         var properties = analyticsTripProperties
         properties["action"] = .string(action)
@@ -1711,14 +1800,15 @@ extension TripOutputStore {
     }
 
     private var analyticsTripProperties: [String: AnalyticsValue] {
-        var properties: [String: AnalyticsValue] = [
+        let properties: [String: AnalyticsValue] = [
             "trip_type": .string(state.mode.analyticsName),
             "duration_days": .integer(state.details.duration)
         ]
-        if let destination = AnalyticsSanitizer.destination(state.fullDestinationString) {
-            properties["destination"] = .string(destination)
-        }
         return properties
+    }
+
+    private var analyticsTripMode: String {
+        state.mode == .groupTrip ? "group" : "solo"
     }
 
     private func logGeneration(

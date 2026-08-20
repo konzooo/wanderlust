@@ -240,6 +240,20 @@ struct GroupNearYouProposalDTO: Decodable, Equatable, Sendable {
         }
     }
 
+    init(
+        places: [NearYouProposalPayload.Place],
+        sparseMessage: String? = nil,
+        setBy: String,
+        operationVersion: Int,
+        previousSuccessfulCount: Int
+    ) {
+        self.places = places
+        self.sparseMessage = sparseMessage
+        self.setBy = setBy
+        operationVersionRaw = Double(operationVersion)
+        previousSuccessfulCountRaw = Double(previousSuccessfulCount)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case places, sparseMessage, setBy
         case operationVersionRaw = "operationVersion"

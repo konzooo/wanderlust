@@ -86,13 +86,10 @@ final class SharedTripStore: ObservableObject {
     }
 
     private func logOpened(trip: Trip, outcome: String) {
-        var properties: [String: AnalyticsValue] = [
+        let properties: [String: AnalyticsValue] = [
             "source": .string("deep_link"),
             "outcome": .string(outcome)
         ]
-        if let destination = AnalyticsSanitizer.destination(trip.destination) {
-            properties["destination"] = .string(destination)
-        }
         AnalyticsTracker.shared.log(.init(.sharedTripOpened, properties: properties))
     }
 

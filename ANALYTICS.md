@@ -1,106 +1,173 @@
 # Wanderlust analytics contract
 
-This file is the source of truth for analytics schema version `1`.
+This file is the source of truth for product analytics schema version `2`.
 
-## Privacy and delivery rules
+## Delivery, identity, and privacy
 
 - Provider: Amplitude Swift `1.18.6`, EU server zone.
-- Production uses the Amplitude-generated device ID for pseudonymous sessions and retention. The app never sets a user ID.
-- Amplitude autocapture is limited to sessions and app lifecycle. Remote autocapture configuration and diagnostics are disabled.
-- IP address, IDFV, location, city, region, country, DMA, and carrier collection are disabled.
-- Debug and UI-test builds do not deliver events. A Debug build can explicitly opt in with the `-analytics-live` launch argument.
-- Release events include `distribution_channel = testflight|app_store`. Every custom event includes `schema_version = 1`.
-- Event names and property keys use lowercase `snake_case`. Properties must be flat primitive strings, integers, doubles, or booleans.
-- Never add names, IDs, invite/share codes, tokens, URLs, raw errors, free-form text, generated content, notes, feedback text, or profile list contents.
-- `destination` must pass `AnalyticsSanitizer.destination`: trim and collapse spaces, lowercase, maximum 80 characters, and plausible place-name characters only.
-- Exact ages are forbidden; use `party_age_bucket`.
-- Errors use only: `network`, `timeout`, `rate_limited`, `authentication`, `validation`, `not_found`, `conflict`, `decoding`, `storage`, `service`, or `unknown`.
+- The app does not set an account user ID. Amplitude's pseudonymous device ID
+  is used for sessions, funnels, retention, and trips per install.
+- Autocapture is limited to sessions and app lifecycle. Remote autocapture and
+  diagnostics are disabled.
+- IP address, IDFV, location, city, region, country, DMA, and carrier collection
+  are disabled in the app configuration.
+- Debug and UI-test builds are offline unless Debug explicitly launches with
+  `-analytics-live`.
+- Every custom event receives `schema_version = 2` and
+  `distribution_channel = debug|testflight|app_store`.
+- Event properties use an exact per-event allowlist and primitive types. An
+  event with an unknown, missing, or wrongly typed property is rejected.
+- Analytics never receives destinations, names, local or server IDs,
+  invite/share codes, tokens, URLs, raw errors, free-form text, notes,
+  generated content, or profile list contents.
+- Exact ages are forbidden. Errors use only `network`, `timeout`,
+  `rate_limited`, `authentication`, `validation`, `not_found`, `conflict`,
+  `decoding`, `storage`, `service`, or `unknown`.
 
-## Shared properties
+## Anonymous install properties
 
-| Property | Type | Meaning |
-|---|---:|---|
-| `schema_version` | integer | Always `1` |
-| `distribution_channel` | string | `debug`, `testflight`, or `app_store` |
-| `destination` | string | Optional sanitized place name |
-| `outcome` | string | Controlled success/failure outcome |
-| `error_category` | string | Fixed taxonomy; never a raw message |
-| `duration_ms` | integer | Operation duration |
-| `trip_mode` / `trip_type` | string | Controlled solo/group or storage context |
+These are updated at launch and after relevant local changes. They are state,
+not increment-only counters.
 
-## Events
+| Property | Type |
+|---|---:|
+| `has_profile` | boolean |
+| `profile_count` | integer |
+| `attach_profile_by_default` | boolean |
+| `saved_solo_trip_count` | integer |
+| `group_trip_count` | integer |
+| `received_trip_count` | integer |
 
-### Lifecycle and navigation
+## Canonical events
 
-Amplitude owns install, update, app open, background, and session events.
+### Navigation and onboarding
 
-| Event | Required properties | Optional properties |
-|---|---|---|
-| `screen_viewed` | `screen_name` | `entry_point` |
-
-Canonical screens: `home`, `basic_info`, `questionnaire`, `trip_output`, `saved_trips`, `profiles`, `feedback`, `group_create`, `group_members`, `group_join`, `group_questionnaire`, `group_dashboard`, `shared_trip`, `welcome`, `group_intro`, `joiner_intro`, and `traveller_dna_intro`.
-
-The four onboarding screens are one-shot introductions, so their volume is a
-count of new users rather than of sessions. `welcome` is logged once per page
-with `entry_point` set to `page_promise`, `page_setup`, `page_advice`, or
-`page_favourites` — the drop-off across the first-launch flow is the gap
-between those four counts, and no separate completion event is emitted.
-
-### Solo planning and results
-
-| Event | Contract |
+| Event | Required properties |
 |---|---|
-| `trip_planning_started` | `entry_point` |
-| `trip_details_submitted` | `duration_days`, `start_month`, `party_type`, `party_age_bucket`, `party_gender`, `has_custom_notes`, `profile_usage`; optional `destination` |
+| `screen_viewed` | `screen_name`; optional `entry_point` |
+| `onboarding_completed` | `flow`, `page` |
+| `onboarding_skipped` | `flow`, `page` |
+
+Profile screens are deliberately distinct: `profile_tab`,
+`profile_management`, and `profile_editor`. Other canonical screens are
+`home`, `basic_info`, `questionnaire`, `trip_output`, `saved_trips`,
+`feedback`, `group_create`, `group_members`, `group_join`,
+`group_questionnaire`, `group_dashboard`, `shared_trip`, `welcome`,
+`group_intro`, `joiner_intro`, and `traveller_dna_intro`.
+
+### Traveller DNA
+
+| Event | Required properties |
+|---|---|
+| `profile_flow_started` | `entry_point`, `operation=create|edit` |
+| `profile_step_viewed` | start fields plus `step_name`, zero-based `step_index` |
+| `traveller_profile_saved` | `entry_point`, `operation`, `profile_count`, five DNA scores, list counts, `has_notes` |
+| `traveller_profile_deleted` | `profile_count`, five DNA scores, list counts, `has_notes` |
+| `traveller_profile_selected` | `entry_point`, `selection=profile|none`, `profile_count` |
+
+The editor steps are `identity`, the five stable DNA dimension names,
+`usually_skip`, `must_haves`, and `additional_notes`. DNA scores are integers
+from `1...5`; lists contribute counts only.
+
+### Solo and group questionnaire
+
+| Event | Required properties |
+|---|---|
 | `questionnaire_started` | `trip_mode`, `questionnaire_version`, `question_count` |
 | `questionnaire_limit_reached` | `trip_mode`, `questionnaire_version` |
-| `questionnaire_completed` | start properties plus `duration_ms`, `undo_count`, `q01_choice`–`q07_choice`; optional Traveller DNA properties |
-| `trip_generation_started` | `component`, `attempt`, `trip_mode`; optional `destination` |
-| `trip_generation_succeeded` | start properties plus `duration_ms` |
-| `trip_generation_failed` | start properties plus `duration_ms`, `error_category` |
-| `trip_result_viewed` | `trip_type`; optional `destination`, `duration_days` |
-| `trip_saved`, `trip_deleted` | `outcome`, `trip_type`; optional `destination`, `error_category` |
-| `favorite_changed` | `action`, `favorite_count`, `trip_type`; optional `destination` |
-| `trip_share_requested` | `trip_type`; optional `destination` |
-| `trip_share_succeeded`, `trip_share_failed` | `outcome`, `trip_type`; optional `destination`, `error_category` |
+| `questionnaire_answered` | `trip_mode`, `questionnaire_version`, `question_key`, `step_index`, `choice` |
+| `questionnaire_completed` | start fields, `duration_ms`, `undo_count`, final attachment state; optional `q01_choice`–`q07_choice` and DNA summary |
+| `group_preferences_submitted` | version/count, `has_profile`, final attachment state, `outcome`; optional choices, DNA summary, `error_category` |
 
-`component` is one of `itinerary`, `suggestions`, or `image`; `attempt` starts at `1`.
+`choice` and every final `qNN_choice` are exactly `left`, `right`, or `both`.
+`questionnaire_answered` measures partial progress; the completion event is the
+canonical final answer distribution.
 
-### Saved, shared, and group trips
+### Trip creation, generation, and engagement
 
-| Event | Contract |
+| Event | Required properties |
+|---|---|
+| `trip_planning_started` | `entry_point`; `trip_mode=solo|group` |
+| `trip_details_submitted` | duration/month/party fields, `profile_usage`; optional attachment source/count |
+| `trip_created` | `trip_mode=solo`, `profile_attached`, `profile_attachment_source`; optional duration/count |
+| `trip_generation_started` | `component`, `attempt`, `trip_mode` |
+| `trip_generation_succeeded` | start fields plus `duration_ms` |
+| `trip_generation_failed` | start fields plus `duration_ms`, `error_category` |
+| `trip_result_viewed`, `group_result_viewed` | `trip_type`; optional duration |
+| `trip_section_viewed` | `trip_mode`, `trip_context`, `section`; optional `subsection`, duration |
+| `worth_it_decided` | `trip_mode`, `trip_context`, `decision`, one-based `item_position` |
+| `trip_saved`, `trip_deleted` | `outcome`, `trip_type`; optional duration/error |
+| `favorite_changed` | `action`, `favorite_count`, `trip_type`; optional duration |
+| `trip_share_requested` | `trip_type`; optional duration |
+| `trip_share_succeeded`, `trip_share_failed` | `outcome`, `trip_type`; optional duration/error |
+
+`trip_created` fires once when a newly generated solo itinerary arrives;
+reopening a saved or received trip never creates one. Generation components
+are `itinerary`, `suggestions`, `know_before_you_go`, `worth_it`,
+`where_to_stay`, `deep_dive`, `near_you`, and `image`.
+
+Top-level output sections are `discover`, `know_before_you_go`, and
+`near_you`; Discover subsections are `suggestions`, `worth_it`, and
+`itinerary`. Each is counted once per screen visit. Worth It decisions are
+`keep`, `skip`, or `undo` and never include item IDs or content.
+
+### Saved, shared, and group collaboration
+
+| Event | Required properties |
 |---|---|
 | `saved_trips_viewed` | `personal_count`, `group_count`, `received_count` |
-| `saved_trip_opened` | `trip_type`; optional `destination` |
-| `shared_trip_opened` | `source`, `outcome`; optional `destination`, `error_category` |
-| `group_trip_creation_started`, `group_trip_created`, `group_trip_creation_failed` | duration/month/profile fields; optional `destination`, `outcome`, `error_category` |
-| `group_member_added` | `role`, `roster_count`, `outcome`; optional `error_category` |
+| `saved_trip_opened` | `trip_type` |
+| `shared_trip_opened` | `source`, `outcome`; optional `error_category` |
+| `group_trip_creation_started` | duration/month/profile fields |
+| `group_trip_created`, `group_trip_creation_failed` | creation fields plus `outcome`; optional error |
+| `group_member_added` | `role`, `roster_count`, `outcome`; optional error |
 | `group_invite_shared` | `method`, `roster_count` |
-| `group_join_started`, `group_join_succeeded`, `group_join_failed` | `source`, `method`; outcome events add `outcome` and optional `error_category` |
-| `group_preferences_submitted` | questionnaire version/count, choices, profile summary, `outcome`; optional `error_category` |
-| `group_generation_requested` | `action`; optional roster/completion counts and `destination` |
-| `group_generation_state_changed` | `previous_state`, `state`, roster/completion counts; optional `destination`, `error_category` |
-| `group_result_viewed` | `trip_type`; optional `destination`, `duration_days` |
+| `group_join_started` | `source`, `method` |
+| `group_join_succeeded`, `group_join_failed` | join fields plus `outcome`; optional error |
+| `group_generation_requested` | `action`; optional roster/completion counts |
+| `group_generation_state_observed` | previous/current state and roster/completion counts; optional error |
 
-Join `source` is `deep_link` or `manual_code`; join `method` is `existing_slot` or `new_member`. Invite method currently uses `copy_link`.
+`group_generation_state_observed` is diagnostic client observation and may be
+emitted by multiple members. Authoritative attempt conversion and reliability
+come from Convex `groupGenerationRuns`, keyed by group and generation version,
+with initial/retry, start/finish timestamps, outcome, and stable error code.
+Component cost, duration, token, and error reporting comes from Convex
+`generationTelemetry`.
 
-### Traveller DNA and feedback
+### Feedback and health
 
-| Event | Contract |
+| Event | Required properties |
 |---|---|
-| `traveller_profile_saved` | `operation`, five `dna_*` scores, `skip_count`, `must_have_count`, `has_notes`, `profile_count` |
-| `traveller_profile_deleted` | five `dna_*` scores, counts, `has_notes`, `profile_count` |
-| `traveller_profile_selected` | `selection`, `profile_count`; profile selection may include five scores and counts |
-| `feedback_submitted` | `outcome`, populated-field booleans, length buckets; optional `error_category` |
+| `near_you_verified` | `proposed`, `resolved`, `survived` |
+| `feedback_submitted` | `outcome`, populated-field booleans, length buckets; optional error |
 
-Traveller DNA properties are the five integer scores `dna_advice_detail`, `dna_physical_energy`, `dna_experience_breadth`, `dna_day_rhythm`, and `dna_structure`, each constrained to `1...5`. Only list counts and `has_notes` are allowed.
+## Dashboards and funnels
 
-## Dashboard definitions
+1. **Solo activation:** `trip_planning_started(trip_mode=solo)` →
+   `trip_details_submitted` → `questionnaire_started` →
+   `questionnaire_completed` → `trip_created` → `trip_result_viewed`.
+2. **Profile creation:** `screen_viewed(profile_tab)` →
+   `profile_flow_started(operation=create)` → ordered `profile_step_viewed` →
+   `traveller_profile_saved`. Break down by `entry_point`.
+3. **Profile adoption:** installs with `has_profile=true` →
+   `trip_created(profile_attached=true)`. Break down by
+   `profile_attachment_source=default|manual`.
+4. **Questionnaire choices:** unique installs and answer counts by
+   `question_key` × `choice`; compare partial `questionnaire_answered` with
+   final `questionnaire_completed` distributions.
+5. **Output engagement:** result view → each `trip_section_viewed` →
+   `worth_it_decided` / `favorite_changed` / successful save/share.
+6. **Group organizer:** group creation started → created → admin member added →
+   invite shared → generation requested → authoritative backend run ready →
+   `group_result_viewed`.
+7. **Group joiner:** join started → succeeded → questionnaire started →
+   preferences submitted → group result viewed. Do not combine this with the
+   organizer funnel as if one device performs every step.
+8. **Frequency and retention:** `trip_created` per pseudonymous install by
+   day/week, solo/group mix, local trip-count properties, and Amplitude weekly
+   returning installs.
+9. **Reliability/cost:** client generation success and p50/p95 duration by
+   normalized component, plus backend telemetry and group runs.
 
-1. **Activation Funnel:** `trip_planning_started` → `trip_details_submitted` → `questionnaire_completed` → successful itinerary generation → `trip_result_viewed` → successful `trip_saved`.
-2. **Generation Reliability:** success rate and p50/p95 `duration_ms` by `component`, `attempt`, and `distribution_channel`; failures by `error_category`.
-3. **Personalization:** questionnaire choices, profile use, Traveller DNA score distributions, favorite rate, and save rate. Do not expose cohorts with very small populations.
-4. **Group Collaboration:** creation → member added/invite → join → preferences → generation ready → result viewed.
-5. **Retention / Engagement:** Amplitude lifecycle sessions, weekly returning devices, saved/shared/group opens, and trips planned per pseudonymous device.
-
-Schema changes require updating this file, typed event definitions, and tests in the same change.
+Schema changes require updating this file, the typed event contract, and tests
+in the same change.

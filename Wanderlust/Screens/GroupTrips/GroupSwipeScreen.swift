@@ -174,7 +174,14 @@ struct GroupSwipeScreen: View {
         var properties: [String: AnalyticsValue] = [
             "questionnaire_version": .integer(preferences.questionnaireVersion),
             "question_count": .integer(preferences.answers.count),
-            "has_profile": .boolean(preferences.profile != nil)
+            "has_profile": .boolean(preferences.profile != nil),
+            "profile_attached": .boolean(preferences.profile != nil),
+            "profile_count": .integer(TravellerProfileLibrary.shared.profiles.count),
+            "profile_attachment_source": .string(
+                TravellerProfileLibrary.shared.analyticsAttachmentSource(
+                    for: selectedProfileID
+                )
+            )
         ]
         for answer in preferences.answers {
             let paddedID = answer.questionID.count == 1

@@ -77,9 +77,6 @@ final class GroupDashboardStore: ObservableStore {
         if case let .loaded(group) = state.group {
             properties["roster_count"] = .integer(group.memberCount)
             properties["completed_count"] = .integer(group.completedCount)
-            if let destination = AnalyticsSanitizer.destination(group.destination) {
-                properties["destination"] = .string(destination)
-            }
         }
         AnalyticsTracker.shared.log(
             .init(.groupGenerationRequested, properties: properties)
@@ -94,9 +91,6 @@ final class GroupDashboardStore: ObservableStore {
             "roster_count": .integer(group.memberCount),
             "completed_count": .integer(group.completedCount)
         ]
-        if let destination = AnalyticsSanitizer.destination(group.destination) {
-            properties["destination"] = .string(destination)
-        }
         if let errorCode = group.errorCode {
             properties["error_category"] = .string(
                 AnalyticsSanitizer.errorCategory(
@@ -106,7 +100,7 @@ final class GroupDashboardStore: ObservableStore {
         }
         previousGroupStatus = group.status
         AnalyticsTracker.shared.log(
-            .init(.groupGenerationStateChanged, properties: properties)
+            .init(.groupGenerationStateObserved, properties: properties)
         )
     }
 }

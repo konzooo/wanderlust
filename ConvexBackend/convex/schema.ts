@@ -94,6 +94,24 @@ export default defineSchema({
     .index("by_token", ["memberTokenHash"]),
 
   /**
+   * Authoritative, once-per-attempt group-generation lifecycle. Client
+   * subscriptions can observe the same status more than once; this table is
+   * what conversion and reliability reporting should count.
+   */
+  groupGenerationRuns: defineTable({
+    groupId: v.id("groups"),
+    generationVersion: v.number(),
+    attemptKind: v.union(v.literal("initial"), v.literal("retry")),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    outcome: v.optional(v.union(v.literal("ready"), v.literal("error"))),
+    errorCode: v.optional(v.string()),
+  }).index("by_groupId_and_generationVersion", [
+    "groupId",
+    "generationVersion",
+  ]),
+
+  /**
    * A solo trip explicitly published by tapping Share. Nothing lands here
    * until then (publish-on-share only — solo trips are otherwise 100% local).
    * The public `code` grants read access; there is no write/update/revoke

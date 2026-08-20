@@ -4,9 +4,11 @@ import { randomShareCode } from "./lib/codes";
 import { hashToken, newToken } from "./lib/tokens";
 import { toSharedTripDTO } from "./lib/dto";
 import { stampMissingStableIds } from "./lib/stableIds";
+import { rateLimiter, requireRateLimit } from "./lib/rateLimits";
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_DESTINATION_LENGTH = 160;
+const MAX_SHARED_TRIP_BYTES = 400_000;
 
 /**
  * Publishes a generated solo trip. Nothing is published until the user taps
@@ -16,6 +18,7 @@ const MAX_DESTINATION_LENGTH = 160;
  */
 export const publishTrip = mutation({
   args: {
+    installToken: v.string(),
     title: v.string(),
     destination: v.string(),
     durationDays: v.number(), // Swift MUST send Double — int64 wire format ≠ v.number()
@@ -46,8 +49,28 @@ export const publishTrip = mutation({
     imageUrl: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {
-    if (args.title.length > MAX_TITLE_LENGTH || args.destination.length > MAX_DESTINATION_LENGTH) {
+    if (
+      args.installToken.length < 32 ||
+      args.installToken.length > 256 ||
+      !args.title.trim() ||
+      args.title.length > MAX_TITLE_LENGTH ||
+      !args.destination.trim() ||
+      args.destination.length > MAX_DESTINATION_LENGTH ||
+      !Number.isInteger(args.durationDays) ||
+      args.durationDays < 1 ||
+      args.durationDays > 30
+    ) {
       throw new ConvexError("Trip metadata too long");
+    }
+    const installHash = await hashToken(args.installToken);
+    requireRateLimit(
+      await rateLimiter.limit(ctx, "sharedPublishInstall", { key: installHash }),
+    );
+    requireRateLimit(await rateLimiter.limit(ctx, "sharedPublishGlobal"));
+
+    const serializedSize = new TextEncoder().encode(JSON.stringify(args)).byteLength;
+    if (serializedSize > MAX_SHARED_TRIP_BYTES) {
+      throw new ConvexError("shared_trip_too_large");
     }
 
     let code = randomShareCode();

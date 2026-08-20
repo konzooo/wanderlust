@@ -81,12 +81,18 @@ struct GroupTripCreateScreen: View {
         .toolbar {
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ProfileSelectionButton(selection: $store.state.selectedProfileID)
+                    ProfileSelectionButton(
+                        selection: $store.state.selectedProfileID,
+                        entryPoint: "group_trip_create"
+                    )
                 }
                 .sharedBackgroundVisibility(.hidden)
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ProfileSelectionButton(selection: $store.state.selectedProfileID)
+                    ProfileSelectionButton(
+                        selection: $store.state.selectedProfileID,
+                        entryPoint: "group_trip_create"
+                    )
                 }
             }
         }

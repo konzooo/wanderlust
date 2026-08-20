@@ -72,7 +72,10 @@ struct QuestionnaireScreen: View {
                     questionnaireBackButton
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    ProfileSelectionButton(selection: profileSelection)
+                    ProfileSelectionButton(
+                        selection: profileSelection,
+                        entryPoint: profileAnalyticsEntryPoint
+                    )
                 }
                 .sharedBackgroundVisibility(.hidden)
             } else {
@@ -80,7 +83,10 @@ struct QuestionnaireScreen: View {
                     questionnaireBackButton
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    ProfileSelectionButton(selection: profileSelection)
+                    ProfileSelectionButton(
+                        selection: profileSelection,
+                        entryPoint: profileAnalyticsEntryPoint
+                    )
                 }
             }
         }
@@ -107,6 +113,12 @@ struct QuestionnaireScreen: View {
             .presentationDragIndicator(.hidden)
             .interactiveDismissDisabled(true)
         }
+    }
+
+    private var profileAnalyticsEntryPoint: String {
+        store.mode.analyticsName == "group"
+            ? "group_questionnaire"
+            : "solo_questionnaire"
     }
 
     // MARK: Sub-views ---------------------------------------------------------
@@ -168,7 +180,12 @@ struct QuestionnaireScreen: View {
                 let snapshot = TravellerProfileLibrary.shared
                     .profile(id: profileSelection.wrappedValue)?
                     .snapshot
-                if let event = store.completionEvent(profile: snapshot) {
+                let attachmentSource = TravellerProfileLibrary.shared
+                    .analyticsAttachmentSource(for: profileSelection.wrappedValue)
+                if let event = store.completionEvent(
+                    profile: snapshot,
+                    profileAttachmentSource: attachmentSource
+                ) {
                     AnalyticsTracker.shared.log(event)
                 }
                 switch store.mode {
@@ -267,7 +284,9 @@ struct QuestionnaireScreen: View {
                 input: TripOrganizer.shared.generationInput(profile: profile)
             ),
             details    : TripOrganizer.shared.tripDetails,
-            mode: .newTrip
+            mode: .newTrip,
+            profileAttachmentSource: TravellerProfileLibrary.shared
+                .analyticsAttachmentSource(for: profileSelection.wrappedValue)
         )
         router.goToItineraryResult(state, resetStack: true)
     }

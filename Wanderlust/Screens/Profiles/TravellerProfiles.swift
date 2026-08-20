@@ -45,6 +45,7 @@ final class TravellerProfileLibrary: ObservableObject {
             self.fileURL = folder.appendingPathComponent("profiles.json")
         }
         load()
+        syncAnalyticsState()
     }
 
     var mainProfile: TravellerProfile? {
@@ -60,7 +61,10 @@ final class TravellerProfileLibrary: ObservableObject {
         return profiles.first(where: { $0.id == id })
     }
 
-    func save(_ profile: TravellerProfile) throws {
+    func save(
+        _ profile: TravellerProfile,
+        analyticsEntryPoint: String = "profile_management"
+    ) throws {
         let cleaned = try normalized(profile)
         let isFirst = profiles.isEmpty
         let wasExisting = profiles.contains(where: { $0.id == cleaned.id })
@@ -75,11 +79,13 @@ final class TravellerProfileLibrary: ObservableObject {
         }
         try persist()
         var properties = cleaned.analyticsProperties
-        properties["operation"] = .string(wasExisting ? "updated" : "created")
+        properties["entry_point"] = .string(analyticsEntryPoint)
+        properties["operation"] = .string(wasExisting ? "edit" : "create")
         properties["profile_count"] = .integer(profiles.count)
         AnalyticsTracker.shared.log(
             .init(.travellerProfileSaved, properties: properties)
         )
+        syncAnalyticsState()
     }
 
     func delete(_ id: UUID) {
@@ -99,17 +105,33 @@ final class TravellerProfileLibrary: ObservableObject {
                 .init(.travellerProfileDeleted, properties: properties)
             )
         }
+        syncAnalyticsState()
     }
 
     func makeMain(_ id: UUID) {
         guard profile(id: id) != nil else { return }
         mainProfileID = id
         try? persist()
+        syncAnalyticsState()
     }
 
     func setAttachByDefault(_ value: Bool) {
         attachByDefault = value && mainProfileID != nil
         try? persist()
+        syncAnalyticsState()
+    }
+
+    func syncAnalyticsState() {
+        AnalyticsTracker.shared.setUserProperties([
+            "has_profile": .boolean(!profiles.isEmpty),
+            "profile_count": .integer(profiles.count),
+            "attach_profile_by_default": .boolean(attachByDefault)
+        ])
+    }
+
+    func analyticsAttachmentSource(for profileID: UUID?) -> String {
+        guard let profileID else { return "none" }
+        return attachByDefault && profileID == mainProfileID ? "default" : "manual"
     }
 
 #if DEBUG
@@ -433,6 +455,7 @@ private extension TravellerProfile {
 
 struct ProfileSelectionButton: View {
     @Binding var selection: UUID?
+    let entryPoint: String
     @EnvironmentObject private var router: NavigationRouter
     @ObservedObject private var library = TravellerProfileLibrary.shared
     @AppStorage(ProfilePreferenceKey.introductionDismissed) private var onboardingDismissed = false
@@ -446,6 +469,11 @@ struct ProfileSelectionButton: View {
     // of this same visit reads as broken, not patient. Suppress it until the
     // traveller leaves and returns to this tab.
     @State private var introSuppressedForTab = false
+
+    init(selection: Binding<UUID?>, entryPoint: String = "profile_management") {
+        _selection = selection
+        self.entryPoint = entryPoint
+    }
 
     var body: some View {
         Button {
@@ -495,7 +523,8 @@ struct ProfileSelectionButton: View {
                     AnalyticsTracker.shared.log(
                         .init(.travellerProfileSelected, properties: [
                             "selection": .string("none"),
-                            "profile_count": .integer(library.profiles.count)
+                            "profile_count": .integer(library.profiles.count),
+                            "entry_point": .string(entryPoint)
                         ])
                     )
                     pickerPresented = false
@@ -511,11 +540,12 @@ struct ProfileSelectionButton: View {
                             isSelected: selection == profile.id
                         ) {
                             selection = profile.id
-                            var properties = profile.analyticsProperties
-                            properties["selection"] = .string("profile")
-                            properties["profile_count"] = .integer(library.profiles.count)
                             AnalyticsTracker.shared.log(
-                                .init(.travellerProfileSelected, properties: properties)
+                                .init(.travellerProfileSelected, properties: [
+                                    "selection": .string("profile"),
+                                    "profile_count": .integer(library.profiles.count),
+                                    "entry_point": .string(entryPoint)
+                                ])
                             )
                             pickerPresented = false
                         }
@@ -548,6 +578,7 @@ struct ProfileSelectionButton: View {
             NavigationStack {
                 ProfilesScreen(
                     startsCreating: startCreating,
+                    analyticsEntryPoint: entryPoint,
                     onProfileCreated: { profile in
                         selection = profile.id
                     }
@@ -572,7 +603,7 @@ struct ProfileSelectionButton: View {
             )
         }
         .fullScreenCover(isPresented: $editorPresented) {
-            TravellerDNAEditorScreen(profile: nil) { profile in
+            TravellerDNAEditorScreen(profile: nil, analyticsEntryPoint: entryPoint) { profile in
                 selection = profile.id
             }
         }
@@ -688,6 +719,7 @@ private enum EditorTarget: Identifiable {
 
 struct ProfilesScreen: View {
     var startsCreating = false
+    var analyticsEntryPoint = "profile_management"
     var onProfileCreated: ((TravellerProfile) -> Void)?
     var navigationTitle = "Profiles"
     var showsDoneButton = true
@@ -736,7 +768,9 @@ struct ProfilesScreen: View {
         }
         .onAppear {
             if logsScreenViewOnAppear {
-                AnalyticsTracker.shared.log(.screenViewed(.profiles))
+                AnalyticsTracker.shared.log(
+                    .screenViewed(.profileManagement, entryPoint: analyticsEntryPoint)
+                )
             }
             guard !didHandleInitialAction else { return }
             didHandleInitialAction = true
@@ -759,7 +793,10 @@ struct ProfilesScreen: View {
             }
         ) {
             if onboardingStartsEditor {
-                TravellerDNAEditorScreen(profile: nil) { saved in
+                TravellerDNAEditorScreen(
+                    profile: nil,
+                    analyticsEntryPoint: analyticsEntryPoint
+                ) { saved in
                     onProfileCreated?(saved)
                 }
             } else {
@@ -780,7 +817,10 @@ struct ProfilesScreen: View {
             }
         }
         .fullScreenCover(item: $editorTarget) { target in
-            TravellerDNAEditorScreen(profile: target.profile) { saved in
+            TravellerDNAEditorScreen(
+                profile: target.profile,
+                analyticsEntryPoint: analyticsEntryPoint
+            ) { saved in
                 onProfileCreated?(saved)
             }
         }
@@ -1000,6 +1040,7 @@ private let dnaQuestions: [DNAQuestion] = [
 
 struct TravellerDNAEditorScreen: View {
     let profile: TravellerProfile?
+    let analyticsEntryPoint: String
     let onSave: (TravellerProfile) -> Void
 
     @ObservedObject private var library = TravellerProfileLibrary.shared
@@ -1014,10 +1055,17 @@ struct TravellerDNAEditorScreen: View {
     @State private var age: String
     @State private var passport: String?
     @State private var saveError: String?
+    @State private var didLogFlowStart = false
+    @State private var loggedPages: Set<Int> = []
     @FocusState private var nameFocused: Bool
 
-    init(profile: TravellerProfile?, onSave: @escaping (TravellerProfile) -> Void) {
+    init(
+        profile: TravellerProfile?,
+        analyticsEntryPoint: String = "profile_management",
+        onSave: @escaping (TravellerProfile) -> Void
+    ) {
         self.profile = profile
+        self.analyticsEntryPoint = analyticsEntryPoint
         self.onSave = onSave
         _name = State(initialValue: profile?.name ?? "")
         _scores = State(initialValue: Dictionary(
@@ -1052,6 +1100,7 @@ struct TravellerDNAEditorScreen: View {
                 }
             }
             .task(id: page) {
+                logAnalyticsIfNeeded()
                 guard page == -1 else {
                     nameFocused = false
                     return
@@ -1343,12 +1392,48 @@ struct TravellerDNAEditorScreen: View {
             updatedAt: now
         )
         do {
-            try library.save(saved)
+            try library.save(saved, analyticsEntryPoint: analyticsEntryPoint)
             onSave(library.profile(id: saved.id) ?? saved)
             dismiss()
         } catch {
             saveError = error.localizedDescription
         }
+    }
+
+    private var analyticsOperation: String { profile == nil ? "create" : "edit" }
+
+    private var analyticsStepName: String {
+        switch page {
+        case -1: "identity"
+        case 0...4: dnaQuestions[page].dimension.rawValue
+        case 5: "usually_skip"
+        case 6: "must_haves"
+        default: "additional_notes"
+        }
+    }
+
+    private func logAnalyticsIfNeeded() {
+        if !didLogFlowStart {
+            didLogFlowStart = true
+            AnalyticsTracker.shared.log(
+                .screenViewed(.profileEditor, entryPoint: analyticsEntryPoint)
+            )
+            AnalyticsTracker.shared.log(
+                .init(.profileFlowStarted, properties: [
+                    "entry_point": .string(analyticsEntryPoint),
+                    "operation": .string(analyticsOperation)
+                ])
+            )
+        }
+        guard loggedPages.insert(page).inserted else { return }
+        AnalyticsTracker.shared.log(
+            .init(.profileStepViewed, properties: [
+                "entry_point": .string(analyticsEntryPoint),
+                "operation": .string(analyticsOperation),
+                "step_name": .string(analyticsStepName),
+                "step_index": .integer(page + 1)
+            ])
+        )
     }
 }
 

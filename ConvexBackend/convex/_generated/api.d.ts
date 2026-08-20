@@ -19,6 +19,7 @@ import type * as lib_components from "../lib/components.js";
 import type * as lib_dto from "../lib/dto.js";
 import type * as lib_openai from "../lib/openai.js";
 import type * as lib_prompts from "../lib/prompts.js";
+import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_schemas from "../lib/schemas.js";
 import type * as lib_stableIds from "../lib/stableIds.js";
 import type * as lib_tokens from "../lib/tokens.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   "lib/dto": typeof lib_dto;
   "lib/openai": typeof lib_openai;
   "lib/prompts": typeof lib_prompts;
+  "lib/rateLimits": typeof lib_rateLimits;
   "lib/schemas": typeof lib_schemas;
   "lib/stableIds": typeof lib_stableIds;
   "lib/tokens": typeof lib_tokens;
@@ -84,4 +86,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

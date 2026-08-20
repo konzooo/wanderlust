@@ -30,7 +30,7 @@ public final class AnalyticsTracker: AnalyticsTracking {
     public func log(_ event: AnalyticsEvent) {
         guard event.isContractValid else {
             assertionFailure(
-                "Analytics event \(event.name.rawValue) is missing required properties"
+                "Analytics event \(event.name.rawValue) violates its property contract"
             )
             return
         }
@@ -42,6 +42,19 @@ public final class AnalyticsTracker: AnalyticsTracking {
             testingClient.log(enrichedEvent)
         } else {
             service.log(enrichedEvent)
+        }
+    }
+
+    /// Updates anonymous install-level state. No account identifier or raw
+    /// content is attached; these properties make profile/trip cohorts usable.
+    public func setUserProperties(_ properties: [String: AnalyticsValue]) {
+        let sanitized = properties.filter { Self.userPropertyContract[$0.key] != nil }
+            .filter { Self.userPropertyContract[$0.key] == Self.kind(of: $0.value) }
+        guard !sanitized.isEmpty else { return }
+        if let testingClient {
+            testingClient.setUserProperties(sanitized)
+        } else {
+            service.setUserProperties(sanitized)
         }
     }
 
@@ -57,4 +70,22 @@ public final class AnalyticsTracker: AnalyticsTracking {
     }
 
     private init() {}
+
+    private enum ValueKind: Equatable { case integer, boolean }
+    private static let userPropertyContract: [String: ValueKind] = [
+        "has_profile": .boolean,
+        "profile_count": .integer,
+        "attach_profile_by_default": .boolean,
+        "saved_solo_trip_count": .integer,
+        "group_trip_count": .integer,
+        "received_trip_count": .integer
+    ]
+
+    private static func kind(of value: AnalyticsValue) -> ValueKind? {
+        switch value {
+        case .integer: .integer
+        case .boolean: .boolean
+        case .string, .double: nil
+        }
+    }
 }

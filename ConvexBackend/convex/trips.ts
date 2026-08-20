@@ -83,7 +83,12 @@ export const generateComponent = action({
     const component = args.component as Component;
     const input = args.input as SoloTripInput;
 
-    if (!args.installToken || !args.tripKey) {
+    if (
+      args.installToken.length < 32 ||
+      args.installToken.length > 256 ||
+      args.tripKey.length === 0 ||
+      args.tripKey.length > 128
+    ) {
       throw new ConvexError("invalid_request");
     }
     if (input.destination.trim().length === 0) {

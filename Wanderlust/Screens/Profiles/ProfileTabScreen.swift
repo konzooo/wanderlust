@@ -38,7 +38,7 @@ struct ProfileTabScreen: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $createDNAPresented) {
-            TravellerDNAEditorScreen(profile: nil) { _ in }
+            TravellerDNAEditorScreen(profile: nil, analyticsEntryPoint: "profile_tab") { _ in }
         }
         .sheet(isPresented: $introPresented) {
             TravellerDNAIntroScreen(
@@ -60,7 +60,8 @@ struct ProfileTabScreen: View {
             .presentationDragIndicator(.visible)
         }
         .onTabRootAppear(.profile, router: router) {
-            AnalyticsTracker.shared.log(.screenViewed(.profiles))
+            AnalyticsTracker.shared.log(.screenViewed(.profileTab))
+            library.syncAnalyticsState()
             presentIntroIfNeeded()
         }
     }
@@ -91,6 +92,7 @@ struct ProfileTabScreen: View {
         if let profile = library.mainProfile {
             NavigationLink {
                 ProfilesScreen(
+                    analyticsEntryPoint: "profile_tab",
                     navigationTitle: "Traveller DNA",
                     showsDoneButton: false,
                     automaticallyPresentsOnboarding: false
@@ -140,7 +142,8 @@ struct ProfileTabScreen: View {
                     symbol: "bubble.left.and.bubble.right",
                     title: "Give Feedback",
                     subtitle: "Help shape what Wanderlust becomes",
-                    accessory: .chevron
+                    accessory: .chevron,
+                    textColor: Color(hex: "#238636")
                 )
             }
             .buttonStyle(.plain)
@@ -448,6 +451,7 @@ private struct ProfileMenuRow: View {
     let title: String
     let subtitle: String
     let accessory: ProfileMenuAccessory
+    var textColor: Color? = nil
 
     var body: some View {
         HStack(spacing: 13) {
@@ -460,10 +464,10 @@ private struct ProfileMenuRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.kanit(15).weight(.medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(textColor ?? Color.primary)
                 Text(subtitle)
                     .font(.kanit(11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(textColor ?? Color.secondary)
                     .lineLimit(1)
             }
 

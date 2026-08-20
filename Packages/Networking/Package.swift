@@ -25,12 +25,13 @@ let package = Package(
 //                         package: "CoreDependencies")
                 .product(name: "CoreModels",
                          package: "CoreModels")
-            ]
+            ],
+            exclude: ["OpenAI"]
         ),
         .testTarget(
             name: "NetworkingTests",
-            dependencies: ["Networking"]
+            dependencies: ["Networking"],
+            exclude: ["Clients/OpenAIClientTests.swift"]
         ),
     ]
 )
-

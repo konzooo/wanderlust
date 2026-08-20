@@ -15,6 +15,19 @@ enum TripComponent: String, CaseIterable, Sendable {
     /// Manual and explicit. Never part of eager solo or group generation.
     case nearYou
 
+    /// Stable analytics spelling. Raw values remain the backend wire contract.
+    var analyticsName: String {
+        switch self {
+        case .itinerary: "itinerary"
+        case .suggestions: "suggestions"
+        case .knowBeforeYouGo: "know_before_you_go"
+        case .deepDive: "deep_dive"
+        case .worthIt: "worth_it"
+        case .whereToStay: "where_to_stay"
+        case .nearYou: "near_you"
+        }
+    }
+
     /// A required component's failure fails the whole generation; everything
     /// else is best-effort and the trip still opens without it. The split is
     /// declared here and enforced identically on the backend.
@@ -90,7 +103,7 @@ enum TripGenerationError: Error, Equatable {
     init(code: String) {
         switch code {
         case "quota_install_daily": self = .installDailyLimit
-        case "quota_global_daily": self = .serviceBusy
+        case "quota_global_daily", "rate_limited": self = .serviceBusy
         case "quota_component_cap": self = .deepDiveLimit
         case "duplicate_deep_dive": self = .duplicateDeepDive
         case let c where c.hasPrefix("incomplete_"): self = .truncatedOutput
@@ -110,6 +123,23 @@ enum TripGenerationError: Error, Equatable {
         case .truncatedOutput: "output_incomplete"
         case .backend(let code): code
         case .transport: "transport"
+        }
+    }
+}
+
+extension TripGenerationError: AnalyticsErrorCategorizing {
+    var analyticsErrorCategory: AnalyticsErrorCategory {
+        switch self {
+        case .installDailyLimit, .deepDiveLimit: .rateLimited
+        case .serviceBusy: .service
+        case .duplicateDeepDive: .conflict
+        case .truncatedOutput: .validation
+        case .transport: .network
+        case let .backend(code):
+            if code.contains("auth") { .authentication }
+            else if code.contains("not_found") { .notFound }
+            else if code.contains("validation") { .validation }
+            else { .service }
         }
     }
 }

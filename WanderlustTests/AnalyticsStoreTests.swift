@@ -1,5 +1,6 @@
 import CoreArchitecture
 import CoreModels
+import DesignSystem
 import Networking
 import XCTest
 @testable import Wanderlust
@@ -42,6 +43,18 @@ final class AnalyticsStoreTests: XCTestCase {
         XCTAssertEqual(events(named: .questionnaireCompleted).count, 1)
     }
 
+    func testQuestionnaireAnswerLogsPartialProgressAndChoice() {
+        let store = QuestionnaireStore(mode: .solo)
+        store.send(.start)
+
+        store.send(.cardSwipped(store.state.cards[0], SwipeDirection.top))
+
+        let event = events(named: .questionnaireAnswered).first
+        XCTAssertEqual(event?.properties["question_key"], .string("q01"))
+        XCTAssertEqual(event?.properties["step_index"], .integer(0))
+        XCTAssertEqual(event?.properties["choice"], .string("both"))
+    }
+
     func testItineraryGenerationLogsOneStartAndOneSuccess() async {
         let store = makeTripStore(itinerary: SuccessfulItineraryGenerator())
 
@@ -51,6 +64,7 @@ final class AnalyticsStoreTests: XCTestCase {
         XCTAssertEqual(componentEvents(.tripGenerationStarted, "itinerary").count, 1)
         XCTAssertEqual(componentEvents(.tripGenerationSucceeded, "itinerary").count, 1)
         XCTAssertEqual(componentEvents(.tripGenerationFailed, "itinerary").count, 0)
+        XCTAssertEqual(events(named: .tripCreated).count, 1)
     }
 
     func testItineraryGenerationLogsOneSanitizedFailure() async {

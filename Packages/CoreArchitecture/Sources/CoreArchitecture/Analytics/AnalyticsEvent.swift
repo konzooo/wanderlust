@@ -24,13 +24,14 @@ public enum AnalyticsValue: Equatable, Sendable {
     }
 }
 
-/// Strongly typed names for the version-one product analytics contract.
+/// Strongly typed names for the version-two product analytics contract.
 public enum AnalyticsEventName: String, CaseIterable, Sendable {
     case screenViewed = "screen_viewed"
     case tripPlanningStarted = "trip_planning_started"
     case tripDetailsSubmitted = "trip_details_submitted"
     case questionnaireStarted = "questionnaire_started"
     case questionnaireLimitReached = "questionnaire_limit_reached"
+    case questionnaireAnswered = "questionnaire_answered"
     case questionnaireCompleted = "questionnaire_completed"
     case tripGenerationStarted = "trip_generation_started"
     case tripGenerationSucceeded = "trip_generation_succeeded"
@@ -40,6 +41,9 @@ public enum AnalyticsEventName: String, CaseIterable, Sendable {
     /// where anyone stayed.
     case nearYouVerified = "near_you_verified"
     case tripResultViewed = "trip_result_viewed"
+    case tripCreated = "trip_created"
+    case tripSectionViewed = "trip_section_viewed"
+    case worthItDecided = "worth_it_decided"
     case tripSaved = "trip_saved"
     case tripDeleted = "trip_deleted"
     case favoriteChanged = "favorite_changed"
@@ -59,17 +63,23 @@ public enum AnalyticsEventName: String, CaseIterable, Sendable {
     case groupJoinFailed = "group_join_failed"
     case groupPreferencesSubmitted = "group_preferences_submitted"
     case groupGenerationRequested = "group_generation_requested"
-    case groupGenerationStateChanged = "group_generation_state_changed"
+    /// A client observation, not an authoritative backend transition. The name
+    /// prevents this event being mistaken for a once-only lifecycle event.
+    case groupGenerationStateObserved = "group_generation_state_observed"
     case groupResultViewed = "group_result_viewed"
     case travellerProfileSaved = "traveller_profile_saved"
     case travellerProfileDeleted = "traveller_profile_deleted"
     case travellerProfileSelected = "traveller_profile_selected"
+    case profileFlowStarted = "profile_flow_started"
+    case profileStepViewed = "profile_step_viewed"
+    case onboardingCompleted = "onboarding_completed"
+    case onboardingSkipped = "onboarding_skipped"
     case feedbackSubmitted = "feedback_submitted"
 }
 
 /// A validated event with primitive, flat properties only.
 public struct AnalyticsEvent: Equatable, Sendable {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
 
     public let name: AnalyticsEventName
     public let properties: [String: AnalyticsValue]
@@ -87,7 +97,8 @@ public struct AnalyticsEvent: Equatable, Sendable {
         "share_code", "invite_code", "code", "token", "url",
         "raw_error", "error_message", "name", "group_name", "member_name",
         "profile_name", "notes", "customizations", "feedback_text",
-        "suggestion_text", "generated_content", "title", "content"
+        "suggestion_text", "generated_content", "title", "content",
+        "destination"
     ]
     private static let forbiddenKeyFragments = [
         "token", "code", "url", "raw_error", "error_message", "free_text"
@@ -115,10 +126,16 @@ public struct AnalyticsEvent: Equatable, Sendable {
         }
     }
 
-    /// Used by the tracker and tests to fail closed when required contract
-    /// fields are missing. Optional fields remain event-specific.
+    /// Fails closed for missing, unknown, or incorrectly typed fields. This is
+    /// deliberately stricter than the provider SDK so arbitrary strings cannot
+    /// silently become part of the analytics schema.
     public var isContractValid: Bool {
-        Self.requiredProperties(for: name).isSubset(of: Set(properties.keys))
+        let keys = Set(properties.keys)
+        let required = Self.requiredProperties(for: name)
+        guard required.isSubset(of: keys),
+              keys.isSubset(of: Self.allowedProperties(for: name))
+        else { return false }
+        return properties.allSatisfy { Self.isValidValue($0.value, for: $0.key) }
     }
 
     public static func requiredProperties(
@@ -139,6 +156,11 @@ public struct AnalyticsEvent: Equatable, Sendable {
             ["trip_mode", "questionnaire_version", "question_count"]
         case .questionnaireLimitReached:
             ["trip_mode", "questionnaire_version"]
+        case .questionnaireAnswered:
+            [
+                "trip_mode", "questionnaire_version", "question_key",
+                "step_index", "choice"
+            ]
         case .questionnaireCompleted:
             [
                 "trip_mode", "questionnaire_version", "question_count",
@@ -154,6 +176,12 @@ public struct AnalyticsEvent: Equatable, Sendable {
             ["proposed", "resolved", "survived"]
         case .tripResultViewed, .groupResultViewed:
             ["trip_type"]
+        case .tripCreated:
+            ["trip_mode", "profile_attached", "profile_attachment_source"]
+        case .tripSectionViewed:
+            ["trip_mode", "trip_context", "section"]
+        case .worthItDecided:
+            ["trip_mode", "trip_context", "decision", "item_position"]
         case .tripSaved, .tripDeleted:
             ["outcome", "trip_type"]
         case .favoriteChanged:
@@ -184,23 +212,171 @@ public struct AnalyticsEvent: Equatable, Sendable {
             ["questionnaire_version", "question_count", "has_profile", "outcome"]
         case .groupGenerationRequested:
             ["action"]
-        case .groupGenerationStateChanged:
+        case .groupGenerationStateObserved:
             ["previous_state", "state", "roster_count", "completed_count"]
         case .travellerProfileSaved:
             [
-                "operation", "profile_count", "skip_count",
-                "must_have_count", "has_notes"
+                "entry_point", "operation", "profile_count", "skip_count",
+                "must_have_count", "has_notes", "dna_advice_detail",
+                "dna_physical_energy", "dna_experience_breadth",
+                "dna_day_rhythm", "dna_structure"
             ]
         case .travellerProfileDeleted:
-            ["profile_count", "skip_count", "must_have_count", "has_notes"]
+            [
+                "profile_count", "skip_count", "must_have_count", "has_notes",
+                "dna_advice_detail", "dna_physical_energy",
+                "dna_experience_breadth", "dna_day_rhythm", "dna_structure"
+            ]
         case .travellerProfileSelected:
-            ["selection", "profile_count"]
+            ["selection", "profile_count", "entry_point"]
+        case .profileFlowStarted:
+            ["entry_point", "operation"]
+        case .profileStepViewed:
+            ["entry_point", "operation", "step_name", "step_index"]
+        case .onboardingCompleted, .onboardingSkipped:
+            ["flow", "page"]
         case .feedbackSubmitted:
             [
                 "outcome", "has_likes_dislikes", "has_suggestions",
                 "likes_dislikes_length_bucket", "suggestions_length_bucket"
             ]
         }
+    }
+
+    /// The exact optional-field contract for every event. Questionnaire/DNA
+    /// fields are enumerated here as well; there are no arbitrary key escapes.
+    public static func allowedProperties(
+        for name: AnalyticsEventName
+    ) -> Set<String> {
+        let required = requiredProperties(for: name)
+        let commonOutcome: Set<String> = ["error_category"]
+        let questionnaireAnswers = Set((1...7).map { String(format: "q%02d_choice", $0) })
+        let profileSummary: Set<String> = [
+            "profile_attached", "profile_attachment_source", "profile_count",
+            "profile_skip_count", "profile_must_have_count", "profile_has_notes",
+            "dna_advice_detail", "dna_physical_energy", "dna_experience_breadth",
+            "dna_day_rhythm", "dna_structure"
+        ]
+
+        let optional: Set<String> = switch name {
+        case .screenViewed:
+            ["entry_point"]
+        case .tripPlanningStarted:
+            ["trip_mode"]
+        case .tripDetailsSubmitted:
+            ["profile_count", "profile_attachment_source"]
+        case .questionnaireStarted, .questionnaireLimitReached, .questionnaireAnswered:
+            []
+        case .questionnaireCompleted, .groupPreferencesSubmitted:
+            questionnaireAnswers.union(profileSummary).union(commonOutcome)
+        case .tripGenerationStarted:
+            ["trip_type", "duration_days"]
+        case .tripGenerationSucceeded, .tripGenerationFailed:
+            ["trip_type", "duration_days", "error_category"]
+        case .nearYouVerified:
+            []
+        case .tripResultViewed, .groupResultViewed:
+            ["duration_days"]
+        case .tripCreated:
+            ["duration_days", "profile_count"]
+        case .tripSectionViewed:
+            ["subsection", "duration_days"]
+        case .worthItDecided:
+            ["duration_days"]
+        case .tripSaved, .tripDeleted, .tripShareSucceeded, .tripShareFailed:
+            ["duration_days", "error_category"]
+        case .favoriteChanged:
+            ["duration_days"]
+        case .tripShareRequested:
+            ["duration_days"]
+        case .savedTripsViewed:
+            []
+        case .savedTripOpened:
+            []
+        case .sharedTripOpened:
+            commonOutcome
+        case .groupTripCreationStarted:
+            ["profile_attachment_source"]
+        case .groupTripCreated, .groupTripCreationFailed:
+            ["profile_attachment_source", "error_category"]
+        case .groupMemberAdded:
+            commonOutcome
+        case .groupInviteShared:
+            []
+        case .groupJoinStarted:
+            []
+        case .groupJoinSucceeded, .groupJoinFailed:
+            commonOutcome
+        case .groupGenerationRequested:
+            ["roster_count", "completed_count"]
+        case .groupGenerationStateObserved:
+            commonOutcome
+        case .travellerProfileSaved, .travellerProfileDeleted:
+            [
+                "entry_point", "has_age", "has_passport", "dna_advice_detail",
+                "dna_physical_energy", "dna_experience_breadth", "dna_day_rhythm",
+                "dna_structure"
+            ]
+        case .travellerProfileSelected:
+            []
+        case .profileFlowStarted:
+            []
+        case .profileStepViewed:
+            []
+        case .onboardingCompleted, .onboardingSkipped:
+            []
+        case .feedbackSubmitted:
+            commonOutcome
+        }
+        return required.union(optional)
+    }
+
+    private static let integerKeys: Set<String> = [
+        "attempt", "completed_count", "duration_days", "duration_ms",
+        "favorite_count", "group_count", "item_position", "must_have_count",
+        "personal_count", "profile_count", "profile_must_have_count",
+        "profile_skip_count", "proposed", "question_count", "questionnaire_version",
+        "received_count", "resolved", "roster_count", "skip_count", "step_index",
+        "survived", "undo_count", "dna_advice_detail", "dna_physical_energy",
+        "dna_experience_breadth", "dna_day_rhythm", "dna_structure"
+    ]
+    private static let booleanKeys: Set<String> = [
+        "has_age", "has_custom_notes", "has_likes_dislikes", "has_notes",
+        "has_passport", "has_profile", "has_suggestions", "profile_attached",
+        "profile_has_notes"
+    ]
+
+    private static func isValidValue(_ value: AnalyticsValue, for key: String) -> Bool {
+        if integerKeys.contains(key) {
+            guard case let .integer(number) = value, number >= 0 else { return false }
+            if key.hasPrefix("dna_") { return (1...5).contains(number) }
+            return true
+        }
+        if booleanKeys.contains(key) {
+            guard case .boolean = value else { return false }
+            return true
+        }
+        guard case let .string(string) = value else { return false }
+        if key == "choice" || key.hasPrefix("q") && key.hasSuffix("_choice") {
+            return ["left", "right", "both"].contains(string)
+        }
+        if key == "question_key" {
+            return Set((1...7).map { String(format: "q%02d", $0) }).contains(string)
+        }
+        if key == "trip_mode" { return ["solo", "group"].contains(string) }
+        if key == "operation" { return ["create", "edit"].contains(string) }
+        if key == "selection" { return ["profile", "none"].contains(string) }
+        if key == "decision" { return ["keep", "skip", "undo"].contains(string) }
+        if key == "component" {
+            return [
+                "itinerary", "suggestions", "know_before_you_go", "worth_it",
+                "where_to_stay", "deep_dive", "near_you", "image"
+            ].contains(string)
+        }
+        if key == "profile_attachment_source" {
+            return ["none", "default", "manual"].contains(string)
+        }
+        return true
     }
 }
 
@@ -218,24 +394,13 @@ public enum AnalyticsErrorCategory: String, Sendable {
     case unknown
 }
 
+/// Errors with a stable domain taxonomy can opt out of fragile description
+/// parsing. Product modules should conform their typed errors to this protocol.
+public protocol AnalyticsErrorCategorizing: Error {
+    var analyticsErrorCategory: AnalyticsErrorCategory { get }
+}
+
 public enum AnalyticsSanitizer {
-    /// Emits only plausible place names. Free-form text, URLs, and identifiers fail closed.
-    public static func destination(_ rawValue: String) -> String? {
-        let collapsed = rawValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(whereSeparator: \.isWhitespace)
-            .joined(separator: " ")
-            .lowercased()
-
-        guard (2...80).contains(collapsed.count) else { return nil }
-        let allowedPunctuation = CharacterSet(charactersIn: " .,-'’")
-        let allowed = CharacterSet.letters
-            .union(.nonBaseCharacters)
-            .union(allowedPunctuation)
-        guard collapsed.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
-        return collapsed
-    }
-
     public static func ageBucket(_ age: Int?) -> String {
         guard let age else { return "unknown" }
         return switch age {
@@ -260,6 +425,9 @@ public enum AnalyticsSanitizer {
     }
 
     public static func errorCategory(_ error: Error) -> AnalyticsErrorCategory {
+        if let categorized = error as? any AnalyticsErrorCategorizing {
+            return categorized.analyticsErrorCategory
+        }
         if let urlError = error as? URLError {
             return urlError.code == .timedOut ? .timeout : .network
         }

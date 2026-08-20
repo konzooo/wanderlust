@@ -74,37 +74,43 @@ final class NearYouTests: XCTestCase {
         XCTAssertTrue(json.contains("walkingMinutes"))
     }
 
-    func testGroupPayloadCannotContainExactAccommodationInput() throws {
-        let exactAddress = "Carrer de Mallorca 166, 2A"
-        let payload = GroupNearYouActionPayload(
-            accommodation: centre(precision: .address).accommodation,
-            discovery: discovery(),
-            researchArea: "Eixample, Barcelona",
-            replace: false
+    func testGroupAccommodationPayloadContainsOnlyTheCoarsePersistedLocation() throws {
+        let payload = GroupNearYouAccommodationInput(
+            CoarseAccommodation(
+                label: "Eixample, Barcelona",
+                latitude: 41.385_123,
+                longitude: 2.173_987,
+                precision: .address
+            )
         )
         let json = String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
 
-        XCTAssertFalse(json.contains(exactAddress))
         XCTAssertFalse(json.contains("rawAddress"))
-        XCTAssertTrue(json.contains("Hotel Example"))
+        XCTAssertTrue(json.contains("Eixample, Barcelona"))
         XCTAssertTrue(json.contains("\"latitude\":41.385"))
+        XCTAssertTrue(json.contains("\"longitude\":2.174"))
     }
 
-    func testUnknownModelCandidateIDCannotMaterialize() {
-        let unknown = UUID()
-        let payload = NearYouSelectionPayload(
-            sections: [
-                .init(
-                    title: "Your kind of morning",
-                    picks: [.init(candidateID: unknown, explanation: "A good fit.")]
-                )
-            ],
-            sparseMessage: nil
+    func testUnresolvedModelProposalCannotReachTheFinishedResult() async {
+        let map = StubNearYouMapService()
+        map.verification = NearYouVerification(
+            places: [],
+            proposed: 1,
+            resolved: 0
         )
+        let model = StubNearYouGenerator()
+        let store = makeStore(map: map, model: model)
 
-        XCTAssertThrowsError(try payload.materialize(discovery: discovery())) { error in
-            XCTAssertEqual(error as? NearYouSelectionError, .unknownCandidateID(unknown))
-        }
+        store.send(.chooseNearYouResolution(.init(
+            title: "Stay",
+            subtitle: nil,
+            centre: centre(precision: .address)
+        )))
+        await settle()
+
+        XCTAssertEqual(map.resolveCallCount, 1)
+        XCTAssertTrue(store.state.nearYouResponse.data?.editorialPicks.isEmpty == true)
+        XCTAssertNotNil(store.state.nearYouResponse.data?.sparseMessage)
     }
 
     func testDisplayedDistanceAndTimeComeFromMapKitCandidate() {
@@ -204,13 +210,13 @@ final class NearYouTests: XCTestCase {
         await settle()
 
         XCTAssertEqual(map.addressInputs, ["Carrer de Mallorca 166"])
-        XCTAssertEqual(group.payloads.count, 0)
+        XCTAssertEqual(group.proposalCalls.count, 0)
 
         store.send(.chooseNearYouResolution(choice))
         await settle()
 
-        XCTAssertEqual(group.payloads.count, 1)
-        XCTAssertFalse(group.payloads[0].replace)
+        XCTAssertEqual(group.proposalCalls.count, 1)
+        XCTAssertFalse(group.proposalCalls[0].replace)
         XCTAssertEqual(store.state.accommodation?.precision, .address)
         XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
         XCTAssertEqual(store.state.groupNearYouSetBy, "Alex")
@@ -254,7 +260,7 @@ final class NearYouTests: XCTestCase {
         await settle()
 
         XCTAssertEqual(map.neighbourhoodInputs, [Trip.StayArea.mockSet[0].area])
-        XCTAssertEqual(group.payloads.first?.accommodation.precision, "neighbourhood")
+        XCTAssertEqual(group.commitCalls.first?.accommodation.precision, .neighbourhood)
         XCTAssertEqual(store.state.accommodation?.precision, .neighbourhood)
     }
 
@@ -275,13 +281,13 @@ final class NearYouTests: XCTestCase {
         // The screen presents the warning before dispatching this action.
         store.send(.regenerateNearYou)
         await settle()
-        XCTAssertEqual(group.payloads.map(\.replace), [false, true])
+        XCTAssertEqual(group.proposalCalls.map(\.replace), [false, true])
         XCTAssertEqual(store.state.groupNearYouGenerationCount, 2)
         XCTAssertFalse(store.canReplaceGroupNearYou)
 
         store.send(.regenerateNearYou)
         await settle()
-        XCTAssertEqual(group.payloads.count, 2)
+        XCTAssertEqual(group.proposalCalls.count, 2)
     }
 
     func testFailedGroupNearYouRetriesOnlyExplicitlyAndDoesNotConsumeReplacement() async {
@@ -297,16 +303,16 @@ final class NearYouTests: XCTestCase {
         )))
         await settle()
         XCTAssertNotNil(store.state.nearYouResponse.error)
-        XCTAssertEqual(group.payloads.count, 1)
+        XCTAssertEqual(group.proposalCalls.count, 1)
         XCTAssertEqual(store.state.groupNearYouGenerationCount, 0)
 
         store.send(.onAppear)
         await settle()
-        XCTAssertEqual(group.payloads.count, 1)
+        XCTAssertEqual(group.proposalCalls.count, 1)
 
         store.send(.retryNearYou)
         await settle()
-        XCTAssertEqual(group.payloads.count, 2)
+        XCTAssertEqual(group.proposalCalls.count, 2)
         XCTAssertTrue(store.state.nearYouResponse.isLoaded)
         XCTAssertEqual(store.state.groupNearYouGenerationCount, 1)
     }
@@ -343,7 +349,7 @@ final class NearYouTests: XCTestCase {
         await settle()
 
         XCTAssertTrue(store.state.nearYouResponse.isLoaded)
-        XCTAssertTrue(group.payloads.isEmpty)
+        XCTAssertTrue(group.proposalCalls.isEmpty)
         XCTAssertEqual(map.discoveryCallCount, 0)
     }
 
@@ -432,11 +438,14 @@ final class NearYouTests: XCTestCase {
             unavailablePracticalKinds: Set(Trip.NearYouPracticalKind.allCases)
         )
         let model = StubNearYouGenerator()
-        model.payload = NearYouSelectionPayload(
-            sections: [
+        model.payload = NearYouProposalPayload(
+            places: [
                 .init(
-                    title: "One real fit",
-                    picks: [.init(candidateID: sparseCandidate.id, explanation: "Fits your pace.")]
+                    name: sparseCandidate.name,
+                    category: sparseCandidate.category,
+                    locationHint: "Near the stay",
+                    explanation: "Fits your pace.",
+                    accessNote: nil
                 )
             ],
             sparseMessage: nil
@@ -773,9 +782,11 @@ private final class StubNearYouMapService: NearYouMapServicing {
     var addressError: Error?
     var neighbourhoodCentre: NearYouSearchCentre?
     var discovery: NearYouDiscovery
+    var verification: NearYouVerification?
     private(set) var addressInputs: [String] = []
     private(set) var neighbourhoodInputs: [String] = []
     private(set) var discoveryCallCount = 0
+    private(set) var resolveCallCount = 0
 
     init() {
         let candidate = Trip.NearYouCandidate(
@@ -821,6 +832,27 @@ private final class StubNearYouMapService: NearYouMapServicing {
         return discovery
     }
 
+    func discoverPractical(around centre: NearYouSearchCentre) async throws -> NearYouDiscovery {
+        discoveryCallCount += 1
+        return discovery
+    }
+
+    func resolve(
+        proposals: [NearYouProposal],
+        around centre: NearYouSearchCentre
+    ) async -> NearYouVerification {
+        resolveCallCount += 1
+        if let verification { return verification }
+        let places = zip(discovery.editorialCandidates, proposals).map {
+            (candidate: $0.0, proposal: $0.1)
+        }
+        return NearYouVerification(
+            places: places,
+            proposed: proposals.count,
+            resolved: places.count
+        )
+    }
+
     private func defaultCentre(
         _ precision: CoarseAccommodation.Precision
     ) -> NearYouSearchCentre {
@@ -842,14 +874,13 @@ private final class StubNearYouGenerator: NearYouGenerating {
     private(set) var callCount = 0
     private(set) var locations: [NearYouLocationContext] = []
     var failuresRemaining = 0
-    var payload: NearYouSelectionPayload?
+    var payload: NearYouProposalPayload?
 
     func generate(
         _ request: TripGenerationRequest,
-        candidates: [Trip.NearYouCandidate],
         location: NearYouLocationContext,
         alreadyRecommended: [String]
-    ) async throws -> NearYouSelectionPayload {
+    ) async throws -> NearYouProposalPayload {
         callCount += 1
         locations.append(location)
         if failuresRemaining > 0 {
@@ -857,52 +888,87 @@ private final class StubNearYouGenerator: NearYouGenerating {
             throw TripGenerationError.transport
         }
         if let payload { return payload }
-        return NearYouSelectionPayload(
-            sections: [
+        return NearYouProposalPayload(
+            places: [
                 .init(
-                    title: "Your kind of morning",
-                    picks: candidates.prefix(1).map {
-                        .init(candidateID: $0.id, explanation: "Fits your taste.")
-                    }
+                    name: "Grounded Cafe",
+                    category: "Café",
+                    locationHint: "Near the stay",
+                    explanation: "Fits your taste.",
+                    accessNote: nil
                 )
             ],
-            sparseMessage: candidates.count < 4 ? "A short, grounded list." : nil
+            sparseMessage: nil
         )
     }
 }
 
 @MainActor
 private final class StubGroupNearYouGenerator: GroupNearYouGenerating {
-    let output: Trip.NearYou
-    var failuresRemaining = 0
-    private(set) var payloads: [GroupNearYouActionPayload] = []
-
-    init(output: Trip.NearYou) {
-        self.output = output
+    struct ProposalCall: Equatable {
+        let researchArea: String
+        let replace: Bool
     }
 
-    func generateGroupNearYou(
+    struct CommitCall: Equatable {
+        let operationVersion: Int
+        let previousSuccessfulCount: Int
+        let accommodation: CoarseAccommodation
+        let nearYou: Trip.NearYou
+    }
+
+    var failuresRemaining = 0
+    private(set) var proposalCalls: [ProposalCall] = []
+    private(set) var commitCalls: [CommitCall] = []
+
+    init(output: Trip.NearYou) {}
+
+    func proposeGroupNearYou(
         groupId: String,
         memberToken: String,
-        payload: GroupNearYouActionPayload
-    ) async throws -> GroupNearYouResultDTO {
-        payloads.append(payload)
+        researchArea: String,
+        replace: Bool
+    ) async throws -> GroupNearYouProposalDTO {
+        proposalCalls.append(.init(researchArea: researchArea, replace: replace))
         if failuresRemaining > 0 {
             failuresRemaining -= 1
             throw TripGenerationError.transport
         }
+        return GroupNearYouProposalDTO(
+            places: [
+                .init(
+                    name: "Grounded Cafe",
+                    category: "Café",
+                    locationHint: "Near the stay",
+                    explanation: "Fits your taste.",
+                    accessNote: nil
+                )
+            ],
+            setBy: "Alex",
+            operationVersion: proposalCalls.count,
+            previousSuccessfulCount: replace ? 1 : 0
+        )
+    }
+
+    func commitGroupNearYou(
+        groupId: String,
+        memberToken: String,
+        operationVersion: Int,
+        previousSuccessfulCount: Int,
+        accommodation: CoarseAccommodation,
+        nearYou: Trip.NearYou
+    ) async throws -> GroupNearYouResultDTO {
+        commitCalls.append(.init(
+            operationVersion: operationVersion,
+            previousSuccessfulCount: previousSuccessfulCount,
+            accommodation: accommodation,
+            nearYou: nearYou
+        ))
         return GroupNearYouResultDTO(
-            accommodation: CoarseAccommodation(
-                label: payload.accommodation.label,
-                latitude: payload.accommodation.latitude,
-                longitude: payload.accommodation.longitude,
-                precision: CoarseAccommodation.Precision(
-                    rawValue: payload.accommodation.precision
-                )!
-            ),
-            nearYou: output,
+            accommodation: accommodation,
+            nearYou: nearYou,
             nearYouSetBy: "Alex",
-            generationCount: payload.replace ? 2 : 1
+            generationCount: previousSuccessfulCount + 1
         )
     }
 }

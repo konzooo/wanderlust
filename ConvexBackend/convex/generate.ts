@@ -73,6 +73,12 @@ export async function startGeneration(
     attemptCount: group.attemptCount + 1,
     errorCode: undefined,
   });
+  await ctx.db.insert("groupGenerationRuns", {
+    groupId: group._id,
+    generationVersion,
+    attemptKind: "initial",
+    startedAt: Date.now(),
+  });
   await ctx.scheduler.runAfter(0, internal.generate.run, {
     groupId: group._id,
     generationVersion,
@@ -135,6 +141,12 @@ export const retryGeneration = mutation({
       generationVersion,
       attemptCount: group.attemptCount + 1,
       errorCode: undefined,
+    });
+    await ctx.db.insert("groupGenerationRuns", {
+      groupId: group._id,
+      generationVersion,
+      attemptKind: "retry",
+      startedAt: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.generate.run, {
       groupId: group._id,
@@ -258,13 +270,28 @@ export const finishGeneration = internalMutation({
         status: "error",
         errorCode: args.requiredErrorCode,
       });
+      await finishRun(
+        ctx,
+        args.groupId,
+        args.generationVersion,
+        "error",
+        args.requiredErrorCode,
+      );
       return;
     }
     if (group.itinerary === undefined) {
       await ctx.db.patch(args.groupId, { status: "error", errorCode: "missing_itinerary" });
+      await finishRun(
+        ctx,
+        args.groupId,
+        args.generationVersion,
+        "error",
+        "missing_itinerary",
+      );
       return;
     }
     await ctx.db.patch(args.groupId, { status: "ready", errorCode: undefined });
+    await finishRun(ctx, args.groupId, args.generationVersion, "ready");
   },
 });
 
@@ -279,8 +306,36 @@ export const fail = internalMutation({
     const group = await ctx.db.get(args.groupId);
     if (!group || group.generationVersion !== args.generationVersion) return;
     await ctx.db.patch(args.groupId, { status: "error", errorCode: args.errorCode });
+    await finishRun(
+      ctx,
+      args.groupId,
+      args.generationVersion,
+      "error",
+      args.errorCode,
+    );
   },
 });
+
+async function finishRun(
+  ctx: MutationCtx,
+  groupId: Id<"groups">,
+  generationVersion: number,
+  outcome: "ready" | "error",
+  errorCode?: string,
+): Promise<void> {
+  const run = await ctx.db
+    .query("groupGenerationRuns")
+    .withIndex("by_groupId_and_generationVersion", (q) =>
+      q.eq("groupId", groupId).eq("generationVersion", generationVersion),
+    )
+    .unique();
+  if (!run || run.finishedAt !== undefined) return;
+  await ctx.db.patch(run._id, {
+    finishedAt: Date.now(),
+    outcome,
+    errorCode,
+  });
+}
 
 /**
  * Performs the external model calls for a group.

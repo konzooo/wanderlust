@@ -1,5 +1,6 @@
 import Combine
 import ConvexMobile
+import CoreArchitecture
 import CoreModels
 import Foundation
 
@@ -48,6 +49,7 @@ final class SharedTripService {
         // Convex `v.number()` is float64; Swift's native `Int` would encode as
         // Convex's int64 wire format, which the validator rejects. Send `Double`.
         var args: [String: ConvexEncodable?] = [
+            "installToken": InstallIdentity.token(),
             "title": title,
             "destination": destination,
             "durationDays": Double(durationDays),

@@ -9,6 +9,7 @@ import {
   tripMode,
 } from "./lib/components";
 import type { Component } from "./lib/prompts";
+import { rateLimiter, requireRateLimit } from "./lib/rateLimits";
 
 /**
  * Server-side spend control for the generation entry points.
@@ -75,8 +76,13 @@ export const reserve = internalMutation({
   },
   handler: async (ctx, args): Promise<Reservation> => {
     const now = Date.now();
+    const installHash = await hashToken(args.installToken);
+    requireRateLimit(
+      await rateLimiter.limit(ctx, "generationBurstInstall", { key: installHash }),
+    );
+    requireRateLimit(await rateLimiter.limit(ctx, "generationBurstGlobal"));
     await consumeGlobalBudget(ctx, now);
-    const installHash = await consumeInstallBudget(ctx, args.installToken, now);
+    await consumeInstallBudget(ctx, args.installToken, now, installHash);
 
     const cap = COMPONENTS[args.component as Component].perTripCap;
     if (cap === null) return { installHash, slotId: null };
@@ -165,6 +171,7 @@ export const recordTelemetry = internalMutation({
 export const reserveGlobalModelCall = internalMutation({
   args: {},
   handler: async (ctx) => {
+    requireRateLimit(await rateLimiter.limit(ctx, "generationBurstGlobal"));
     await consumeGlobalBudget(ctx, Date.now());
     return { reserved: true };
   },
@@ -192,8 +199,9 @@ async function consumeInstallBudget(
   ctx: MutationCtx,
   installToken: string,
   now: number,
+  precomputedInstallHash?: string,
 ): Promise<string> {
-  const installHash = await hashToken(installToken);
+  const installHash = precomputedInstallHash ?? await hashToken(installToken);
   const install = await ctx.db
     .query("installs")
     .withIndex("by_hash", (q) => q.eq("installHash", installHash))

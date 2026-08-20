@@ -61,6 +61,17 @@ class QuestionnaireStore: ObservableStore {
                 session.record(questionID: card.step.id, choice: choice)
             }
 
+            let paddedID = card.step.id.count == 1 ? "0\(card.step.id)" : card.step.id
+            AnalyticsTracker.shared.log(
+                .init(.questionnaireAnswered, properties: [
+                    "trip_mode": .string(mode.analyticsName),
+                    "questionnaire_version": .integer(mode.questionnaireVersion),
+                    "question_key": .string("q\(paddedID)"),
+                    "step_index": .integer(state.cardsCompleted),
+                    "choice": .string(choice.rawValue)
+                ])
+            )
+
             // Increment Progress Counter
             state.cardsCompleted += 1
 
@@ -99,7 +110,10 @@ class QuestionnaireStore: ObservableStore {
         return preferences
     }
 
-    func completionEvent(profile: TravellerProfileSnapshot?) -> AnalyticsEvent? {
+    func completionEvent(
+        profile: TravellerProfileSnapshot?,
+        profileAttachmentSource: String = "none"
+    ) -> AnalyticsEvent? {
         guard !state.didLogCompletion else { return nil }
         state.didLogCompletion = true
 
@@ -112,6 +126,11 @@ class QuestionnaireStore: ObservableStore {
             ),
             "undo_count": .integer(state.undoCount)
         ]
+        properties["profile_attached"] = .boolean(profile != nil)
+        properties["profile_attachment_source"] = .string(profileAttachmentSource)
+        properties["profile_count"] = .integer(
+            TravellerProfileLibrary.shared.profiles.count
+        )
 
         let answers: [(String, String)]
         switch mode {

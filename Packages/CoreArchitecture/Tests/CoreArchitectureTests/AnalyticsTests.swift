@@ -17,7 +17,7 @@ final class AnalyticsTests: XCTestCase {
     }
 
     func testSchemaVersionIsStable() {
-        XCTAssertEqual(AnalyticsEvent.schemaVersion, 1)
+        XCTAssertEqual(AnalyticsEvent.schemaVersion, 2)
     }
 
     func testEveryTypedEventDeclaresRequiredProperties() {
@@ -36,6 +36,50 @@ final class AnalyticsTests: XCTestCase {
                 .screenViewed,
                 properties: ["screen_name": .string("home")]
             ).isContractValid
+        )
+    }
+
+    func testContractValidationRejectsUnknownAndWronglyTypedProperties() {
+        XCTAssertFalse(
+            AnalyticsEvent(
+                .screenViewed,
+                properties: [
+                    "screen_name": .string("home"),
+                    "arbitrary_note": .string("should never enter the schema")
+                ]
+            ).isContractValid
+        )
+        XCTAssertFalse(
+            AnalyticsEvent(
+                .questionnaireAnswered,
+                properties: [
+                    "trip_mode": .string("solo"),
+                    "questionnaire_version": .string("one"),
+                    "question_key": .string("q01"),
+                    "step_index": .integer(0),
+                    "choice": .string("left")
+                ]
+            ).isContractValid
+        )
+    }
+
+    func testQuestionnaireAnswerAcceptsOnlyCanonicalChoices() {
+        let properties: [String: AnalyticsValue] = [
+            "trip_mode": .string("solo"),
+            "questionnaire_version": .integer(1),
+            "question_key": .string("q01"),
+            "step_index": .integer(0),
+            "choice": .string("both")
+        ]
+        XCTAssertTrue(
+            AnalyticsEvent(.questionnaireAnswered, properties: properties)
+                .isContractValid
+        )
+        var invalid = properties
+        invalid["choice"] = .string("option_a")
+        XCTAssertFalse(
+            AnalyticsEvent(.questionnaireAnswered, properties: invalid)
+                .isContractValid
         )
     }
 
@@ -75,22 +119,7 @@ final class AnalyticsTests: XCTestCase {
             "oversized": .string(String(repeating: "x", count: 121))
         ])
 
-        XCTAssertEqual(event.properties, ["destination": .string("lisbon")])
-    }
-
-    func testDestinationSanitization() {
-        XCTAssertEqual(
-            AnalyticsSanitizer.destination("  São   Paulo, Brazil  "),
-            "são paulo, brazil"
-        )
-        XCTAssertEqual(
-            AnalyticsSanitizer.destination("St. John's"),
-            "st. john's"
-        )
-        XCTAssertNil(AnalyticsSanitizer.destination("https://example.com"))
-        XCTAssertNil(AnalyticsSanitizer.destination("Paris 75001"))
-        XCTAssertNil(AnalyticsSanitizer.destination("x"))
-        XCTAssertNil(AnalyticsSanitizer.destination(String(repeating: "a", count: 81)))
+        XCTAssertTrue(event.properties.isEmpty)
     }
 
     func testAgeBucketingNeverEmitsExactAge() {
@@ -153,6 +182,25 @@ final class AnalyticsTests: XCTestCase {
         recorder.log(event)
 
         XCTAssertEqual(recorder.events, [event])
+    }
+
+    @MainActor
+    func testAnonymousUserPropertiesUseAnExactContract() {
+        let recorder = RecordingAnalyticsService()
+        AnalyticsTracker.shared.useForTesting(recorder)
+        defer { AnalyticsTracker.shared.useForTesting(nil) }
+
+        AnalyticsTracker.shared.setUserProperties([
+            "has_profile": .boolean(true),
+            "profile_count": .integer(2),
+            "profile_name": .string("private"),
+            "saved_solo_trip_count": .string("wrong type")
+        ])
+
+        XCTAssertEqual(recorder.userProperties, [
+            "has_profile": .boolean(true),
+            "profile_count": .integer(2)
+        ])
     }
 }
 

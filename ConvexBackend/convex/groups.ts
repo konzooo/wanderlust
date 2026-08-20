@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query, QueryCtx } from "./_generated/server";
+import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { randomInviteCode } from "./lib/codes";
 import { hashToken, newToken, tokenMatchesHash } from "./lib/tokens";
@@ -10,6 +10,34 @@ import {
   TRAVELLER_DNA_VERSIONS,
 } from "./lib/validators";
 import { startGeneration } from "./generate";
+import { rateLimiter, requireRateLimit } from "./lib/rateLimits";
+
+const MAX_GROUP_NAME_LENGTH = 100;
+const MAX_DESTINATION_LENGTH = 160;
+const MAX_MEMBER_NAME_LENGTH = 80;
+const MAX_GROUP_MEMBERS = 30;
+
+function requireInstallToken(token: string) {
+  if (token.length < 32 || token.length > 256) {
+    throw new ConvexError("invalid_install_token");
+  }
+}
+
+function requireMemberName(name: string) {
+  if (!name.trim() || name.length > MAX_MEMBER_NAME_LENGTH) {
+    throw new ConvexError("invalid_member_name");
+  }
+}
+
+async function requireMembershipCapacity(ctx: MutationCtx, groupId: Id<"groups">) {
+  requireRateLimit(await rateLimiter.limit(ctx, "groupMembership", { key: groupId }));
+  requireRateLimit(await rateLimiter.limit(ctx, "groupMembershipGlobal"));
+  const members = await loadMembers(ctx, groupId);
+  if (members.length >= MAX_GROUP_MEMBERS) {
+    throw new ConvexError("group_member_limit");
+  }
+  return members;
+}
 
 /** Loads a group's roster, ordered oldest-first so the admin sits at the top. */
 async function loadMembers(ctx: QueryCtx, groupId: Id<"groups">): Promise<Doc<"members">[]> {
@@ -42,12 +70,33 @@ async function viewerMember(
  */
 export const createGroup = mutation({
   args: {
+    installToken: v.string(),
     name: v.string(),
     destination: v.string(),
     durationDays: v.number(),
     startMonth: v.string(),
   },
   handler: async (ctx, args) => {
+    requireInstallToken(args.installToken);
+    if (
+      !args.name.trim() ||
+      args.name.length > MAX_GROUP_NAME_LENGTH ||
+      !args.destination.trim() ||
+      args.destination.length > MAX_DESTINATION_LENGTH ||
+      !Number.isInteger(args.durationDays) ||
+      args.durationDays < 1 ||
+      args.durationDays > 30 ||
+      !args.startMonth.trim() ||
+      args.startMonth.length > 20
+    ) {
+      throw new ConvexError("invalid_group_input");
+    }
+    const installHash = await hashToken(args.installToken);
+    requireRateLimit(
+      await rateLimiter.limit(ctx, "groupCreateInstall", { key: installHash }),
+    );
+    requireRateLimit(await rateLimiter.limit(ctx, "groupCreateGlobal"));
+
     let code = randomInviteCode();
     for (let attempt = 0; attempt < 5; attempt++) {
       const existing = await ctx.db
@@ -98,6 +147,7 @@ export const addAdminSelf = mutation({
     name: v.string(),
   },
   handler: async (ctx, args) => {
+    requireMemberName(args.name);
     const group = await ctx.db.get(args.groupId);
     if (!group) {
       throw new ConvexError("Group not found");
@@ -108,7 +158,7 @@ export const addAdminSelf = mutation({
     if (group.status !== "collecting") {
       throw new ConvexError("Group is closed");
     }
-    const members = await loadMembers(ctx, args.groupId);
+    const members = await requireMembershipCapacity(ctx, args.groupId);
     if (members.some((m) => m.role === "admin")) {
       throw new ConvexError("Organizer already added");
     }
@@ -138,6 +188,7 @@ export const seedMember = mutation({
     name: v.string(),
   },
   handler: async (ctx, args) => {
+    requireMemberName(args.name);
     const group = await ctx.db.get(args.groupId);
     if (!group) {
       throw new ConvexError("Group not found");
@@ -148,6 +199,7 @@ export const seedMember = mutation({
     if (group.status !== "collecting") {
       throw new ConvexError("Group is closed");
     }
+    await requireMembershipCapacity(ctx, args.groupId);
 
     const memberId = await ctx.db.insert("members", {
       groupId: args.groupId,
@@ -256,6 +308,10 @@ export const claimSlot = mutation({
     memberId: v.id("members"),
   },
   handler: async (ctx, args) => {
+    requireRateLimit(
+      await rateLimiter.limit(ctx, "groupMembership", { key: args.groupId }),
+    );
+    requireRateLimit(await rateLimiter.limit(ctx, "groupMembershipGlobal"));
     const group = await ctx.db.get(args.groupId);
     if (!group) {
       throw new ConvexError("Group not found");
@@ -296,6 +352,7 @@ export const addSelf = mutation({
     name: v.string(),
   },
   handler: async (ctx, args) => {
+    requireMemberName(args.name);
     const group = await ctx.db.get(args.groupId);
     if (!group) {
       throw new ConvexError("Group not found");
@@ -303,6 +360,7 @@ export const addSelf = mutation({
     if (group.status !== "collecting") {
       throw new ConvexError("Group is closed");
     }
+    await requireMembershipCapacity(ctx, args.groupId);
 
     const memberToken = newToken();
     const memberId = await ctx.db.insert("members", {

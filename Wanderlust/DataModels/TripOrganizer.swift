@@ -121,8 +121,9 @@ extension Array where Element == QuestionaireStep {
 // MARK: - Analytics Event
 
 extension TripOrganizer {
+    @MainActor
     var basicInfoEventProperties: [String: AnalyticsValue] {
-        var properties: [String: AnalyticsValue] = [
+        let properties: [String: AnalyticsValue] = [
             "duration_days": .integer(tripDetails.duration),
             "start_month": .string(tripDetails.month.rawValue.lowercased()),
             "party_type": .string(tripDetails.members.groupType.rawValue),
@@ -134,12 +135,14 @@ extension TripOrganizer {
                 !(tripDetails.members.customizations?
                     .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
             ),
-            "profile_usage": .string(selectedProfileID == nil ? "none" : "selected")
+            "profile_usage": .string(selectedProfileID == nil ? "none" : "selected"),
+            "profile_count": .integer(TravellerProfileLibrary.shared.profiles.count),
+            "profile_attachment_source": .string(
+                TravellerProfileLibrary.shared.analyticsAttachmentSource(
+                    for: selectedProfileID
+                )
+            )
         ]
-
-        if let destination = AnalyticsSanitizer.destination(tripDetails.destination.name) {
-            properties["destination"] = .string(destination)
-        }
         return properties
     }
 

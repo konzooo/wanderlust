@@ -81,7 +81,15 @@ struct WelcomeScreen: View {
         // has neither problem: it costs no layout space, and it renders
         // wherever the view is hosted.
         .overlay(alignment: .topTrailing) {
-            Button("Skip", action: onFinish)
+            Button("Skip") {
+                AnalyticsTracker.shared.log(
+                    .init(.onboardingSkipped, properties: [
+                        "flow": .string("welcome"),
+                        "page": .string(page.analyticsID)
+                    ])
+                )
+                onFinish()
+            }
                 .font(.kanit(14))
                 .foregroundStyle(.secondary)
                 .opacity(page.isLast ? 0 : 1)
@@ -114,6 +122,12 @@ struct WelcomeScreen: View {
 
             Button(page.buttonTitle) {
                 if page.isLast {
+                    AnalyticsTracker.shared.log(
+                        .init(.onboardingCompleted, properties: [
+                            "flow": .string("welcome"),
+                            "page": .string(page.analyticsID)
+                        ])
+                    )
                     onFinish()
                 } else if let next = Page(rawValue: page.rawValue + 1) {
                     UIImpactFeedbackGenerator(style: .soft).impactOccurred()

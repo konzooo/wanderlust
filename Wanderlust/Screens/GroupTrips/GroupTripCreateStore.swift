@@ -18,14 +18,16 @@ class GroupTripCreateStore: ObservableStore {
             guard state.readyToCreate, !state.isCreating else { return }
             state.isCreating = true
             state.errorMessage = nil
-            var properties: [String: AnalyticsValue] = [
+            let properties: [String: AnalyticsValue] = [
                 "duration_days": .integer(state.durationDays),
                 "start_month": .string(state.month.rawValue.lowercased()),
-                "has_profile": .boolean(state.selectedProfileID != nil)
+                "has_profile": .boolean(state.selectedProfileID != nil),
+                "profile_attachment_source": .string(
+                    TravellerProfileLibrary.shared.analyticsAttachmentSource(
+                        for: state.selectedProfileID
+                    )
+                )
             ]
-            if let destination = AnalyticsSanitizer.destination(state.destination) {
-                properties["destination"] = .string(destination)
-            }
             AnalyticsTracker.shared.log(
                 .init(.groupTripCreationStarted, properties: properties)
             )

@@ -54,12 +54,18 @@ struct BasicInfoScreen: View {
         .toolbar {
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)
+                    ProfileSelectionButton(
+                        selection: $tripOrganizer.selectedProfileID,
+                        entryPoint: "solo_trip_details"
+                    )
                 }
                 .sharedBackgroundVisibility(.hidden)
             } else {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ProfileSelectionButton(selection: $tripOrganizer.selectedProfileID)
+                    ProfileSelectionButton(
+                        selection: $tripOrganizer.selectedProfileID,
+                        entryPoint: "solo_trip_details"
+                    )
                 }
             }
         }

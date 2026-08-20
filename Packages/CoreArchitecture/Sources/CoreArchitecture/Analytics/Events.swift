@@ -14,7 +14,9 @@ public extension AnalyticsEvent {
         case tripOutput = "trip_output"
         case feedback = "feedback"
         case savedTrips = "saved_trips"
-        case profiles = "profiles"
+        case profileTab = "profile_tab"
+        case profileManagement = "profile_management"
+        case profileEditor = "profile_editor"
         case groupCreate = "group_create"
         case groupMembers = "group_members"
         case groupJoin = "group_join"
@@ -40,9 +42,10 @@ public extension AnalyticsEvent {
         return .init(.screenViewed, properties: properties)
     }
 
-    static func tripPlanningStarted(entryPoint: String) -> Self {
+    static func tripPlanningStarted(entryPoint: String, tripMode: String = "solo") -> Self {
         .init(.tripPlanningStarted, properties: [
-            "entry_point": .string(entryPoint)
+            "entry_point": .string(entryPoint),
+            "trip_mode": .string(tripMode)
         ])
     }
 
@@ -62,8 +65,4 @@ public extension AnalyticsEvent {
         return .init(name, properties: values)
     }
 
-    static func destinationProperty(_ rawValue: String) -> [String: AnalyticsValue] {
-        guard let destination = AnalyticsSanitizer.destination(rawValue) else { return [:] }
-        return ["destination": .string(destination)]
-    }
 }

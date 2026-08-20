@@ -370,7 +370,8 @@ public struct AnalyticsEvent: Equatable, Sendable {
         if key == "component" {
             return [
                 "itinerary", "suggestions", "know_before_you_go", "worth_it",
-                "where_to_stay", "deep_dive", "near_you", "image"
+                "where_to_stay", "deep_dive", "near_you", "image",
+                "suggestions_top_up"
             ].contains(string)
         }
         if key == "profile_attachment_source" {

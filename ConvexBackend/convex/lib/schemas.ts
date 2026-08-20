@@ -109,12 +109,46 @@ export const ITINERARY_SCHEMA = itinerarySchema();
 const DYNAMIC_CATEGORY_IDS = ["cafes", "vibe", "new", "rainy", "random"];
 const STATIC_CATEGORY_IDS = ["month", "couples", "group", "solo", "family", "avoid"];
 
-function category(ids: string[]): unknown {
-  return obj({ ID: strEnum(ids), title: str, texts: arr(LINKABLE_TEXT) }, [
+function category(
+  ids: string[],
+  textBounds?: { minItems?: number; maxItems?: number },
+): unknown {
+  return obj({ ID: strEnum(ids), title: str, texts: arr(LINKABLE_TEXT, textBounds) }, [
     "ID",
     "title",
     "texts",
   ]);
+}
+
+/**
+ * A focused second pass for a suggestions response that was usable but thin.
+ *
+ * Every field is required because strict Structured Outputs requires it. A
+ * target the first response already satisfied is represented by JSON null;
+ * every missing target is a category whose `texts` count is bound to precisely
+ * the number of new cards needed to reach the four-card product minimum. This
+ * keeps the repair call small without throwing away the useful first response.
+ */
+export function suggestionsTopUpSchema(plan: {
+  dynamic: { ids: string[]; count: number } | null;
+  month: { ids: string[]; count: number } | null;
+  party: { ids: string[]; count: number } | null;
+  avoid: { ids: string[]; count: number } | null;
+}): unknown {
+  const target = (value: { ids: string[]; count: number } | null) => {
+    if (!value) return { type: "null" };
+    const count = Math.max(1, Math.min(4, Math.round(value.count)));
+    return category(value.ids, { minItems: count, maxItems: count });
+  };
+  return obj(
+    {
+      dynamic: target(plan.dynamic),
+      month: target(plan.month),
+      party: target(plan.party),
+      avoid: target(plan.avoid),
+    },
+    ["dynamic", "month", "party", "avoid"],
+  );
 }
 
 /**

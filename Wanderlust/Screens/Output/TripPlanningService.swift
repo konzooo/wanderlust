@@ -70,6 +70,155 @@ struct SuggestionsPayload: Decodable, Equatable, Sendable {
     }
 }
 
+/// The minimal copy of an already-visible feed that the focused repair call
+/// needs. Stable UUIDs and map metadata deliberately stay on-device; the
+/// backend needs only category identity and prose to count gaps and avoid
+/// repeating cards.
+struct SuggestionTopUpSnapshot: Codable, Equatable, Sendable {
+    struct Category: Codable, Equatable, Sendable {
+        let ID: String?
+        let title: String
+        let texts: [String]
+    }
+
+    let dynamicSuggestions: [Category]
+    let staticSuggestions: [Category]
+
+    init(_ suggestions: Trip.Suggestions) {
+        func snapshot(_ category: Trip.Suggestions.Category) -> Category {
+            Category(
+                ID: category.ID?.rawValue,
+                title: category.title,
+                texts: category.texts.map(\.text)
+            )
+        }
+        dynamicSuggestions = suggestions.dynamicSuggestions.map(snapshot)
+        staticSuggestions = suggestions.staticSuggestions.map(snapshot)
+    }
+}
+
+/// Completeness is a grading decision, not a reason to discard usable prose.
+/// The first response is displayed as soon as it decodes; this helper decides
+/// whether one background call is useful and merges that call append-only.
+enum SuggestionCompletion {
+    static let minimumCards = 4
+    static let maximumCards = 5
+
+    static func isComplete(_ suggestions: Trip.Suggestions, groupType: String) -> Bool {
+        let hasDynamic = suggestions.dynamicSuggestions.contains {
+            isDynamic($0.ID) && readableCount($0) >= minimumCards
+        }
+        let requiredStatic: [Trip.Suggestions.TipSectionID] = [
+            .month,
+            expectedPartyID(groupType),
+            .avoid
+        ]
+        return hasDynamic && requiredStatic.allSatisfy { requiredID in
+            suggestions.staticSuggestions.contains {
+                $0.ID == requiredID && readableCount($0) >= minimumCards
+            }
+        }
+    }
+
+    static func merge(
+        existing: Trip.Suggestions,
+        additions: Trip.Suggestions,
+        groupType: String
+    ) -> Trip.Suggestions {
+        let dynamic = mergeCategories(
+            existing.dynamicSuggestions,
+            additions.dynamicSuggestions
+        )
+        let mergedStatic = mergeCategories(
+            existing.staticSuggestions,
+            additions.staticSuggestions
+        )
+        let expectedOrder: [Trip.Suggestions.TipSectionID] = [
+            .month,
+            expectedPartyID(groupType),
+            .avoid
+        ]
+        var orderedStatic: [Trip.Suggestions.Category] = []
+        var used = Set<UUID>()
+        for id in expectedOrder {
+            if let category = mergedStatic.first(where: { $0.ID == id }) {
+                orderedStatic.append(category)
+                used.insert(category.id)
+            }
+        }
+        orderedStatic += mergedStatic.filter { !used.contains($0.id) }
+        return Trip.Suggestions(
+            dynamicSuggestions: dynamic,
+            staticSuggestions: orderedStatic
+        )
+    }
+
+    private static func mergeCategories(
+        _ existing: [Trip.Suggestions.Category],
+        _ additions: [Trip.Suggestions.Category]
+    ) -> [Trip.Suggestions.Category] {
+        var result = existing
+        for addition in additions {
+            let index = result.firstIndex { current in
+                if let id = addition.ID { return current.ID == id }
+                return current.title.normalizedSuggestionKey == addition.title.normalizedSuggestionKey
+            }
+            guard let index else {
+                result.append(addition)
+                continue
+            }
+
+            let current = result[index]
+            var texts = current.texts
+            var seen = Set(texts.map { $0.text.normalizedSuggestionKey })
+            for card in addition.texts where texts.count < maximumCards {
+                let key = card.text.normalizedSuggestionKey
+                guard !key.isEmpty, seen.insert(key).inserted else { continue }
+                texts.append(card)
+            }
+            result[index] = Trip.Suggestions.Category(
+                id: current.id,
+                ID: current.ID,
+                title: current.title,
+                texts: texts,
+                requestedInterest: current.requestedInterest
+            )
+        }
+        return result
+    }
+
+    private static func readableCount(_ category: Trip.Suggestions.Category) -> Int {
+        category.texts.filter {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }.count
+    }
+
+    private static func isDynamic(_ id: Trip.Suggestions.TipSectionID?) -> Bool {
+        switch id {
+        case .cafes, .vibe, .new, .rainy, .random, nil: true
+        case .couples, .month, .avoid, .group, .solo, .family: false
+        }
+    }
+
+    private static func expectedPartyID(_ groupType: String) -> Trip.Suggestions.TipSectionID {
+        switch groupType.lowercased() {
+        case "couple", "couples": .couples
+        case "family": .family
+        case "group": .group
+        default: .solo
+        }
+    }
+}
+
+private extension String {
+    var normalizedSuggestionKey: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+}
+
 /// The split-variant Worth-it/Skip call's envelope.
 struct WorthItPayload: Decodable, Equatable, Sendable {
     let items: [Trip.WorthItItem]
@@ -94,6 +243,22 @@ protocol SuggestionsGenerating {
         _ request: TripGenerationRequest,
         alreadyRecommended: [String]
     ) async throws -> SuggestionsPayload
+
+    /// A single optional background completion pass. `nil` means this service
+    /// has no top-up capability (used by lightweight test and preview doubles).
+    func topUp(
+        _ request: TripGenerationRequest,
+        existing: Trip.Suggestions,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions?
+}
+
+extension SuggestionsGenerating {
+    func topUp(
+        _ request: TripGenerationRequest,
+        existing: Trip.Suggestions,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions? { nil }
 }
 
 /// Produces the four Worth-it/Skip cards. Only used by the split variant.
@@ -146,6 +311,18 @@ struct BackendSuggestionsService: SuggestionsGenerating {
         try await service.generate(
             .suggestions,
             for: request,
+            alreadyRecommended: alreadyRecommended
+        )
+    }
+
+    func topUp(
+        _ request: TripGenerationRequest,
+        existing: Trip.Suggestions,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions? {
+        try await service.topUpSuggestions(
+            for: request,
+            existing: existing,
             alreadyRecommended: alreadyRecommended
         )
     }

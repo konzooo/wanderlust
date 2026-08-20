@@ -478,6 +478,80 @@ export function buildSystemPrompt(
   ].join("\n\n");
 }
 
+export type SuggestionTopUpPromptTarget = {
+  ids: string[];
+  count: number;
+  existingTitle: string | null;
+  existingTexts: string[];
+};
+
+export type SuggestionTopUpPromptPlan = {
+  dynamic: SuggestionTopUpPromptTarget | null;
+  month: SuggestionTopUpPromptTarget | null;
+  party: SuggestionTopUpPromptTarget | null;
+  avoid: SuggestionTopUpPromptTarget | null;
+};
+
+/**
+ * The repair pass deliberately has its own task block. Reusing the ordinary
+ * suggestions prompt would ask for all four categories again, producing
+ * duplicates and making the supposedly small background call as expensive as
+ * the first one.
+ */
+export function buildSuggestionTopUpSystemPrompt(
+  mode: TripMode,
+  plan: SuggestionTopUpPromptPlan,
+): string {
+  const fields = (["dynamic", "month", "party", "avoid"] as const)
+    .map((field) => {
+      const target = plan[field];
+      if (!target) return `- ${field}: return null; the first response already completed it.`;
+      return `- ${field}: return exactly ${target.count} NEW suggestions using ID ${
+        target.ids.length === 1 ? `"${target.ids[0]}"` : target.ids.map((id) => `"${id}"`).join(", ")
+      }.`;
+    })
+    .join("\n");
+  const task = `SUGGESTIONS TOP-UP
+The first response is already visible to the traveller. Return only the missing additions below; never rewrite or repeat an existing card.
+${fields}
+
+For every non-null field:
+- Keep the existing category's subject and title when one is supplied in the user message.
+- Each new suggestion is a distinct card, 100 to 150 characters and no more than two sentences.
+- Make every addition specific, useful and complementary to the existing cards.
+- The response fields are dynamic, month, party and avoid. A completed field is null.`;
+  return [
+    roleBlock("suggestions", mode),
+    INJECTION_BLOCK,
+    VOICE_BLOCK,
+    mode === "group" ? INPUT_GROUP : INPUT_SOLO,
+    task,
+    LANES_BLOCK,
+    STYLE_BLOCK,
+  ].join("\n\n");
+}
+
+/** The trip summary plus the already-visible cards, treated strictly as data. */
+export function buildSuggestionTopUpUserMessage(
+  input: TripInput,
+  plan: SuggestionTopUpPromptPlan,
+  alreadyRecommended?: string[],
+): string {
+  const base = buildUserMessage(input, { alreadyRecommended });
+  const visible = (["dynamic", "month", "party", "avoid"] as const)
+    .flatMap((field) => {
+      const target = plan[field];
+      if (!target || (!target.existingTitle && target.existingTexts.length === 0)) return [];
+      return [
+        `${field} category already visible: ${clean(target.existingTitle ?? "Untitled")}`,
+        ...target.existingTexts.map((text) => `- Existing card: ${clean(text)}`),
+      ];
+    });
+  return visible.length
+    ? `${base}\n\nEXISTING SUGGESTIONS — DO NOT REPEAT\n${visible.join("\n")}`
+    : base;
+}
+
 // MARK: - User message assembly ------------------------------------------------
 
 export function buildUserMessage(

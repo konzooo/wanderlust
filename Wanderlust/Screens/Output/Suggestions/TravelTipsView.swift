@@ -15,6 +15,11 @@ public struct TravelTipsView: View {
     @Binding var favorites: Trip.Favorites
     /// `nil` where there is nothing to re-request (read-only trips).
     let onRetry: (() -> Void)?
+    /// A partial feed is already visible while one focused completion request
+    /// fills its missing cards/categories in the background.
+    let isCompletingSuggestions: Bool
+    let suggestionsCompletionFailed: Bool
+    let onRetryCompletion: (() -> Void)?
     /// The interest currently being deep-dived, if any. Renders a skeleton
     /// section at the very top of the feed — the same place the finished
     /// dive will land — so the traveller sees where their request is headed
@@ -29,11 +34,17 @@ public struct TravelTipsView: View {
         suggestions: AsyncValue<Trip.Suggestions>,
         favorites: Binding<Trip.Favorites>,
         deepDiveLoadingInterest: String? = nil,
+        isCompletingSuggestions: Bool = false,
+        suggestionsCompletionFailed: Bool = false,
+        onRetryCompletion: (() -> Void)? = nil,
         onRetry: (() -> Void)? = nil
     ) {
         self.suggestions = suggestions
         self._favorites = favorites
         self.deepDiveLoadingInterest = deepDiveLoadingInterest
+        self.isCompletingSuggestions = isCompletingSuggestions
+        self.suggestionsCompletionFailed = suggestionsCompletionFailed
+        self.onRetryCompletion = onRetryCompletion
         self.onRetry = onRetry
         self.footer = nil
     }
@@ -42,12 +53,18 @@ public struct TravelTipsView: View {
         suggestions: AsyncValue<Trip.Suggestions>,
         favorites: Binding<Trip.Favorites>,
         deepDiveLoadingInterest: String? = nil,
+        isCompletingSuggestions: Bool = false,
+        suggestionsCompletionFailed: Bool = false,
+        onRetryCompletion: (() -> Void)? = nil,
         onRetry: (() -> Void)? = nil,
         @ViewBuilder footer: () -> Footer
     ) {
         self.suggestions = suggestions
         self._favorites = favorites
         self.deepDiveLoadingInterest = deepDiveLoadingInterest
+        self.isCompletingSuggestions = isCompletingSuggestions
+        self.suggestionsCompletionFailed = suggestionsCompletionFailed
+        self.onRetryCompletion = onRetryCompletion
         self.onRetry = onRetry
         self.footer = AnyView(footer())
     }
@@ -80,6 +97,13 @@ public struct TravelTipsView: View {
                         }
                         .padding(.vertical, 20)
                         .animation(.easeInOut(duration: 0.3), value: deepDiveLoadingInterest)
+                        .animation(.easeInOut(duration: 0.3), value: sections)
+                    }
+
+                    if isCompletingSuggestions {
+                        completionStatus
+                    } else if suggestionsCompletionFailed {
+                        completionFailure
                     }
 
                     if let footer {
@@ -88,6 +112,37 @@ public struct TravelTipsView: View {
                 }
             }
         }
+    }
+
+    private var completionStatus: some View {
+        HStack(spacing: 9) {
+            ProgressView()
+                .controlSize(.small)
+                .tint(Color.appTint)
+            Text("Adding a few more ideas…")
+                .font(.kanit(13))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 20)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var completionFailure: some View {
+        HStack(spacing: 10) {
+            Text("Some suggestions didn’t come through.")
+                .font(.kanit(13))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            if let onRetryCompletion {
+                Button("Try again", action: onRetryCompletion)
+                    .font(.kanit(13).weight(.medium))
+                    .foregroundStyle(Color.appTint)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 20)
     }
 
     private static func mapSections(from suggestions: Trip.Suggestions) -> [TipsSection] {
@@ -135,7 +190,7 @@ extension TravelTipsView {
 
                 // ---------- Carousel ----------
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
+                    HStack(alignment: .top, spacing: 14) {
                         ForEach(section.cards) { card in
                             SuggestionCard(card: card, favorites: $favorites)
                         }
@@ -213,8 +268,9 @@ extension TravelTipsView {
     }
 
     private struct SuggestionCard: View {
-        // Fixed so the carousel keeps its uniform rhythm; sized to fit the 150-character
-        // ceiling the prompt sets (about four lines) with the last line clear of the heart.
+        // The 120-point minimum keeps the carousel rhythm for conforming cards.
+        // A model can still exceed its prose budget, so the card grows rather
+        // than clipping useful content while a top-up/replacement is pending.
         fileprivate static let cardWidth: CGFloat = 270
         fileprivate static let cardHeight: CGFloat = 120
 
@@ -227,9 +283,12 @@ extension TravelTipsView {
                     .font(DS.Typography.generatedBody)
                     .foregroundStyle(.primary)
                     .padding(14)
-                    .padding(.trailing, 6)
-                    .padding(.bottom, 14)
-                    .frame(width: Self.cardWidth, height: Self.cardHeight, alignment: .topLeading)
+                    // Reserve the bottom-right corner for the heart even when
+                    // an unexpectedly long card wraps onto extra lines.
+                    .padding(.trailing, 26)
+                    .padding(.bottom, 24)
+                    .frame(width: Self.cardWidth, alignment: .topLeading)
+                    .frame(minHeight: Self.cardHeight, alignment: .topLeading)
 
                 Button {
                     favorites.toggle(card.id)
@@ -238,7 +297,8 @@ extension TravelTipsView {
                 }
                 .padding(10)
             }
-            .frame(width: Self.cardWidth, height: Self.cardHeight)
+            .frame(width: Self.cardWidth)
+            .frame(minHeight: Self.cardHeight)
             .background(
                 RoundedRectangle(cornerRadius: CGFloat.Radius.cardSmall, style: .continuous)
                     .fill(.regularMaterial)

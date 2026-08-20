@@ -197,6 +197,30 @@ final class TripGenerationService {
         }
     }
 
+    /// Focused second request for a suggestions response that was readable but
+    /// incomplete. The first response is already on screen before this starts;
+    /// the returned payload contains additions only.
+    func topUpSuggestions(
+        for request: TripGenerationRequest,
+        existing: Trip.Suggestions,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions {
+        var args: [String: ConvexEncodable?] = [
+            "installToken": InstallIdentity.token(),
+            "tripKey": request.tripKey,
+            "input": request.input,
+            "existingSuggestions": SuggestionTopUpSnapshot(existing)
+        ]
+        if !alreadyRecommended.isEmpty {
+            args["alreadyRecommended"] = alreadyRecommended as [(any ConvexEncodable)?]
+        }
+        do {
+            return try await client.action("trips:topUpSuggestions", with: args)
+        } catch let error as ClientError {
+            throw Self.mapped(error)
+        }
+    }
+
     /// Turns the Convex transport error into a typed generation error. A
     /// `ConvexError` payload is the JSON-encoded value the backend threw — for
     /// us always a bare string code, so the quotes come off before matching.
@@ -216,3 +240,4 @@ final class TripGenerationService {
 // JSON-encodes it, so `durationDays` arrives as a plain number matching
 // `v.number()` rather than Convex's int64 wire format.
 extension TripGenerationInput: @retroactive ConvexEncodable {}
+extension SuggestionTopUpSnapshot: ConvexEncodable {}

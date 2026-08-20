@@ -254,6 +254,11 @@ struct TripOutputScreen: View {
                 suggestions: store.suggestionsWithDeepDives,
                 favorites: favoritesBinding,
                 deepDiveLoadingInterest: store.deepDiveInFlightInterest,
+                isCompletingSuggestions: store.isSuggestionsTopUpInFlight,
+                suggestionsCompletionFailed: store.suggestionsTopUpFailed,
+                onRetryCompletion: {
+                    store.send(.retrySuggestionsTopUp)
+                },
                 onRetry: canRetry ? { store.send(.retryComponent(.suggestions)) } : nil
             ) {
                 // This is the end of the suggestions feed, not a second view

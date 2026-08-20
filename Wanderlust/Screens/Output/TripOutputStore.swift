@@ -34,6 +34,10 @@ class TripOutputStore: ObservableStore {
     @Published private(set) var deepDiveInFlightInterest: String?
     @Published private(set) var deepDiveErrorMessage: String?
     @Published private(set) var deepDiveCapReached = false
+    /// The first suggestions payload remains `.loaded` while this is true, so
+    /// the traveller can read it while one focused completion call runs.
+    @Published private(set) var isSuggestionsTopUpInFlight = false
+    @Published private(set) var suggestionsTopUpFailed = false
 
     /// Server-side duplicate/cap errors can reveal committed slots missing
     /// from this local copy. Remember them for this screen lifetime so a chip
@@ -68,6 +72,9 @@ class TripOutputStore: ObservableStore {
     /// MapKit work; persisted results remain the sole reopen source.
     private var nearYouTask: Task<Void, Never>?
     private var groupDeepDiveTask: Task<Void, Never>?
+    private var suggestionsTopUpTask: Task<Void, Never>?
+    private var suggestionsRevision = 0
+    private var suggestionsTopUpAttemptedRevision: Int?
     private var lastNearYouDiscovery: NearYouDiscovery?
     /// Exact while this screen lives, coarse after reopen. Keeping the resolved
     /// centre here lets an in-session retry route from the same point without
@@ -203,6 +210,15 @@ class TripOutputStore: ObservableStore {
             } else {
                 generate(component, restart: true)
             }
+
+        case .retrySuggestionsTopUp:
+            guard let request = state.generationRequest,
+                  let existing = state.suggestionsResponse.data else { return }
+            startSuggestionsTopUp(
+                request: request,
+                existing: existing,
+                force: true
+            )
 
         case .decideWorthIt(let id, let decision):
             applyWorthIt(decision, to: id)
@@ -406,6 +422,9 @@ extension TripOutputStore {
         case retry
         /// Retry exactly one component, from that component's own error state.
         case retryComponent(TripComponent)
+        /// Retry only the non-blocking suggestions completion pass. The partial
+        /// feed remains visible before, during and after this action.
+        case retrySuggestionsTopUp
         /// Record (or, with `nil`, undo) a Worth-it/Skip decision.
         case decideWorthIt(UUID, WorthItDecision?)
         /// Central binding write so group hearts persist locally as one layer.
@@ -1146,6 +1165,10 @@ extension TripOutputStore {
                     )
                     guard coordinator.isCurrent(component, attempt: attempt) else { return }
                     apply(payload)
+                    startSuggestionsTopUp(
+                        request: request,
+                        existing: payload.suggestions
+                    )
 
                 case .worthIt:
                     let items = try await worthItService.generate(
@@ -1218,6 +1241,9 @@ extension TripOutputStore {
         // `nil` means the coordinator suppressed this as a duplicate. The run
         // already in flight owns the component, so leave its state alone.
         guard let attempt else { return }
+        if component == .suggestions {
+            cancelSuggestionsTopUpForNewGeneration()
+        }
         if component == .deepDive {
             deepDiveInFlightInterest = deepDiveInterest
             deepDiveErrorMessage = nil
@@ -1304,6 +1330,100 @@ extension TripOutputStore {
         guard variant == .combined else { return }
         state.worthItResponse = .loaded(payload.worthIt ?? [])
         state.whereToStayResponse = .loaded(payload.whereToStay ?? [])
+    }
+
+    /// Starts at most one automatic completion pass for this suggestions
+    /// revision. The partial value remains `.loaded` throughout; only the
+    /// small status row changes while the additions are generated.
+    private func startSuggestionsTopUp(
+        request: TripGenerationRequest,
+        existing: Trip.Suggestions,
+        force: Bool = false
+    ) {
+        guard !SuggestionCompletion.isComplete(
+            existing,
+            groupType: request.input.groupType
+        ) else {
+            isSuggestionsTopUpInFlight = false
+            suggestionsTopUpFailed = false
+            return
+        }
+        guard force || suggestionsTopUpAttemptedRevision != suggestionsRevision else { return }
+
+        suggestionsTopUpTask?.cancel()
+        suggestionsTopUpAttemptedRevision = suggestionsRevision
+        isSuggestionsTopUpInFlight = true
+        suggestionsTopUpFailed = false
+        let revision = suggestionsRevision
+        let startedAt = Date()
+        let attempt = force ? 2 : 1
+
+        suggestionsTopUpTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if revision == suggestionsRevision {
+                    isSuggestionsTopUpInFlight = false
+                    suggestionsTopUpTask = nil
+                }
+            }
+            do {
+                let additions = try await suggestionsService.topUp(
+                    request,
+                    existing: existing,
+                    alreadyRecommended: alreadyRecommended()
+                )
+                try Task.checkCancellation()
+                guard revision == suggestionsRevision else { return }
+                guard let additions else {
+                    // Preview and lightweight test doubles deliberately opt out
+                    // of the live repair endpoint. Their partial mock stays put
+                    // without presenting a fake network failure.
+                    return
+                }
+
+                let current = state.suggestionsResponse.data ?? existing
+                let merged = SuggestionCompletion.merge(
+                    existing: current,
+                    additions: additions,
+                    groupType: request.input.groupType
+                )
+                state.suggestionsResponse = .loaded(merged)
+                suggestionsTopUpFailed = !SuggestionCompletion.isComplete(
+                    merged,
+                    groupType: request.input.groupType
+                )
+                if state.saved { reSaveTrip() }
+                logGeneration(
+                    .tripGenerationSucceeded,
+                    component: "suggestions_top_up",
+                    attempt: attempt,
+                    duration: startedAt
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                guard revision == suggestionsRevision else { return }
+                // This is intentionally not `setFailure(.suggestions, error)`:
+                // the first payload is useful and remains the screen's value.
+                suggestionsTopUpFailed = true
+                logGeneration(
+                    .tripGenerationFailed,
+                    component: "suggestions_top_up",
+                    attempt: attempt,
+                    duration: startedAt,
+                    error: error
+                )
+            }
+        }
+    }
+
+    private func cancelSuggestionsTopUpForNewGeneration() {
+        suggestionsTopUpTask?.cancel()
+        suggestionsTopUpTask = nil
+        suggestionsRevision += 1
+        suggestionsTopUpAttemptedRevision = nil
+        isSuggestionsTopUpInFlight = false
+        suggestionsTopUpFailed = false
     }
 
     /// This screen's live state for one component, flattened so the coordinator

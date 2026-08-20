@@ -78,6 +78,23 @@ export const soloTripInput = v.object({
   profile: v.optional(v.union(travellerProfileSnapshot, v.null())),
 });
 
+/**
+ * Compact, privacy-conscious copy of the first suggestions response sent back
+ * only when it needs a top-up. UUIDs, map metadata and coordinates stay on the
+ * device; the repair pass needs only category identity and visible prose to
+ * know what is missing and avoid repeating it.
+ */
+export const suggestionCategorySnapshot = v.object({
+  ID: v.optional(v.union(v.string(), v.null())),
+  title: v.string(),
+  texts: v.array(v.string()),
+});
+
+export const suggestionsSnapshot = v.object({
+  dynamicSuggestions: v.array(suggestionCategorySnapshot),
+  staticSuggestions: v.array(suggestionCategorySnapshot),
+});
+
 /** Input size ceilings. Free text reaches a paid model, so it is bounded here. */
 export const MAX_DESTINATION_INPUT_LENGTH = 160;
 export const MAX_CUSTOMIZATIONS_LENGTH = 2_000;
@@ -85,6 +102,9 @@ export const MAX_INTEREST_LENGTH = 80;
 export const MAX_ALREADY_RECOMMENDED_ITEMS = 200;
 export const MAX_NEAR_YOU_CANDIDATES = 60;
 export const MAX_NEAR_YOU_LOCATION_LENGTH = 160;
+export const MAX_SUGGESTION_SNAPSHOT_CATEGORIES = 8;
+export const MAX_SUGGESTION_SNAPSHOT_CARDS = 10;
+export const MAX_SUGGESTION_SNAPSHOT_TEXT_LENGTH = 1_000;
 
 /**
  * The only MapKit facts the Near You model may receive. Accommodation input,

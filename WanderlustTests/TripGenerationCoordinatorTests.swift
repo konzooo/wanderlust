@@ -229,6 +229,74 @@ final class TripGenerationCoordinatorTests: XCTestCase {
         XCTAssertEqual(suggestions.callCount, 1)
     }
 
+    /// A thin but valid first response is useful immediately. Completing it
+    /// must not put the whole suggestions component back into loading state.
+    func testPartialSuggestionsStayVisibleWhileTopUpRunsThenMergeInPlace() async {
+        let suggestions = ProgressiveSuggestionsService()
+        let itinerary = CountingItineraryService()
+        let store = makeStore(
+            itinerary: itinerary,
+            suggestions: suggestions
+        )
+
+        store.send(.onAppear)
+        await itinerary.release()
+        await waitUntil {
+            suggestions.topUpCallCount == 1
+                && store.state.suggestionsResponse.isLoaded
+                && store.isSuggestionsTopUpInFlight
+        }
+
+        let visible = try? XCTUnwrap(store.state.suggestionsResponse.data)
+        XCTAssertEqual(visible?.dynamicSuggestions.count, 1)
+        XCTAssertEqual(visible?.dynamicSuggestions.first?.texts.count, 1)
+        XCTAssertEqual(visible?.staticSuggestions.map(\.ID), [.month])
+        XCTAssertNil(store.state.suggestionsResponse.error)
+
+        let originalCategoryID = visible?.dynamicSuggestions.first?.id
+        let originalCard = visible?.dynamicSuggestions.first?.texts.first
+        await suggestions.releaseTopUp()
+        await waitUntil {
+            !store.isSuggestionsTopUpInFlight
+                && SuggestionCompletion.isComplete(
+                    store.state.suggestionsResponse.data ?? .init(),
+                    groupType: "couple"
+                )
+        }
+
+        let completed = try? XCTUnwrap(store.state.suggestionsResponse.data)
+        XCTAssertEqual(completed?.dynamicSuggestions.first?.id, originalCategoryID)
+        XCTAssertEqual(completed?.dynamicSuggestions.first?.texts.first, originalCard)
+        XCTAssertEqual(completed?.dynamicSuggestions.first?.texts.count, 4)
+        XCTAssertEqual(completed?.staticSuggestions.map(\.ID), [.month, .couples, .avoid])
+        XCTAssertTrue(completed?.staticSuggestions.allSatisfy { $0.texts.count == 4 } == true)
+        XCTAssertFalse(store.suggestionsTopUpFailed)
+    }
+
+    /// Completion is best-effort. If it fails, the already-visible cards must
+    /// remain loaded and retryable instead of becoming an empty error screen.
+    func testFailedTopUpKeepsPartialSuggestionsLoaded() async {
+        let suggestions = ProgressiveSuggestionsService(failingTopUp: true)
+        let itinerary = CountingItineraryService()
+        let store = makeStore(
+            itinerary: itinerary,
+            suggestions: suggestions
+        )
+
+        store.send(.onAppear)
+        await itinerary.release()
+        await waitUntil {
+            suggestions.topUpCallCount == 1 && store.isSuggestionsTopUpInFlight
+        }
+        await suggestions.releaseTopUp()
+        await waitUntil { store.suggestionsTopUpFailed }
+
+        XCTAssertTrue(store.state.suggestionsResponse.isLoaded)
+        XCTAssertEqual(store.state.suggestionsResponse.data, suggestions.partial)
+        XCTAssertNil(store.state.suggestionsResponse.error)
+        XCTAssertFalse(store.isSuggestionsTopUpInFlight)
+    }
+
     // MARK: - Helpers
 
     private func makeStore(
@@ -332,6 +400,77 @@ private final class CountingSuggestionsService: SuggestionsGenerating {
     }
 
     func release() async { await gate.open() }
+}
+
+@MainActor
+private final class ProgressiveSuggestionsService: SuggestionsGenerating {
+    private(set) var topUpCallCount = 0
+    let partial: Trip.Suggestions
+    private let additions: Trip.Suggestions
+    private let failingTopUp: Bool
+    private let topUpGate = Gate()
+
+    init(failingTopUp: Bool = false) {
+        self.failingTopUp = failingTopUp
+        partial = Trip.Suggestions(
+            dynamicSuggestions: [
+                suggestionCategory(.cafes, "Explore Rome like a local", ["Already visible local tip"])
+            ],
+            staticSuggestions: [
+                suggestionCategory(.month, "June in Rome", ["Already visible June tip"])
+            ]
+        )
+        additions = Trip.Suggestions(
+            dynamicSuggestions: [
+                suggestionCategory(.cafes, "Explore Rome like a local", [
+                    "Local tip two", "Local tip three", "Local tip four"
+                ])
+            ],
+            staticSuggestions: [
+                suggestionCategory(.month, "June in Rome", [
+                    "June tip two", "June tip three", "June tip four"
+                ]),
+                suggestionCategory(.couples, "Rome for couples", [
+                    "Couples tip one", "Couples tip two", "Couples tip three", "Couples tip four"
+                ]),
+                suggestionCategory(.avoid, "What to avoid in Rome", [
+                    "Avoid tip one", "Avoid tip two", "Avoid tip three", "Avoid tip four"
+                ])
+            ]
+        )
+    }
+
+    func generate(
+        _ request: TripGenerationRequest,
+        alreadyRecommended: [String]
+    ) async throws -> SuggestionsPayload {
+        SuggestionsPayload(suggestions: partial)
+    }
+
+    func topUp(
+        _ request: TripGenerationRequest,
+        existing: Trip.Suggestions,
+        alreadyRecommended: [String]
+    ) async throws -> Trip.Suggestions? {
+        topUpCallCount += 1
+        await topUpGate.wait()
+        if failingTopUp { throw TripGenerationError.transport }
+        return additions
+    }
+
+    func releaseTopUp() async { await topUpGate.open() }
+}
+
+private func suggestionCategory(
+    _ id: Trip.Suggestions.TipSectionID,
+    _ title: String,
+    _ texts: [String]
+) -> Trip.Suggestions.Category {
+    Trip.Suggestions.Category(
+        ID: id,
+        title: title,
+        texts: texts.map { LocationLinkableText(text: $0) }
+    )
 }
 
 @MainActor

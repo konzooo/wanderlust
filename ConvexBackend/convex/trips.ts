@@ -11,6 +11,11 @@ import {
 import type { Component, NearYouCandidate, SoloTripInput } from "./lib/prompts";
 import { OpenAIError } from "./lib/openai";
 import { ValidationError } from "./lib/validation";
+import {
+  runSuggestionTopUp,
+  suggestionTopUpPlan,
+  type SuggestionsSnapshot,
+} from "./lib/suggestionTopUp";
 import type { Reservation } from "./quota";
 import {
   MAX_ALREADY_RECOMMENDED_ITEMS,
@@ -19,9 +24,13 @@ import {
   MAX_INTEREST_LENGTH,
   MAX_NEAR_YOU_CANDIDATES,
   MAX_NEAR_YOU_LOCATION_LENGTH,
+  MAX_SUGGESTION_SNAPSHOT_CARDS,
+  MAX_SUGGESTION_SNAPSHOT_CATEGORIES,
+  MAX_SUGGESTION_SNAPSHOT_TEXT_LENGTH,
   nearYouCandidate,
   nearYouLocation,
   soloTripInput,
+  suggestionsSnapshot,
 } from "./lib/validators";
 import { stampMissingStableIds } from "./lib/stableIds";
 
@@ -213,6 +222,120 @@ export const generateComponent = action({
     }
   },
 });
+
+/**
+ * Completes a usable-but-thin solo suggestions response without delaying its
+ * first paint. The client has already rendered `existingSuggestions` before it
+ * calls this action; this endpoint returns additions only, and one failure
+ * leaves that visible first response untouched.
+ */
+export const topUpSuggestions = action({
+  args: {
+    installToken: v.string(),
+    tripKey: v.string(),
+    input: soloTripInput,
+    existingSuggestions: suggestionsSnapshot,
+    alreadyRecommended: v.optional(v.union(v.array(v.string()), v.null())),
+  },
+  handler: async (ctx, args): Promise<unknown> => {
+    const input = args.input as SoloTripInput;
+    const existing = args.existingSuggestions as SuggestionsSnapshot;
+    if (
+      args.installToken.length < 32 ||
+      args.installToken.length > 256 ||
+      args.tripKey.length === 0 ||
+      args.tripKey.length > 128 ||
+      input.destination.trim().length === 0
+    ) {
+      throw new ConvexError("invalid_request");
+    }
+    if (
+      input.destination.length > MAX_DESTINATION_INPUT_LENGTH ||
+      (input.customizations ?? "").length > MAX_CUSTOMIZATIONS_LENGTH ||
+      !validSuggestionSnapshot(existing)
+    ) {
+      throw new ConvexError("input_too_long");
+    }
+
+    const tripInput = { mode: "solo" as const, solo: input };
+    if (suggestionTopUpPlan(existing, tripInput).complete) {
+      return { dynamicSuggestions: [], staticSuggestions: [] };
+    }
+
+    const reservation: Reservation = await ctx.runMutation(internal.quota.reserve, {
+      installToken: args.installToken,
+      tripKey: args.tripKey,
+      component: "suggestions",
+      label: "automatic_top_up",
+    });
+    const startedAt = Date.now();
+    try {
+      const result = await runSuggestionTopUp({
+        input: tripInput,
+        existing,
+        alreadyRecommended:
+          args.alreadyRecommended?.slice(0, MAX_ALREADY_RECOMMENDED_ITEMS) ?? undefined,
+      });
+      if (!result) return { dynamicSuggestions: [], staticSuggestions: [] };
+      await ctx.runMutation(internal.quota.recordTelemetry, {
+        component: "suggestions",
+        mode: "solo" as const,
+        inputTokens: result.usage.inputTokens,
+        cachedInputTokens: result.usage.cachedInputTokens,
+        outputTokens: result.usage.outputTokens,
+        durationMs: result.durationMs,
+        variant: "split" as const,
+        maxOutputTokens: result.maxOutputTokens,
+        repairs: result.validation.repairs,
+        providerAttempts: result.providerAttempts,
+        webSearchCalls: result.webSearchCalls,
+        model: result.model,
+      });
+      if (reservation.slotId) {
+        await ctx.runMutation(internal.quota.commitReservation, {
+          slotId: reservation.slotId,
+        });
+      }
+      return result.data;
+    } catch (error) {
+      const code = failureCode(error);
+      const measuredError = error instanceof OpenAIError || error instanceof ValidationError
+        ? error
+        : undefined;
+      const usage = measuredError?.usage;
+      await ctx.runMutation(internal.quota.recordTelemetry, {
+        component: "suggestions",
+        mode: "solo" as const,
+        inputTokens: usage?.inputTokens ?? 0,
+        cachedInputTokens: usage?.cachedInputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        durationMs: measuredError?.durationMs ?? Date.now() - startedAt,
+        errorCode: code,
+        variant: "split" as const,
+        providerAttempts: measuredError?.providerAttempts ?? 1,
+        webSearchCalls: 0,
+      });
+      if (reservation.slotId) {
+        await ctx.runMutation(internal.quota.releaseReservation, {
+          slotId: reservation.slotId,
+        });
+      }
+      throw new ConvexError(code);
+    }
+  },
+});
+
+function validSuggestionSnapshot(value: SuggestionsSnapshot): boolean {
+  const categories = [...value.dynamicSuggestions, ...value.staticSuggestions];
+  return categories.length <= MAX_SUGGESTION_SNAPSHOT_CATEGORIES &&
+    categories.every((category) =>
+      category.title.length <= 160 &&
+      category.texts.length <= MAX_SUGGESTION_SNAPSHOT_CARDS &&
+      category.texts.every((text) =>
+        text.length > 0 && text.length <= MAX_SUGGESTION_SNAPSHOT_TEXT_LENGTH
+      )
+    );
+}
 
 function validNearYouCandidates(candidates: NearYouCandidate[]): boolean {
   const ids = new Set<string>();

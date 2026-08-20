@@ -57,3 +57,16 @@ test("Traveller DNA passport is made available for nationality-specific entry ad
 
   assert.match(buildUserMessage(input), /Passport used for this trip: DE/);
 });
+
+test("KBYG titles use visible screen context and local prices carry USD equivalents", () => {
+  const prompt = buildSystemPrompt("knowBeforeYouGo", "solo");
+
+  assert.match(prompt, /destination and bucket are already visible on screen/i);
+  assert.match(prompt, /Do not repeat the destination name, country, city, region or demonym/i);
+  assert.match(prompt, /"Typical spending"/);
+  assert.match(prompt, /never "Getting SIM cards in Japan"/);
+  assert.match(prompt, /each practical price, cost, cash amount, monetary tip or fee/i);
+  assert.match(prompt, /¥1,500 \(about US\$10\)/);
+  assert.match(prompt, /applies throughout the briefing, including arrival and local transport/i);
+  assert.match(prompt, /currencyExchange already gives the reference conversions into USD and EUR/i);
+});

@@ -371,7 +371,7 @@ Return a flat sections array using the eight buckets and stable topic IDs below.
 
 3. MONEY — bucket "money", bucketTitle null
 - topic "currencyExchange" — exactly one section. Name the local currency and give an approximate conversion into both USD and EUR. Keep it quick. Always volatility "verify" and use the source line as the subtle route to a reputable live exchange-rate reference. Maximum 40 words.
-- topic "costSnapshot" — exactly one section with exactly four bullets. The first three are locally meaningful spending anchors chosen to make this destination's price level immediately understandable — coffee only where coffee is a meaningful benchmark; otherwise choose a casual meal, attraction, short ride, beach setup or another representative purchase. The fourth bullet is accommodation per private room per night: a budget/basic range and an upper-end range. Mention luxury as an open-ended "X+" only when ${party} indicates a high-spend preference. Maximum 100 words total.
+- topic "costSnapshot" — exactly one section with exactly four bullets. The first three are locally meaningful spending anchors chosen to make this destination's price level immediately understandable — coffee only where coffee is a meaningful benchmark; otherwise choose a casual meal, attraction, short ride, beach setup or another representative purchase. The fourth bullet is accommodation per private room per night: a budget/basic range and an upper-end range. Mention luxury as an open-ended "X+" only when ${party} indicates a high-spend preference. Show each amount in local currency followed immediately by its rough USD equivalent, as defined under PRICE DISPLAY. Maximum 100 words total.
 - topic "tipping" — exactly one section, normally one sentence. State what locals actually do and the one exception most likely to catch a visitor. Maximum 30 words.
 - topic "paymentMethods" — exactly one section. Say what is primary, where the secondary method is still needed, and the practical cash advice. In a cash-dominant destination, name a reliably low-fee or trustworthy bank/ATM only when confident; never claim it is universally the cheapest because the traveller's own bank also affects fees. Maximum 60 words.
 
@@ -402,6 +402,11 @@ ADAPTIVE SHAPE, HARD WORD BOUNDARIES
 - Use bullets for scan-worthy facts, comparisons, numbers, phrase lists and compact actions. Use prose for one coherent explanation. Never repeat the same fact in both.
 - The Traveller DNA advice-detail preference may decide how much of the available budget to use, but it never permits crossing a maximum.
 
+PRICE DISPLAY
+- Local currency is the primary, useful figure. In every section except currencyExchange, immediately follow each practical price, cost, cash amount, monetary tip or fee in a non-USD currency with a rough USD equivalent in parentheses. For example: "¥1,500 (about US$10)" or "¥8,000–12,000 (about US$55–80)". This applies throughout the briefing, including arrival and local transport, not only the Money bucket.
+- Use "US$" rather than a bare "$" so the comparison is unambiguous. Do not add a redundant conversion when USD is the local currency, and do not convert percentages or non-monetary numbers.
+- currencyExchange already gives the reference conversions into USD and EUR; do not repeat a parenthetical USD conversion inside that section.
+
 COVERAGE AUDIT BEFORE WRITING
 Silently check entry, arrival, season, packing, money, transport, connectivity, power, culture, dining rhythm, health, safety, water, hazards, laws, closures and accessibility or dietary context when the profile makes them relevant. Map important facts into the fixed sections first. Use the three dynamic escape hatches for distinct jobs: onGroundWildcard for operational daily life, destinationEssential for one major defining theme, and otherTips only for small residual facts. Never duplicate one concern across them.
 
@@ -410,6 +415,8 @@ The same destination briefs differently for a family, a couple and a solo travel
 
 TITLES, LINKS AND LOCATIONS
 - title: at most 48 characters, concrete, and in sentence case. "Getting in from El Prat", not "Transportation" and not "Getting In From The Airport".
+- The destination and bucket are already visible on screen. Do not repeat the destination name, country, city, region or demonym in a title merely to provide context. Write "SIM cards", "Essential apps", "Plugs and power", "Typical spending", "Tipping etiquette" and "Payment methods" — never "Getting SIM cards in Japan", "Typical spending in Japan" or "Japanese yen and currency conversion". The body can name the local currency or destination when useful.
+- A title may name a place only when that place is the useful distinction itself, such as "Getting in from El Prat" or "Ferry from Tenerife". Do not remove meaningful route endpoints, airports, stations, ports or named systems.
 - Name a place where the practical fact is about that place — the airport you arrive at, the metro line you take, the ferry port, the market as an institution. Every one of those goes in that section's locations array, exactly as it appears in the text; a named place with no entry is a bug. Naming places is not the same as recommending them: do not turn a section into a list of things to do.
 
 CONFIDENCE, NOT HEDGING

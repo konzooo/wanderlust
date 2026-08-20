@@ -361,7 +361,7 @@ public extension Trip.KnowBeforeYouGo {
             topic: .arrivalTransport,
             title: "Getting in from El Prat",
             body: "Aerobús is the easiest first transfer with luggage: it runs to Plaça Catalunya in about 35 minutes. Metro and train cost less; a taxi makes sense late at night or for a family.",
-            bullets: ["Aerobús: direct and frequent", "Taxi: roughly €35"],
+            bullets: ["Aerobús: direct and frequent", "Taxi: roughly €35 (about US$39)"],
             locations: [
                 .init(linkSubstring: "El Prat", placeName: "Josep Tarradellas Barcelona–El Prat Airport")
             ]
@@ -369,7 +369,7 @@ public extension Trip.KnowBeforeYouGo {
         .init(
             bucket: .beforeYouLeave,
             topic: .monthPacking,
-            title: "Barcelona in May",
+            title: "What May feels like",
             body: "Days are usually warm and evenings cooler, with occasional showers and growing crowds.",
             bullets: ["Pack breathable layers", "Bring a light rain shell", "Add comfortable walking shoes"]
         ),
@@ -412,7 +412,7 @@ public extension Trip.KnowBeforeYouGo {
             topic: .costSnapshot,
             title: "What things cost",
             body: "",
-            bullets: ["Coffee: €1.50–3", "Casual meal: €12–20", "Museum ticket: €10–18", "Private room: €70–120 basic; €180–300 upper end"]
+            bullets: ["Coffee: €1.50–3 (about US$2–3)", "Casual meal: €12–20 (about US$13–22)", "Museum ticket: €10–18 (about US$11–20)", "Private room: €70–120 (about US$77–132) basic; €180–300 (about US$198–330) upper end"]
         ),
         .init(
             bucket: .money,
@@ -424,7 +424,7 @@ public extension Trip.KnowBeforeYouGo {
             bucket: .money,
             topic: .paymentMethods,
             title: "Cards first, some cash",
-            body: "Contactless cards are the default. Keep €20–30 for markets and very small purchases, and decline dynamic currency conversion at terminals and ATMs."
+            body: "Contactless cards are the default. Keep €20–30 (about US$22–33) for markets and very small purchases, and decline dynamic currency conversion at terminals and ATMs."
         ),
         .init(
             bucket: .gettingAround,

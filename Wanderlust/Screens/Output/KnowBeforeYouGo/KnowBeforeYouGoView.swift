@@ -36,10 +36,9 @@ struct KnowBeforeYouGoView: View {
     /// Which sections are open, by `Section.id`.
     ///
     /// Held here rather than inside each row so it survives the buckets being
-    /// rebuilt, and so the "first one starts open" rule can be applied once
-    /// across the whole briefing rather than once per bucket.
+    /// rebuilt. An empty initial set deliberately makes the briefing land as a
+    /// compact table of contents; the traveller chooses what to expand.
     @State private var expanded: Set<UUID> = []
-    @State private var hasSeededFirstSection = false
 
     var body: some View {
         if unavailable {
@@ -93,21 +92,8 @@ struct KnowBeforeYouGoView: View {
                     }
                     .padding(.horizontal, .Padding.sm3)
                     .padding(.vertical, .Padding.md)
-                    .onAppear { seedFirstSection(of: briefing) }
                 }
             }
-        }
-    }
-
-    /// Opens the very first section once, so the tab never lands as a wall of
-    /// closed rows with nothing to read. Guarded by its own flag rather than by
-    /// `expanded.isEmpty`, or closing that section by hand would re-open it on
-    /// the next redraw.
-    private func seedFirstSection(of briefing: Trip.KnowBeforeYouGo) {
-        guard !hasSeededFirstSection else { return }
-        hasSeededFirstSection = true
-        if let first = briefing.groups.first?.sections.first {
-            expanded.insert(first.id)
         }
     }
 }

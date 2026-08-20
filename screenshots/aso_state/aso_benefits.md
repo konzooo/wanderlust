@@ -3,15 +3,26 @@
 - App name: Wanderlust
 - Bundle ID: `app.kk.wanderlust`
 - Target display slot: iPhone 6.5-inch portrait (`1284 × 2778`)
-- Brand background: Wanderlust Blue (`#586FF2`)
+- Current marketing background: Wanderlust Home Gradient
+  (`#D5DDFF` → `#E6EAFD` → `#F6F4F6` → `#FDF0DC` → `#FFF7E8`)
+- Marketing headline: App Purple (`#586FF2`)
+- Route accent: App Tint/Violet (`#586FF2` → `#8B6BF6`)
 
 ## Confirmed headlines
 
 1. GET INSPIRED FOR YOUR NEXT TRIP
 2. BASED ON YOUR PERSONALITY
-3. YOUR UNIQUE PATH, NOT THE TOURIST TRAIL
+3. YOUR UNIQUE PATH / NOT THE TOURIST TRAIL
+4. NEW: GROUP TRIPS
+   - DIFFERENT PERSONALITIES.
+   - ONE JOINT TRIP.
+5. NEW: PROFILES
+   - WANDERLUST LEARNS
+   - AND GROWS WITH YOU!
 
-The wording above is user-confirmed and should remain verbatim.
+The wording above is user-confirmed and should remain verbatim. Screenshots 4
+and 5 use `NEW: GROUP TRIPS` and `NEW: PROFILES` respectively as smaller,
+thinner eyebrows above their two bold lines.
 
 ## Audience and positioning
 

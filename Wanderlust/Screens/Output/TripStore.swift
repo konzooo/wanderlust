@@ -17,8 +17,19 @@ extension Trip: @retroactive FilePersistable {
     public var groupingFolder: String {
         itinerary.destination ?? details.destination.name
     }
-    /// Trips with exactly the same `details` are considered duplicates.
-    public var duplicateIdentity: Trip.Details { details }
+    /// A generated trip's backend key is also its durable local identity.
+    /// Two independently generated trips may have identical destination/date/
+    /// party details but different answers and output, so those trips must not
+    /// overwrite one another when automatic persistence runs. Files written
+    /// before `tripKey` existed retain the legacy details-based behaviour.
+    public var duplicateIdentity: TripStorageIdentity {
+        tripKey.map(TripStorageIdentity.tripKey) ?? .legacyDetails(details)
+    }
+}
+
+public enum TripStorageIdentity: Hashable, Sendable {
+    case tripKey(String)
+    case legacyDetails(Trip.Details)
 }
 
 public typealias TripStorage = FileStore<Trip>

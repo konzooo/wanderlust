@@ -90,7 +90,7 @@ class SavedTripsStore: ObservableStore {
             }
         }
 
-        var seen: Set<Trip.Details> = []
+        var seen: Set<TripStorageIdentity> = []
         return sorted.filter { seen.insert($0.trip.duplicateIdentity).inserted }
     }
 

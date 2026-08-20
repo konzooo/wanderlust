@@ -1,5 +1,6 @@
 import CoreArchitecture
 import CoreModels
+import Networking
 import XCTest
 @testable import Wanderlust
 
@@ -248,6 +249,24 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertEqual(result.first?.createdAt, Date(timeIntervalSince1970: 200))
     }
 
+    func testSeparatelyGeneratedTripsWithTheSameDetailsRemainDistinct() throws {
+        var first = savedTrip(destination: "Lisbon", createdAt: 100)
+        var second = savedTrip(destination: "Lisbon", createdAt: 200)
+        first.tripKey = "generation-one"
+        second.tripKey = "generation-two"
+        let storage = try isolatedStorage()
+        defer { try? FileManager.default.removeItem(at: storage.rootURL) }
+
+        try storage.save(first)
+        try storage.save(second)
+
+        let result = SavedTripsStore.newestFirstUnique([first, second])
+
+        XCTAssertEqual(try storage.fetchAll().count, 2)
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(Set(result.compactMap(\.tripKey)), ["generation-one", "generation-two"])
+    }
+
     func testMyTripsUsesFileCreationDateForLegacyTrips() {
         let older = savedTrip(destination: "Athens", createdAt: nil)
         let newer = savedTrip(destination: "Berlin", createdAt: nil)
@@ -282,6 +301,104 @@ final class TripPersistenceTests: XCTestCase {
         XCTAssertEqual(failed.persisted.failureCode, "output_incomplete")
     }
 
+    // MARK: - Automatic persistence
+
+    @MainActor
+    func testGeneratedTripPersistsBeforeBookmarkAndBookmarkDoesNotDuplicateIt() async throws {
+        let storage = try isolatedStorage()
+        defer { try? FileManager.default.removeItem(at: storage.rootURL) }
+        let store = makeAutoPersistingStore(storage: storage, tripKey: "auto-save-one")
+
+        store.generate(.itinerary)
+        await waitUntil { store.hasPersistedTrip }
+
+        XCTAssertFalse(store.state.saved)
+        XCTAssertEqual(try storage.fetchAll().count, 1)
+        XCTAssertEqual(try storage.fetchAll().first?.tripKey, "auto-save-one")
+
+        store.send(.saveTrip(confirmOverride: false))
+        await waitUntil { store.state.saved }
+
+        XCTAssertEqual(try storage.fetchAll().count, 1)
+    }
+
+    @MainActor
+    func testLaterComponentCompletionUpdatesTheAutomaticCopy() async throws {
+        let storage = try isolatedStorage()
+        defer { try? FileManager.default.removeItem(at: storage.rootURL) }
+        let store = makeAutoPersistingStore(storage: storage, tripKey: "auto-save-components")
+
+        store.generate(.itinerary)
+        await waitUntil { store.hasPersistedTrip }
+        store.generate(.suggestions)
+        await waitUntil {
+            (try? storage.fetchAll().first?.suggestionsState.isReady) == true
+        }
+
+        XCTAssertFalse(store.state.saved)
+        XCTAssertEqual(try storage.fetchAll().count, 1)
+        XCTAssertTrue(try XCTUnwrap(storage.fetchAll().first).suggestionsState.isReady)
+    }
+
+    @MainActor
+    func testDiscardRemovesTheAutomaticCopy() async throws {
+        let storage = try isolatedStorage()
+        defer { try? FileManager.default.removeItem(at: storage.rootURL) }
+        let store = makeAutoPersistingStore(storage: storage, tripKey: "auto-save-discard")
+
+        store.generate(.itinerary)
+        await waitUntil { store.hasPersistedTrip }
+        store.send(.discardAndNavigateBack)
+        await waitUntil { !store.hasPersistedTrip }
+
+        XCTAssertTrue(try storage.fetchAll().isEmpty)
+    }
+
+    @MainActor
+    func testLateGenerationCannotRecreateADiscardedTrip() async throws {
+        let storage = try isolatedStorage()
+        defer { try? FileManager.default.removeItem(at: storage.rootURL) }
+        let suggestions = DeferredPersistenceSuggestionsService()
+        let store = makeAutoPersistingStore(
+            storage: storage,
+            tripKey: "auto-save-late-completion",
+            suggestionsService: suggestions
+        )
+
+        store.generate(.itinerary)
+        await waitUntil { store.hasPersistedTrip }
+        store.generate(.suggestions)
+        store.send(.discardAndNavigateBack)
+        await waitUntil { !store.hasPersistedTrip }
+
+        await suggestions.release()
+        await waitUntil { store.state.suggestionsResponse.isLoaded }
+
+        XCTAssertTrue(try storage.fetchAll().isEmpty)
+    }
+
+    @MainActor
+    func testPersistingALegacySavedTripMigratesWithoutLeavingADuplicate() async throws {
+        let storage = try isolatedStorage()
+        defer { try? FileManager.default.removeItem(at: storage.rootURL) }
+        let legacy = savedTrip(destination: "Lisbon", createdAt: 100)
+        try storage.save(legacy)
+        let store = TripOutputStore(
+            initialState: TripOutputStateFactory.savedTrip(legacy),
+            imageService: PersistenceTestImageService(),
+            tripStorageFactory: { storage }
+        )
+
+        store.send(.applicationDidEnterBackground)
+        await waitUntil {
+            guard let trips = try? storage.fetchAll() else { return false }
+            return trips.count == 1 && trips.first?.tripKey != nil
+        }
+
+        XCTAssertEqual(try storage.fetchAll().count, 1)
+        XCTAssertNotNil(try storage.fetchAll().first?.tripKey)
+    }
+
     // MARK: - Helpers
 
     private func trip(suggestions: ComponentState<Trip.Suggestions>) -> Trip {
@@ -312,6 +429,43 @@ final class TripPersistenceTests: XCTestCase {
 
     private func decode(_ json: String) throws -> Trip {
         try JSONDecoder().decode(Trip.self, from: Data(json.utf8))
+    }
+
+    @MainActor
+    private func makeAutoPersistingStore(
+        storage: TripStorage,
+        tripKey: String,
+        suggestionsService: any SuggestionsGenerating = MockSuggestionsService(
+            delayNanoseconds: 0
+        )
+    ) -> TripOutputStore {
+        TripOutputStore(
+            initialState: .init(
+                generationRequest: .init(tripKey: tripKey, input: .mock),
+                details: .mock,
+                mode: .newTrip
+            ),
+            imageService: PersistenceTestImageService(),
+            itineraryService: MockItineraryService(delayNanoseconds: 0),
+            suggestionsService: suggestionsService,
+            tripStorageFactory: { storage }
+        )
+    }
+
+    private func isolatedStorage() throws -> TripStorage {
+        try TripStorage(rootFolderName: "TripAutoPersistenceTests-\(UUID().uuidString)")
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: Duration = .seconds(2),
+        _ condition: () -> Bool
+    ) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while !condition(), clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(1))
+        }
     }
 
     /// A trip exactly as v1 of the app wrote it: no `schemaVersion`, no
@@ -358,5 +512,44 @@ final class TripPersistenceTests: XCTestCase {
           "favorites": { "liked": [] }\(suggestions)
         }
         """
+    }
+}
+
+private struct PersistenceTestImageService: ImageService {
+    func fetchImageURL(for query: String) async throws -> URL {
+        URL(string: "https://example.invalid/auto-persist.jpg")!
+    }
+}
+
+@MainActor
+private final class DeferredPersistenceSuggestionsService: SuggestionsGenerating {
+    private let gate = PersistenceTestGate()
+
+    func generate(
+        _ request: TripGenerationRequest,
+        alreadyRecommended: [String]
+    ) async throws -> SuggestionsPayload {
+        await gate.wait()
+        return SuggestionsPayload(suggestions: .mock)
+    }
+
+    func release() async {
+        await gate.open()
+    }
+}
+
+private actor PersistenceTestGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
     }
 }

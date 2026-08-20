@@ -14,6 +14,7 @@ struct TripOutputScreen: View {
     @StateObject var store: TripOutputStore
     @EnvironmentObject var router: NavigationRouter
     @Environment(\.navigationTab) private var navigationTab
+    @Environment(\.scenePhase) private var scenePhase
     
     @State private var isDrawerOpen = false
     @State private var hasDismissedOutputOnThisVisit = false
@@ -147,6 +148,10 @@ struct TripOutputScreen: View {
             store.logTripCreatedIfNeeded()
             store.logResultViewedIfNeeded()
             store.logCurrentSectionViewed()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background else { return }
+            store.send(.applicationDidEnterBackground)
         }
         .onChange(of: store.state.selectedContentTab) { _, _ in
             store.logCurrentSectionViewed()

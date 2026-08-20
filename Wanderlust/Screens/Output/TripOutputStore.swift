@@ -23,6 +23,11 @@ class TripOutputStore: ObservableStore {
     // UI Bindings
     @Published var retryCount: Int = 0
     @Published var presentSaveToast: Bool = false
+    /// Disk durability is intentionally separate from `state.saved`, which
+    /// continues to drive the existing bookmark/onboarding ritual. A new trip
+    /// is persisted automatically once its itinerary exists, while the bookmark
+    /// remains visually unchanged until the traveller taps it.
+    @Published private(set) var hasPersistedTrip: Bool = false
     /// Favourites are a full-screen sheet reached from the header, not a tab.
     @Published var isFavouritesSheetPresented: Bool = false
     @Published var isPublishingShare: Bool = false
@@ -62,6 +67,10 @@ class TripOutputStore: ObservableStore {
     private let groupNearYouService: any GroupNearYouGenerating
     private let groupTripObserver: any GroupTripObserving
     private let groupCredentials: GroupTripCredentials?
+    private let tripStorageFactory: () throws -> TripStorage
+    /// Set before an explicit discard/delete so queued generation completions
+    /// cannot recreate the file after the deletion wins.
+    private var suppressesTripPersistence = false
     private var groupSubscription: AnyCancellable?
     /// True only after the member acknowledged the one-replacement warning.
     private var replacingGroupNearYou = false
@@ -116,7 +125,8 @@ class TripOutputStore: ObservableStore {
         groupNearYouService: (any GroupNearYouGenerating)? = nil,
         groupTripObserver: (any GroupTripObserving)? = nil,
         groupCredentials: GroupTripCredentials? = nil,
-        variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant
+        variant: SuggestionsVariant = OutputFeatureFlags.suggestionsVariant,
+        tripStorageFactory: @escaping () throws -> TripStorage = { try TripStorage() }
     ) {
         var restoredState = initialState
         self.groupPersonalStore = groupPersonalStore ?? GroupTripPersonalStore()
@@ -125,6 +135,9 @@ class TripOutputStore: ObservableStore {
         self.groupTripObserver = groupTripObserver ?? GroupTripService.shared
         self.groupCredentials = groupCredentials
             ?? initialState.groupId.flatMap(GroupTripCredentialsStore.load)
+        self.tripStorageFactory = tripStorageFactory
+        hasPersistedTrip = initialState.mode == .savedTrip
+            || initialState.mode == .sharedTrip
         if let groupId = initialState.groupId {
             let personal = self.groupPersonalStore.load(groupId: groupId)
             restoredState.favorites = personal.favorites
@@ -276,6 +289,11 @@ class TripOutputStore: ObservableStore {
         case .saveTrip(let confirmOverride):
             saveTrip(confirmOverride: confirmOverride)
 
+        case .applicationDidEnterBackground:
+            // The trip is normally already durable by this point. This flush is
+            // a cheap final snapshot of any UI edits or just-landed component.
+            persistTripSnapshot()
+
         case .shareTrip:
             shareTrip()
 
@@ -297,7 +315,7 @@ class TripOutputStore: ObservableStore {
             } else if state.saved {
                 if state.mode == .savedTrip {
                     // Trip is already saved, save changes and navigate back directly
-                    reSaveTrip()
+                    persistTripSnapshot()
                 }
                 router?.pop(on: routerTab)
 
@@ -311,9 +329,10 @@ class TripOutputStore: ObservableStore {
             saveTrip(confirmOverride: false)
             
         case .discardAndNavigateBack:
-            // Discard changes and navigate back
+            // Automatic persistence is a recovery copy, not a veto over an
+            // explicit discard. Remove it so the existing dialog remains true.
             state.alert = nil
-            router?.pop(on: routerTab)
+            deleteTrip()
             
         case .deleteTrip(let confirmDeletion):
             if confirmDeletion {
@@ -453,6 +472,7 @@ extension TripOutputStore {
         case regenerateNearYou
         case changeNearYouStay
         case saveTrip(confirmOverride: Bool = false)
+        case applicationDidEnterBackground
         case shareTrip
         /// Confirmation is the presenter's job — the favourites sheet owns its
         /// own alert, because one presented by the screen underneath would
@@ -899,7 +919,7 @@ extension TripOutputStore {
                 state.nearYouResponse = .loaded(output)
                 lastCompletedNearYou = output
                 lastCompletedNearYouAccommodation = state.accommodation
-                if state.saved { reSaveTrip() }
+                persistTripSnapshot()
                 logGeneration(
                     .tripGenerationSucceeded,
                     component: "near_you",
@@ -910,7 +930,7 @@ extension TripOutputStore {
                 return
             } catch {
                 state.nearYouResponse = .error(error)
-                if state.saved { reSaveTrip() }
+                persistTripSnapshot()
                 logGeneration(
                     .tripGenerationFailed,
                     component: "near_you",
@@ -1041,6 +1061,7 @@ extension TripOutputStore {
             logWorthItDecision("undo", itemID: id)
         }
         persistGroupPersonalLayer()
+        persistTripSnapshot()
     }
 
     private func setFavorites(_ favorites: Trip.Favorites) {
@@ -1052,6 +1073,7 @@ extension TripOutputStore {
         }
         state.favorites = favorites
         persistGroupPersonalLayer()
+        persistTripSnapshot()
     }
 
     /// Records a Worth-it/Skip decision, or undoes it with `nil`.
@@ -1085,6 +1107,7 @@ extension TripOutputStore {
         }
         logWorthItDecision(analyticsDecision, itemID: id)
         persistGroupPersonalLayer()
+        persistTripSnapshot()
     }
 
     private func persistGroupPersonalLayer() {
@@ -1205,12 +1228,12 @@ extension TripOutputStore {
                         requestedInterest: deepDiveInterest
                     )
                     state.deepDives = (state.deepDives ?? []) + [persisted]
-                    if state.saved { reSaveTrip() }
 
                 case .nearYou:
                     // Manual MapKit → backend flow; never generated here.
                     return
                 }
+                persistTripSnapshot()
                 logGeneration(
                     .tripGenerationSucceeded,
                     component: component.analyticsName,
@@ -1228,6 +1251,7 @@ extension TripOutputStore {
                 } else {
                     setFailure(component, error)
                 }
+                persistTripSnapshot()
                 logGeneration(
                     .tripGenerationFailed,
                     component: component.analyticsName,
@@ -1392,7 +1416,7 @@ extension TripOutputStore {
                     merged,
                     groupType: request.input.groupType
                 )
-                if state.saved { reSaveTrip() }
+                persistTripSnapshot()
                 logGeneration(
                     .tripGenerationSucceeded,
                     component: "suggestions_top_up",
@@ -1550,10 +1574,10 @@ extension TripOutputStore {
                 await MainActor.run {
                     guard imageRequestID == requestID else { return }
                     state.imageUrlResponse = .loaded(response)
-                    if state.saved {
-                        reSaveTrip()
-                    } else if state.mode == .sharedTrip {
+                    if state.mode == .sharedTrip {
                         persistReceivedTrip()
+                    } else {
+                        persistTripSnapshot()
                     }
                     logGeneration(
                         .tripGenerationSucceeded,
@@ -1579,28 +1603,57 @@ extension TripOutputStore {
         }
     }
     
-    /// Writes the current screen state back onto an already-saved trip.
+    /// Writes the current solo-trip state to its durable recovery copy.
     ///
-    /// Merge-on-complete: the itinerary is the baseline and must be ready, but
-    /// anything still generating writes as `.absent` and is merged over what is
-    /// already on disk, so a re-save triggered by (say) a favourite toggle can
-    /// never wipe a component that finished in an earlier session.
-    private func reSaveTrip() {
-        guard let trip = currentTrip() else { return }
+    /// This deliberately does not mutate `state.saved`: disk durability and the
+    /// bookmark UI are separate until that UX is redesigned. Merge-on-complete
+    /// means an itinerary can land immediately while later components safely
+    /// update the same file without erasing one another.
+    private func persistTripSnapshot() {
+        guard !suppressesTripPersistence,
+              state.mode == .newTrip || state.mode == .savedTrip,
+              let trip = currentTrip() else { return }
 
         Task {
              do {
-                 let storage = try TripStorage()
-                 let stored = try storage
-                     .fetch(inGrouping: trip.groupingFolder)
-                     .first { $0.duplicateIdentity == trip.duplicateIdentity }
-                 try storage.save(stored.map(trip.merged(over:)) ?? trip)
+                 guard !suppressesTripPersistence else { return }
+                 let storage = try tripStorageFactory()
+                 let stored = try storedTrip(matching: trip, in: storage)
+                 let value = stored.map(trip.merged(over:)) ?? trip
+                 // A legacy saved trip acquires its first trip key when opened.
+                 // Remove the details-keyed file before writing the keyed value
+                 // so that migration cannot leave a duplicate behind.
+                 if let stored,
+                    stored.duplicateIdentity != value.duplicateIdentity {
+                     try storage.delete(stored)
+                 }
+                 try storage.save(value)
+                 hasPersistedTrip = true
                  TripLibraryNotifier.postSoon()
              } catch {
-                 // Handle error (could add error state)
-                 print("Failed to save trip: \(error)")
+                 print("Failed to persist trip snapshot: \(error)")
              }
          }
+    }
+
+    /// Exact key match for generated trips; details fallback only migrates a
+    /// genuinely keyless legacy file opened in `.savedTrip` mode. A brand-new
+    /// generation never takes this fallback, so matching trip details cannot
+    /// cause it to overwrite an older trip.
+    private func storedTrip(
+        matching trip: Trip,
+        in storage: TripStorage
+    ) throws -> Trip? {
+        let candidates = try storage.fetch(inGrouping: trip.groupingFolder)
+        if let exact = candidates.first(where: {
+            $0.duplicateIdentity == trip.duplicateIdentity
+        }) {
+            return exact
+        }
+        guard state.mode == .savedTrip else { return nil }
+        return candidates.first {
+            $0.tripKey == nil && $0.details == trip.details
+        }
     }
 
     /// The trip as it currently stands on screen, or `nil` if the baseline
@@ -1658,18 +1711,26 @@ extension TripOutputStore {
     private func saveTrip(confirmOverride: Bool) {
         // Saving is permitted as soon as the baseline is ready — that fast save
         // is a flow travellers already have. A component still generating is
-        // recorded as `.absent` and merged in by `reSaveTrip` when it lands.
+        // recorded as `.absent` and merged in by `persistTripSnapshot` when it lands.
         guard let trip = currentTrip() else {
             print("saveTrip: Data not loaded yet. itinerary: \(state.itineraryResponse), suggestions: \(state.suggestionsResponse)")
+            return
+        }
+
+        // Preserve today's bookmark ritual without performing a redundant file
+        // write. If automatic persistence failed, `hasPersistedTrip` remains
+        // false and the normal save path below is still a real retry.
+        if state.mode == .newTrip && hasPersistedTrip {
+            completeSaveInteraction()
             return
         }
 
         // Save
         Task {
             do {
-                let storage = try TripStorage()
-                let existing = try storage.fetch(inGrouping: trip.groupingFolder).first { $0.duplicateIdentity == trip.duplicateIdentity }
-                if existing != nil && !confirmOverride {
+                let storage = try tripStorageFactory()
+                let existing = try storedTrip(matching: trip, in: storage)
+                if existing != nil && !confirmOverride && state.mode != .newTrip {
                     // Show dialog to confirm override
                     await MainActor.run {
                         state.alert = .override
@@ -1680,25 +1741,16 @@ extension TripOutputStore {
                 // Save trip (override if needed). Merging also preserves the
                 // original creation date, so overriding or editing an old trip
                 // does not move it to the top of My Trips.
-                try storage.save(existing.map(trip.merged(over:)) ?? trip)
+                let value = existing.map(trip.merged(over:)) ?? trip
+                if let existing,
+                   existing.duplicateIdentity != value.duplicateIdentity {
+                    try storage.delete(existing)
+                }
+                try storage.save(value)
                 await MainActor.run {
                     TripLibraryNotifier.postSoon()
-                    presentSaveToast = true
-                    state.saved = true
-                    
-                    // If the unsaved trip dialog was showing, navigate back after saving
-                    if state.alert == .unsavedTrip {
-                        router?.pop(on: routerTab)
-                    }
-                    
-                    state.alert = nil
-                    AnalyticsTracker.shared.log(
-                        .outcome(
-                            .tripSaved,
-                            outcome: "success",
-                            properties: analyticsTripProperties
-                        )
-                    )
+                    hasPersistedTrip = true
+                    completeSaveInteraction()
                 }
             } catch {
                 await MainActor.run {
@@ -1717,18 +1769,43 @@ extension TripOutputStore {
         }
     }
 
+    private func completeSaveInteraction() {
+        presentSaveToast = true
+        state.saved = true
+
+        // If the unsaved trip dialog was showing, navigate back after saving.
+        if state.alert == .unsavedTrip {
+            router?.pop(on: routerTab)
+        }
+
+        state.alert = nil
+        AnalyticsTracker.shared.log(
+            .outcome(
+                .tripSaved,
+                outcome: "success",
+                properties: analyticsTripProperties
+            )
+        )
+    }
+
     private func deleteTrip() {
-        // Deletion matches on `duplicateIdentity` (the trip's details), so it
+        // Deletion matches on `duplicateIdentity` (the generation's trip key), so it
         // only needs the baseline — a trip whose suggestions failed is still a
         // trip the traveller can delete.
-        guard let trip = currentTrip() else { return }
+        suppressesTripPersistence = true
+        guard let trip = currentTrip() else {
+            router?.pop(on: routerTab)
+            return
+        }
 
         Task {
             do {
-                let storage = try TripStorage()
-                try storage.delete(trip)
+                let storage = try tripStorageFactory()
+                let stored = try storedTrip(matching: trip, in: storage)
+                try storage.delete(stored ?? trip)
                 await MainActor.run {
                     TripLibraryNotifier.postSoon()
+                    hasPersistedTrip = false
                     state.alert = nil
                     AnalyticsTracker.shared.log(
                         .outcome(
@@ -1741,6 +1818,7 @@ extension TripOutputStore {
                 }
             } catch {
                 await MainActor.run {
+                    suppressesTripPersistence = false
                     AnalyticsTracker.shared.log(
                         .outcome(
                             .tripDeleted,
@@ -1803,12 +1881,9 @@ extension TripOutputStore {
                     imageUrl: state.imageUrlResponse.data?.absoluteString
                 )
                 state.shareCode = code
-                // Persist the code onto the saved file, if there is one. If the
-                // trip isn't saved yet, the code still lives in `state` and
-                // will land on disk the next time `saveTrip`/`reSaveTrip` runs.
-                if state.saved {
-                    reSaveTrip()
-                }
+                // New solo trips are already durable before the bookmark is
+                // tapped, so the published code must update that recovery copy.
+                persistTripSnapshot()
                 shareSheetURL = SharedTripLink.url(for: code)
                 AnalyticsTracker.shared.log(
                     .outcome(
@@ -1958,7 +2033,8 @@ extension TripOutputStore {
     }
 
     /// Saves the recipient's local changes (favorites and a migrated image URL)
-    /// back onto their received trip. Fire-and-forget, mirroring `reSaveTrip`.
+    /// back onto their received trip. Fire-and-forget, mirroring
+    /// `persistTripSnapshot`.
     private func persistReceivedTrip() {
         guard state.shareCode != nil, let trip = currentTrip() else { return }
         Task {

@@ -145,7 +145,7 @@ struct TopHeader: View {
                 Text("\(favouriteCount)")
                     .font(.kanitLight(16))
             }
-            .foregroundStyle(Color.white)
+            .foregroundStyle(favouriteCount > 0 ? Color.red : Color.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 3)
             .background(.thinMaterial.opacity(0.5), in: Capsule())

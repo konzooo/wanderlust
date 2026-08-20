@@ -145,14 +145,20 @@ final class TripGenerationCoordinatorTests: XCTestCase {
         store.send(.onAppear)
         await itinerary.release()
         await suggestions.release()
-        await settle()
+        await waitUntil {
+            store.state.itineraryResponse.isLoaded
+                && store.state.suggestionsResponse.error != nil
+        }
         XCTAssertTrue(store.state.itineraryResponse.isLoaded)
         XCTAssertNotNil(store.state.suggestionsResponse.error)
 
         suggestions.failing = false
         store.send(.retry)
         await suggestions.release()
-        await settle()
+        await waitUntil {
+            suggestions.callCount == 2
+                && store.state.suggestionsResponse.isLoaded
+        }
 
         XCTAssertEqual(itinerary.callCount, 1, "A succeeded component must not be re-run")
         XCTAssertEqual(suggestions.callCount, 2)
@@ -255,6 +261,21 @@ final class TripGenerationCoordinatorTests: XCTestCase {
     /// explicit gate, so a couple of hops is enough — no wall-clock waiting.
     private func settle() async {
         for _ in 0..<8 { await Task.yield() }
+    }
+
+    /// Waits for observable async state instead of assuming a fixed number of
+    /// executor hops. Clean CI runners can take longer to schedule the store's
+    /// child tasks even though the test doubles themselves have no delay.
+    private func waitUntil(
+        timeout: Duration = .seconds(2),
+        _ condition: () -> Bool
+    ) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+
+        while !condition(), clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(1))
+        }
     }
 }
 

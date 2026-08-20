@@ -22,6 +22,7 @@ import type * as lib_prompts from "../lib/prompts.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
 import type * as lib_schemas from "../lib/schemas.js";
 import type * as lib_stableIds from "../lib/stableIds.js";
+import type * as lib_suggestionTopUp from "../lib/suggestionTopUp.js";
 import type * as lib_tokens from "../lib/tokens.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as lib_validators from "../lib/validators.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rateLimits": typeof lib_rateLimits;
   "lib/schemas": typeof lib_schemas;
   "lib/stableIds": typeof lib_stableIds;
+  "lib/suggestionTopUp": typeof lib_suggestionTopUp;
   "lib/tokens": typeof lib_tokens;
   "lib/validation": typeof lib_validation;
   "lib/validators": typeof lib_validators;

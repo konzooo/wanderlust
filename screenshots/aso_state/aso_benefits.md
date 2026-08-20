@@ -1,7 +1,7 @@
 # Wanderlust App Store Screenshot Benefits
 
 - App name: Wanderlust
-- Bundle ID: `app.kk.wanderlust`
+- Bundle ID: `com.wanderlust.client`
 - Target display slot: iPhone 6.5-inch portrait (`1284 × 2778`)
 - Current marketing background: Wanderlust Home Gradient
   (`#D5DDFF` → `#E6EAFD` → `#F6F4F6` → `#FDF0DC` → `#FFF7E8`)

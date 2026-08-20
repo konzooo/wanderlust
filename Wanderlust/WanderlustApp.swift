@@ -6,7 +6,6 @@
 //
 
 import CoreArchitecture
-import Sentry
 import SwiftUI
 import DesignSystem
 
@@ -266,31 +265,7 @@ private struct PrivacyPolicyConsentOverlay: View {
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        CrashReporter.start()
         AnalyticsTracker.shared.initialize()
         return true
-    }
-}
-
-private enum CrashReporter {
-    static func start(bundle: Bundle = .main) {
-        guard let dsn = bundle.object(forInfoDictionaryKey: "SentryDSN") as? String,
-              !dsn.isEmpty,
-              !dsn.contains("$(")
-        else { return }
-
-        SentrySDK.start { options in
-            options.dsn = dsn
-            options.sendDefaultPii = false
-            options.tracesSampleRate = 0
-            options.attachScreenshot = false
-            options.attachViewHierarchy = false
-            options.enableMemoryIntrospection = false
-#if DEBUG
-            options.environment = "development"
-#else
-            options.environment = "production"
-#endif
-        }
     }
 }

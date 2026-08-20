@@ -124,7 +124,6 @@
 		C0DE40020000000000000001 /* TripStartDateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40020000000000000002 /* TripStartDateTests.swift */; };
 		C0DE40030000000000000001 /* HomeTripsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE40030000000000000002 /* HomeTripsStoreTests.swift */; };
 		C0DE60010000000000000001 /* PassportPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE60010000000000000002 /* PassportPicker.swift */; };
-		C50000010000000000000001 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = C50000030000000000000003 /* Sentry */; };
 		D1A000000000000000000001 /* TravellerProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000000000000000000002 /* TravellerProfiles.swift */; };
 		D59368E70C3420299BF88A3D /* GroupDashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4057D1E9A5E0D37EA9B0301 /* GroupDashboardScreen.swift */; };
 		E62E79C0F76A809743B787BE /* SelectAllTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5838D40D1A8A278054EEEB7 /* SelectAllTextField.swift */; };
@@ -314,7 +313,6 @@
 				6195B75E2E0F4B3E0086D241 /* Networking in Frameworks */,
 				6195B75B2E0F4B0B0086D241 /* CoreArchitecture in Frameworks */,
 				EB1C12E35EA1BF6C1A59DD0F /* ConvexMobile in Frameworks */,
-				C50000010000000000000001 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -806,7 +804,6 @@
 				6195B75A2E0F4B0B0086D241 /* CoreArchitecture */,
 				6195B75D2E0F4B3E0086D241 /* Networking */,
 				DE4D79994C3CA95E87EFB613 /* ConvexMobile */,
-				C50000030000000000000003 /* Sentry */,
 			);
 			productName = Wanderlust;
 			productReference = 5D4EFFB02CB05B0E007E3FF2 /* Wanderlust.app */;
@@ -885,7 +882,6 @@
 				6195B75C2E0F4B3E0086D241 /* XCLocalSwiftPackageReference "Packages/Networking" */,
 				6108F5FA2E0F4D1E00B26F72 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */,
 				D482A8B7F522B3B5182189AF /* XCRemoteSwiftPackageReference "convex-swift" */,
-				C50000020000000000000002 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			productRefGroup = 5D4EFFB12CB05B0E007E3FF2 /* Products */;
 			projectDirPath = "";
@@ -1244,7 +1240,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
-				SENTRY_DSN = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1297,7 +1292,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
-				SENTRY_DSN = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1449,14 +1443,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		C50000020000000000000002 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 9.24.0;
-			};
-		};
 		D482A8B7F522B3B5182189AF /* XCRemoteSwiftPackageReference "convex-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/get-convex/convex-swift";
@@ -1479,11 +1465,6 @@
 		6195B75D2E0F4B3E0086D241 /* Networking */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Networking;
-		};
-		C50000030000000000000003 /* Sentry */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C50000020000000000000002 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
 		};
 		DE4D79994C3CA95E87EFB613 /* ConvexMobile */ = {
 			isa = XCSwiftPackageProductDependency;

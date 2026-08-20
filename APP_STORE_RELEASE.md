@@ -28,13 +28,11 @@ The AASA `appIDs` entry must stay in sync with the bundle ID
 4. Confirm no event contains IP/location/IDFV data, names, codes, URLs, raw errors, or free-form content.
 5. Create the funnels and dashboards described in `ANALYTICS.md`.
 
-## Sentry crash reporting handoff
+## Crash reporting
 
-1. Create an iOS Sentry project for bundle ID `com.wanderlust.client`.
-2. Paste its public DSN into the Release build setting `SENTRY_DSN`. A missing DSN safely disables Sentry, including in CI and Debug builds.
-3. Keep screenshots, view-hierarchy capture, performance tracing, memory introspection, and default PII disabled as configured in `WanderlustApp.swift`.
-4. Upload the final archive's dSYMs using Sentry's setup wizard or `sentry-cli`, then confirm the release is visible in Sentry before submission.
-5. Send a handled test event from TestFlight, remove that temporary test call, and confirm the issue is symbolicated.
+Sentry was disabled and has been removed from the app and its Swift package
+dependencies. Future archives should not contain `Sentry.framework` and do not
+need a Sentry DSN or Sentry dSYM upload.
 
 ## Conservative App Privacy answers
 
@@ -42,7 +40,6 @@ Declare third-party SDK behavior as well as app behavior:
 
 - **Identifiers → Device ID:** Analytics; linked to the device; not used for tracking.
 - **Usage Data → Product Interaction:** Analytics; linked to the device; not used for tracking.
-- **Diagnostics → Crash Data, Performance Data, and Other Diagnostic Data:** App Functionality; not linked to the user; not used for tracking.
 - **Browsing/Search History or Other User Content:** destinations and structured travel preferences used for app functionality. Analytics receives bounded preference categories/counts, not destination or free-form text.
 - **Contact Info → Name and Other User Content:** group-trip functionality.
 - **User Content → Customer Support** and **Identifiers → Device ID:** feedback functionality.
@@ -69,7 +66,7 @@ prod must be set with `npx convex env set <KEY> <value> --prod`.
 
 - Deploy `web/privacy.html` and `web/support.html` so `/privacy` and `/support` return over HTTPS.
 - Verify the archive contains `com.wanderlust.client`, `2.0.0 (1)`, the intended entitlements, and Amplitude’s `PrivacyInfo.xcprivacy`.
-- Confirm the Release `SENTRY_DSN` is set and the archive's dSYMs are uploaded to Sentry.
+- Verify the archive contains no Sentry framework or package.
 - Generate Xcode's aggregate privacy report from the final archive and reconcile every collected-data type and required-reason API with the App Privacy answers before submission.
 - Install the store build of `1.2.2` first, then build over it, and confirm saved trips and Traveller DNA profiles survive the upgrade.
 - Verify the archive contains no Firebase frameworks/packages and no `GoogleService-Info.plist`.
